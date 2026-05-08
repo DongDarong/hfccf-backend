@@ -1,205 +1,278 @@
-# hfccf-backend
+# HFCCF Backend
 
-A Laravel 13 backend API for managing products with standard CRUD endpoints, request validation, and consistent JSON responses.
+Laravel 13 API backend for the HFCCF admin system. The current backend slice supports authentication, RBAC, forgot-password OTP flow, personal access tokens, and API rate limiting for the Vue frontend.
 
 ## Stack
 
 - PHP 8.3+
 - Laravel 13
-- SQLite by default (`.env.example`)
-- Vite for frontend asset build tooling
+- MySQL or MariaDB
+- Token-based API authentication
 
-## Features
+## Current Features
 
-- List products with pagination
-- Create a product
-- View a single product
-- Update a product
-- Delete a product
-- Validation errors returned as JSON
-- Consistent API response envelope
+- Login with active HFCCF system users
+- Authenticated user profile endpoint
+- Logout with token revocation
+- Forgot password OTP request, OTP verification, and password reset
+- Role, permission, department, and user seed data aligned with the frontend contract
+- API rate limiting for general API traffic, login, OTP, and password reset endpoints
+- Consistent JSON error responses for missing API routes and rate-limit failures
 
-## Getting Started
+## Setup
 
-### 1. Install dependencies
+### 1. Install Dependencies
 
 ```bash
 composer install
 npm install
 ```
 
-### 2. Configure environment
+### 2. Configure Environment
 
 ```bash
 copy .env.example .env
 php artisan key:generate
 ```
 
-The default environment uses SQLite:
-
-```bash
-New-Item -ItemType File -Force database/database.sqlite
-```
-
-Then update `.env` if needed:
+Use MySQL/MariaDB for local development:
 
 ```env
-DB_CONNECTION=sqlite
-DB_DATABASE=database/database.sqlite
+APP_NAME=hfccf-backend
+APP_URL=http://hfccf-backend.test
+FRONTEND_URLS=http://localhost:5173,http://127.0.0.1:5173
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=hfccf_backend
+DB_USERNAME=root
+DB_PASSWORD=
+
+SESSION_DRIVER=file
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
 ```
 
-### 3. Run migrations
+### 3. Run Migrations and Seeders
 
 ```bash
-php artisan migrate
+php artisan migrate:fresh --seed
 ```
 
-### 4. Start the app
+Current migration set intentionally keeps only the HFCCF auth/RBAC schema. The removed Laravel starter/demo tables are not required by this API:
 
-Backend only:
+- `products`
+- `password_reset_tokens`
+- `sessions`
+- `cache`
+- `cache_locks`
+- `jobs`
+- `job_batches`
+- `failed_jobs`
+
+### 4. Start the Backend
 
 ```bash
 php artisan serve
 ```
 
-Backend with queue/log/vite dev processes:
-
-```bash
-composer dev
-```
-
-### 5. Run tests
-
-```bash
-composer test
-```
-
-## API
-
-Base URL:
+If using Laragon, the expected local API host is:
 
 ```text
-http://127.0.0.1:8000/api
+http://hfccf-backend.test/api
 ```
 
-### Endpoints
+## API Response Format
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/products` | List products |
-| `POST` | `/products` | Create a product |
-| `GET` | `/products/{id}` | Get a product |
-| `PUT` / `PATCH` | `/products/{id}` | Update a product |
-| `DELETE` | `/products/{id}` | Delete a product |
-
-### Query Parameters
-
-`GET /products` supports:
-
-- `per_page`: number of records per page, minimum `1`, maximum `100`, default `10`
-
-### Request Payload
-
-Create product:
-
-```json
-{
-  "name": "Wireless Mouse",
-  "description": "Ergonomic Bluetooth mouse",
-  "price": 24.99,
-  "stock": 35
-}
-```
-
-Update product:
-
-```json
-{
-  "price": 19.99,
-  "stock": 50
-}
-```
-
-### Validation Rules
-
-- `name`: required on create, string, max 255 characters
-- `description`: nullable string
-- `price`: required on create, numeric, minimum 0
-- `stock`: required on create, integer, minimum 0
-
-## Response Format
-
-Successful responses use this structure:
+Successful responses:
 
 ```json
 {
   "success": true,
-  "message": "Product retrieved successfully.",
-  "data": {
-    "id": 1,
-    "name": "Wireless Mouse",
-    "description": "Ergonomic Bluetooth mouse",
-    "price": 24.99,
-    "stock": 35,
-    "created_at": "2026-04-24T07:00:00.000000Z",
-    "updated_at": "2026-04-24T07:00:00.000000Z"
-  }
+  "message": "Login successful.",
+  "data": {}
 }
 ```
 
-List responses include pagination metadata:
-
-```json
-{
-  "success": true,
-  "message": "Products retrieved successfully.",
-  "data": {
-    "products": [],
-    "pagination": {
-      "current_page": 1,
-      "last_page": 1,
-      "per_page": 10,
-      "total": 0
-    }
-  }
-}
-```
-
-Validation failures return HTTP `422`:
+Error responses:
 
 ```json
 {
   "success": false,
-  "message": "Validation failed.",
-  "data": {
-    "errors": {
-      "name": [
-        "The name field is required."
-      ]
-    }
-  }
-}
-```
-
-Missing products return HTTP `404`:
-
-```json
-{
-  "success": false,
-  "message": "Product not found.",
+  "message": "Invalid credentials.",
   "data": null
 }
 ```
 
+Rate limit responses return HTTP `429`:
+
+```json
+{
+  "success": false,
+  "message": "Too many requests. Please wait before trying again.",
+  "data": null
+}
+```
+
+## Auth API
+
+Base URL:
+
+```text
+/api
+```
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/auth/login` | No | Login and issue a bearer token |
+| `GET` | `/auth/me` | Bearer token | Return authenticated user profile |
+| `POST` | `/auth/logout` | Bearer token | Revoke current bearer token |
+| `POST` | `/auth/forgot-password` | No | Issue OTP for active Super Admin password reset |
+| `POST` | `/auth/verify-otp` | No | Verify password reset OTP |
+| `POST` | `/auth/reset-password` | No | Reset password after OTP verification |
+
+### Login Payload
+
+```json
+{
+  "email": "superadmin01@hfccf.org",
+  "password": "superadmin@123"
+}
+```
+
+### Login Response
+
+```json
+{
+  "success": true,
+  "message": "Login successful.",
+  "data": {
+    "token": "1|plain-text-token",
+    "user": {
+      "id": "usr_001",
+      "firstName": "Vanna",
+      "lastName": "Nop",
+      "username": "Vanna Nop",
+      "email": "superadmin01@hfccf.org",
+      "role": "superadmin",
+      "scope": "super_admin",
+      "domain": "global",
+      "departmentCode": "operations",
+      "department": "Operations",
+      "status": "active",
+      "role_permission": ["all:*"]
+    }
+  }
+}
+```
+
+### Authenticated Requests
+
+```http
+Authorization: Bearer <token>
+Accept: application/json
+```
+
+## Seed Login Accounts
+
+| User Type | Email | Password |
+| --- | --- | --- |
+| Super Admin | `superadmin01@hfccf.org` | `superadmin@123` |
+| Sport Admin | `sport.admin01@hfccf.org` | `sportAdmin@123` |
+| Coach | `coach01@hfccf.org` | `Coach@123` |
+
+## Rate Limiting
+
+Configured in `app/Providers/AppServiceProvider.php` and applied in `routes/api.php`.
+
+| Limiter | Limit |
+| --- | --- |
+| General API | `120 requests/minute` per authenticated user or IP |
+| Login | `5 requests/minute` per email and `20 requests/minute` per IP |
+| Forgot password / OTP verify | `3 requests/minute` per email and `10 requests/minute` per IP |
+| Password reset | `3 requests/minute` per email and `10 requests/minute` per IP |
+
+## Frontend Integration
+
+The Vue frontend should point to:
+
+```env
+VITE_API_BASE_URL=/api
+```
+
+For local development, the frontend Vite proxy forwards `/api` to:
+
+```text
+http://hfccf-backend.test
+```
+
+If not using the Vite proxy, set the frontend API base URL directly:
+
+```env
+VITE_API_BASE_URL=http://hfccf-backend.test/api
+```
+
+Make sure `FRONTEND_URLS` in this backend `.env` includes the browser origin used by Vite.
+
+## Verification Commands
+
+```bash
+php artisan route:list
+php artisan migrate:status
+.\vendor\bin\phpunit.bat
+```
+
+Quick login check:
+
+```powershell
+Invoke-WebRequest `
+  -Uri http://hfccf-backend.test/api/auth/login `
+  -Method POST `
+  -ContentType 'application/json' `
+  -Body '{"email":"superadmin01@hfccf.org","password":"superadmin@123"}' `
+  -UseBasicParsing
+```
+
+Quick rate-limit check:
+
+```powershell
+$statuses = @()
+for ($i = 1; $i -le 6; $i++) {
+  try {
+    Invoke-WebRequest `
+      -Uri 'http://hfccf-backend.test/api/auth/login' `
+      -Method POST `
+      -ContentType 'application/json' `
+      -Body '{"email":"rate-limit-check@hfccf.test","password":"wrong-password"}' `
+      -UseBasicParsing | Out-Null
+    $statuses += 200
+  } catch {
+    $statuses += [int]$_.Exception.Response.StatusCode
+  }
+}
+$statuses -join ', '
+```
+
+Expected result:
+
+```text
+401, 401, 401, 401, 401, 429
+```
+
 ## Project Structure
 
-- `routes/api.php`: API route definitions
-- `app/Http/Controllers/Api/ProductController.php`: product CRUD logic
-- `app/Http/Requests`: request validation
-- `app/Http/Resources/ProductResource.php`: API output formatting
-- `database/migrations`: schema definitions
+- `routes/api.php`: API routes and route-level rate limiter middleware
+- `app/Http/Controllers/Api/AuthController.php`: auth and password reset flow
+- `app/Http/Middleware/AuthenticateApiToken.php`: bearer token authentication
+- `app/Http/Resources/AuthUserResource.php`: frontend-compatible user response mapper
+- `app/Models`: auth/RBAC models
+- `database/migrations/2026_04_24_150000_create_hfccf_auth_tables.php`: HFCCF auth/RBAC schema
+- `database/seeders/HfccfAuthSeeder.php`: frontend-aligned seed users, roles, and permissions
 
 ## Notes
 
-- The repository still includes Laravel starter frontend tooling, but the main implemented feature is the product API.
-- If you switch away from SQLite, update the database settings in `.env` before running migrations.
+- User IDs are string IDs such as `usr_001`, matching the frontend contract.
+- The role code `adminscholaship` is intentionally unchanged because the frontend depends on that exact value.
+- Players and preschool students are data records, not system users.
+- Product CRUD scaffold was removed because it is not part of the HFCCF system contract.
