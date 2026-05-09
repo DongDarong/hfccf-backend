@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\DeletedUser;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -81,5 +82,35 @@ class User extends Authenticatable
     public function personalAccessTokens(): HasMany
     {
         return $this->hasMany(PersonalAccessToken::class, 'tokenable_id', 'id');
+    }
+
+    protected static function booted(): void
+    {
+        static::deleted(function (User $user) {
+            // Only archive if it's a permanent deletion (forceDelete)
+            // or if the user wants every soft-delete archived too.
+            // Given the request, we'll archive on any deletion event.
+            DeletedUser::create([
+                'original_id' => $user->id,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'username' => $user->username,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role_code' => $user->role_code,
+                'department_code' => $user->department_code,
+                'bio' => $user->bio,
+                'status' => $user->status,
+                'avatar' => $user->avatar,
+                'password' => $user->password,
+                'email_verified_at' => $user->email_verified_at,
+                'last_login_at' => $user->last_login_at,
+                'user_created_at' => $user->created_at,
+                'user_updated_at' => $user->updated_at,
+                'deleted_at' => now(),
+                'deleted_by' => auth()->id(),
+                'original_data' => $user->toArray(),
+            ]);
+        });
     }
 }

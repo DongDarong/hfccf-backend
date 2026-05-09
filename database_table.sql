@@ -24,6 +24,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `deleted_users`;
 DROP TABLE IF EXISTS `personal_access_tokens`;
 DROP TABLE IF EXISTS `password_reset_otps`;
 DROP TABLE IF EXISTS `password_change_requests`;
@@ -52,6 +53,33 @@ DROP TABLE IF EXISTS `roles`;
 DROP TABLE IF EXISTS `departments`;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+CREATE TABLE `deleted_users` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `original_id` VARCHAR(16) NOT NULL,
+  `first_name` VARCHAR(100) NOT NULL,
+  `last_name` VARCHAR(100) NOT NULL,
+  `username` VARCHAR(191) NOT NULL,
+  `email` VARCHAR(191) NOT NULL,
+  `phone` VARCHAR(32) DEFAULT NULL,
+  `role_code` VARCHAR(32) NOT NULL,
+  `department_code` VARCHAR(32) NOT NULL,
+  `bio` TEXT DEFAULT NULL,
+  `status` ENUM('active', 'pending', 'inactive', 'suspended') NOT NULL,
+  `avatar` VARCHAR(2048) DEFAULT NULL,
+  `password` VARCHAR(255) NOT NULL,
+  `email_verified_at` TIMESTAMP NULL DEFAULT NULL,
+  `last_login_at` TIMESTAMP NULL DEFAULT NULL,
+  `user_created_at` TIMESTAMP NULL DEFAULT NULL,
+  `user_updated_at` TIMESTAMP NULL DEFAULT NULL,
+  `deleted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_by` VARCHAR(16) DEFAULT NULL,
+  `original_data` JSON DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `deleted_users_original_id_index` (`original_id`),
+  KEY `deleted_users_email_index` (`email`),
+  KEY `deleted_users_deleted_at_index` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `departments` (
   `code` VARCHAR(32) NOT NULL,
