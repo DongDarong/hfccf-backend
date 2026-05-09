@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
+        $middleware->append(\Illuminate\Routing\Middleware\ThrottleRequests::class.':global');
 
         $middleware->alias([
             'auth.token' => AuthenticateApiToken::class,

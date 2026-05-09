@@ -22,12 +22,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        RateLimiter::for('api', function (Request $request) {
-            $userId = $request->user()?->id;
-            $identity = $userId ?: $request->ip();
+        RateLimiter::for('global', function (Request $request) {
+            return Limit::perMinute(500)->by($request->ip());
+        });
 
-            // General API protection: enough for normal dashboard usage, but still blocks noisy clients.
-            return Limit::perMinute(120)->by('api:'.$identity);
+        RateLimiter::for('api', function (Request $request) {
+            $user = $request->user();
+            
+            if ($user) {
+                // Authenticated users get more headroom.
+                return Limit::perMinute(300)->by('api:user:'.$user->id);
+            }
+
+            // Guests are more restricted.
+            return Limit::perMinute(60)->by('api:ip:'.$request->ip());
         });
 
         RateLimiter::for('auth-login', function (Request $request) {
