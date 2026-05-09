@@ -22,6 +22,7 @@ class AuthController extends Controller
     public function login(LoginRequest $request): JsonResponse
     {
         $credentials = $request->validated();
+        $remember = (bool) ($credentials['remember'] ?? false);
 
         $user = User::query()
             ->with([
@@ -52,7 +53,10 @@ class AuthController extends Controller
             'last_login_at' => now(),
         ])->save();
 
-        [, $plainTextToken] = PersonalAccessToken::issueFor($user);
+        // "Remember me" issues a longer-lived API token.
+        // Frontend still decides whether to persist the token in localStorage or sessionStorage.
+        $expiresAt = $remember ? now()->addDays(30) : now()->addHours(12);
+        [$token, $plainTextToken] = PersonalAccessToken::issueFor($user, 'auth-token', $expiresAt);
 
         $user->load([
             'department',
@@ -65,6 +69,7 @@ class AuthController extends Controller
             'message' => 'Login successful.',
             'data' => [
                 'token' => $plainTextToken,
+                'expiresAt' => $token->expires_at?->toISOString(),
                 'user' => AuthUserResource::make($user)->resolve($request),
             ],
         ], Response::HTTP_OK);

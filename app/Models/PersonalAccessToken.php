@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class PersonalAccessToken extends Model
@@ -21,7 +22,7 @@ class PersonalAccessToken extends Model
     /**
      * @return array{0:self,1:string}
      */
-    public static function issueFor(User $user, string $name = 'auth-token'): array
+    public static function issueFor(User $user, string $name = 'auth-token', ?Carbon $expiresAt = null): array
     {
         $plainTextToken = Str::random(64);
 
@@ -31,6 +32,8 @@ class PersonalAccessToken extends Model
             'name' => $name,
             'token' => hash('sha256', $plainTextToken),
             'abilities' => ['*'],
+            // When set, the middleware will reject expired tokens.
+            'expires_at' => $expiresAt,
         ]);
 
         return [$token, $token->id.'|'.$plainTextToken];

@@ -27,12 +27,14 @@ class AuthApiTest extends TestCase
         $response = $this->postJson('/api/auth/login', [
             'email' => $user->email,
             'password' => 'secret-pass',
+            'remember' => true,
         ]);
 
         $response
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('message', 'Login successful.')
+            ->assertJsonPath('data.expiresAt', fn ($value) => is_string($value) && $value !== '')
             ->assertJsonPath('data.user.id', $user->id)
             ->assertJsonPath('data.user.firstName', $user->first_name)
             ->assertJsonPath('data.user.lastName', $user->last_name)

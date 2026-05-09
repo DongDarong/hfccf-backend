@@ -24,6 +24,8 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
+            // When true, we issue a longer-lived API token (see AuthController).
+            'remember' => ['sometimes', 'boolean'],
         ];
     }
 }
