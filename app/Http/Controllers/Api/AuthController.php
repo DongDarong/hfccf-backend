@@ -12,6 +12,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Symfony\Component\HttpFoundation\Response;
+use App\Mail\PasswordResetOtpMail;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -76,52 +78,54 @@ class AuthController extends Controller
     }
 
     public function forgotPassword(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-        ]);
+{
+    $validated = $request->validate([
+        'email' => ['required', 'email'],
+    ]);
 
-        $user = $this->findEligibleRecoveryUser($validated['email']);
+    $user = $this->findEligibleRecoveryUser($validated['email']);
 
-        if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only an active Super Admin account can reset a password.',
-                'data' => null,
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        PasswordResetOtp::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->update(['status' => 'cancelled']);
-
-        $plainOtp = (string) random_int(100000, 999999);
-
-        $otp = PasswordResetOtp::query()->create([
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'otp_hash' => Hash::make($plainOtp),
-            'purpose' => 'forgot_password',
-            'channel' => 'email',
-            'status' => 'pending',
-            'expires_at' => now()->addMinutes(10),
-            'last_sent_at' => now(),
-            'request_ip' => $request->ip(),
-            'user_agent' => substr((string) $request->userAgent(), 0, 255),
-        ]);
-
+    if (! $user) {
         return response()->json([
-            'success' => true,
-            'message' => 'OTP sent successfully.',
-            'data' => [
-                'email' => $otp->email,
-                // Development-only bridge until SMTP/SMS delivery is connected.
-                'demoOtp' => $plainOtp,
-                'expiresAt' => $otp->expires_at?->toISOString(),
-            ],
-        ], Response::HTTP_OK);
+            'success' => false,
+            'message' => 'Only an active Super Admin account can reset a password.',
+            'data' => null,
+        ], Response::HTTP_UNPROCESSABLE_ENTITY);
     }
+
+    PasswordResetOtp::query()
+        ->where('user_id', $user->id)
+        ->where('status', 'pending')
+        ->update(['status' => 'cancelled']);
+
+    $plainOtp = (string) random_int(100000, 999999);
+
+    $otp = PasswordResetOtp::query()->create([
+        'user_id' => $user->id,
+        'email' => $user->email,
+        'otp_hash' => Hash::make($plainOtp),
+        'purpose' => 'forgot_password',
+        'channel' => 'email',
+        'status' => 'pending',
+        'expires_at' => now()->addMinutes(10),
+        'last_sent_at' => now(),
+        'request_ip' => $request->ip(),
+        'user_agent' => substr((string) $request->userAgent(), 0, 255),
+    ]);
+
+    Mail::to($user->email)->send(
+        new PasswordResetOtpMail($plainOtp, $user->email)
+    );
+
+    return response()->json([
+        'success' => true,
+        'message' => 'OTP sent successfully.',
+        'data' => [
+            'email' => $otp->email,
+            'expiresAt' => $otp->expires_at?->toISOString(),
+        ],
+    ], Response::HTTP_OK);
+}
 
     public function verifyOtp(Request $request): JsonResponse
     {

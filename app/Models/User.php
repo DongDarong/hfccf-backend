@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\DeletedUser;
+use App\Traits\HasAuditFields;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -35,7 +36,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes, HasAuditFields;
 
     protected $primaryKey = 'id';
 
@@ -102,14 +103,13 @@ class User extends Authenticatable
                 'bio' => $user->bio,
                 'status' => $user->status,
                 'avatar' => $user->avatar,
-                'password' => $user->password,
                 'email_verified_at' => $user->email_verified_at,
                 'last_login_at' => $user->last_login_at,
                 'user_created_at' => $user->created_at,
                 'user_updated_at' => $user->updated_at,
                 'deleted_at' => now(),
                 'deleted_by' => auth()->id(),
-                'original_data' => $user->toArray(),
+                'original_data' => $user->makeHidden(['password', 'remember_token'])->toArray(),
             ]);
         });
     }

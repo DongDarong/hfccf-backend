@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasAuditFields;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Department extends Model
 {
+    use HasAuditFields;
+
     protected $primaryKey = 'code';
 
     public $incrementing = false;
