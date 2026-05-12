@@ -1,14 +1,15 @@
 <?php
 
 use App\Http\Middleware\EnsureUserHasPermission;
-use Illuminate\Http\Request;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\HandleCors;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
-use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Auth\AuthenticationException;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
@@ -20,8 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
-        $middleware->append(\Illuminate\Routing\Middleware\ThrottleRequests::class.':global');
+        $middleware->append(HandleCors::class);
+        $middleware->append(ThrottleRequests::class.':global');
 
         $middleware->alias([
             'permission' => EnsureUserHasPermission::class,

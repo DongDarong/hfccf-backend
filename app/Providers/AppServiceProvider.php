@@ -28,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('api', function (Request $request) {
             $user = $request->user();
-            
+
             if ($user) {
                 // Authenticated users get more headroom.
                 return Limit::perMinute(300)->by('api:user:'.$user->id);

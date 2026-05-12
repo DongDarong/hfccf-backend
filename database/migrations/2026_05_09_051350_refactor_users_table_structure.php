@@ -60,7 +60,7 @@ return new class extends Migration
             }
 
             $table->dropColumn(['created_by', 'updated_by']);
-            
+
             $table->dropUnique(['username']);
 
             if ($driver !== 'sqlite') {

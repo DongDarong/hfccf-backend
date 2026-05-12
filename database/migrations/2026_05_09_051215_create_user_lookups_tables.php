@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -67,7 +67,7 @@ return new class extends Migration
             $table->string('status', 32)->change();
             $table->foreign('status')->references('code')->on('user_statuses')->cascadeOnUpdate();
         });
-        
+
         // 5. Update Deleted Users Table (status)
         Schema::table('deleted_users', function (Blueprint $table) {
             $table->string('status', 32)->change();

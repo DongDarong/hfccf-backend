@@ -255,4 +255,3 @@ class UserController extends Controller
         return 'usr_'.$suffix;
     }
 }
-

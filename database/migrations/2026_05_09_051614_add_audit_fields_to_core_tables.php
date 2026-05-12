@@ -14,7 +14,7 @@ return new class extends Migration
         $tables = ['departments', 'roles'];
 
         foreach ($tables as $tableName) {
-            Schema::table($tableName, function (Blueprint $table) use ($tableName) {
+            Schema::table($tableName, function (Blueprint $table) {
                 $table->string('created_by', 16)->nullable()->after('created_at');
                 $table->string('updated_by', 16)->nullable()->after('updated_at');
 
