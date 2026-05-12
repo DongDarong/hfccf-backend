@@ -802,6 +802,22 @@ INSERT INTO `users` (
     '2026-02-01 08:00:00'
   ),
   (
+    'usr_002',
+    'Darong',
+    'Dong',
+    'Darong Dong',
+    'dngdarong@gmail.com',
+    NULL,
+    'superadmin',
+    'operations',
+    'active',
+    NULL,
+    '$2y$10$6DBagypVXd2fYvsjEE3J5uhIIpIG.gWnVIuE6LXnl0yCiN.Ofsz9q',
+    NULL,
+    '2026-05-12 12:00:00',
+    '2026-05-12 12:00:00'
+  ),
+  (
     'usr_016',
     'Sovann',
     'Lim',

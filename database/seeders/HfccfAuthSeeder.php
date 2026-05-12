@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 
 class HfccfAuthSeeder extends Seeder
@@ -123,6 +124,22 @@ class HfccfAuthSeeder extends Seeder
                 'last_login_at' => '2026-03-04 04:15:00',
                 'created_at' => '2026-02-01 08:00:00',
                 'updated_at' => '2026-02-01 08:00:00',
+            ],
+            [
+                'id' => 'usr_002',
+                'first_name' => 'Darong',
+                'last_name' => 'Dong',
+                'username' => 'Darong Dong',
+                'email' => 'dngdarong@gmail.com',
+                'phone' => null,
+                'role_code' => 'superadmin',
+                'department_code' => 'operations',
+                'status' => 'active',
+                'avatar' => null,
+                'password' => Hash::make('Darong@123'),
+                'last_login_at' => null,
+                'created_at' => '2026-05-12 12:00:00',
+                'updated_at' => '2026-05-12 12:00:00',
             ],
             [
                 'id' => 'usr_016',
