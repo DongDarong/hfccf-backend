@@ -21,6 +21,14 @@ class AuthController extends Controller
 
     private const RECOVERY_PERMISSION = 'all:*';
 
+    private const OTP_PURPOSE = 'forgot_password';
+
+    private const OTP_STATUS_ACTIVE = ['pending', 'verified'];
+
+    private const OTP_STATUS_TERMINAL = ['used', 'expired', 'cancelled'];
+
+    private const OTP_MAX_ATTEMPTS = 5;
+
     public function login(LoginRequest $request): JsonResponse
     {
         $credentials = $request->validated();
@@ -78,44 +86,37 @@ class AuthController extends Controller
 
         $user = $this->findEligibleRecoveryUser($validated['email']);
 
-        if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only an active Super Admin account can reset a password.',
-                'data' => null,
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if ($user) {
+            $this->invalidateActiveOtps($user->email);
+
+            $plainOtp = (string) random_int(100000, 999999);
+
+            $otp = PasswordResetOtp::query()->create([
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'otp_hash' => Hash::make($plainOtp),
+                'purpose' => self::OTP_PURPOSE,
+                'channel' => 'email',
+                'status' => 'pending',
+                'attempts' => 0,
+                'max_attempts' => self::OTP_MAX_ATTEMPTS,
+                'resend_count' => 0,
+                'expires_at' => now()->addMinutes(10),
+                'last_sent_at' => now(),
+                'request_ip' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            ]);
+
+            Mail::to($user->email)->send(
+                new PasswordResetOtpMail($plainOtp, $user->email)
+            );
         }
-
-        PasswordResetOtp::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->update(['status' => 'cancelled']);
-
-        $plainOtp = (string) random_int(100000, 999999);
-
-        $otp = PasswordResetOtp::query()->create([
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'otp_hash' => Hash::make($plainOtp),
-            'purpose' => 'forgot_password',
-            'channel' => 'email',
-            'status' => 'pending',
-            'expires_at' => now()->addMinutes(10),
-            'last_sent_at' => now(),
-            'request_ip' => $request->ip(),
-            'user_agent' => substr((string) $request->userAgent(), 0, 255),
-        ]);
-
-        Mail::to($user->email)->send(
-            new PasswordResetOtpMail($plainOtp, $user->email)
-        );
 
         return response()->json([
             'success' => true,
-            'message' => 'OTP sent successfully.',
+            'message' => 'If the email exists, a verification code has been sent.',
             'data' => [
-                'email' => $otp->email,
-                'expiresAt' => $otp->expires_at?->toISOString(),
+                'expiresAt' => now()->addMinutes(10)->toISOString(),
             ],
         ], Response::HTTP_OK);
     }
@@ -127,32 +128,30 @@ class AuthController extends Controller
             'code' => ['required', 'digits:6'],
         ]);
 
-        $otp = $this->latestPendingOtp($validated['email']);
+        $otp = $this->latestActiveOtp($validated['email']);
 
         if (! $otp) {
             return $this->invalidOtpResponse();
         }
 
-        if ($otp->expires_at->isPast()) {
-            $otp->forceFill(['status' => 'expired'])->save();
-
-            return $this->invalidOtpResponse('OTP has expired.');
-        }
-
-        if (! Hash::check($validated['code'], $otp->otp_hash)) {
-            $otp->increment('attempts');
-
-            if ($otp->attempts >= $otp->max_attempts) {
-                $otp->forceFill(['status' => 'cancelled'])->save();
-            }
+        if ($this->otpIsExpired($otp)) {
+            $this->expireOtp($otp);
 
             return $this->invalidOtpResponse();
         }
 
-        $otp->forceFill([
-            'status' => 'verified',
-            'verified_at' => now(),
-        ])->save();
+        if (! Hash::check($validated['code'], $otp->otp_hash)) {
+            $this->registerFailedOtpAttempt($otp);
+
+            return $this->invalidOtpResponse();
+        }
+
+        if ($otp->status === 'pending') {
+            $otp->forceFill([
+                'status' => 'verified',
+                'verified_at' => now(),
+            ])->save();
+        }
 
         return response()->json([
             'success' => true,
@@ -172,16 +171,22 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $otp = PasswordResetOtp::query()
-            ->with('user')
-            ->where('email', strtolower($validated['email']))
-            ->where('purpose', 'forgot_password')
-            ->where('status', 'verified')
-            ->latest('id')
-            ->first();
+        $otp = $this->latestActiveOtp($validated['email']);
 
-        if (! $otp || $otp->expires_at->isPast() || ! Hash::check($validated['code'], $otp->otp_hash)) {
-            return $this->invalidOtpResponse('Verify OTP before creating a new password.');
+        if (! $otp || ! $otp->user) {
+            return $this->invalidOtpResponse();
+        }
+
+        if ($this->otpIsExpired($otp)) {
+            $this->expireOtp($otp);
+
+            return $this->invalidOtpResponse();
+        }
+
+        if (! Hash::check($validated['code'], $otp->otp_hash)) {
+            $this->registerFailedOtpAttempt($otp);
+
+            return $this->invalidOtpResponse();
         }
 
         $otp->user->forceFill([
@@ -194,6 +199,7 @@ class AuthController extends Controller
         $otp->forceFill([
             'status' => 'used',
             'used_at' => now(),
+            'verified_at' => $otp->verified_at ?? now(),
         ])->save();
 
         return response()->json([
@@ -264,14 +270,47 @@ class AuthController extends Controller
         return $user;
     }
 
-    private function latestPendingOtp(string $email): ?PasswordResetOtp
+    private function invalidateActiveOtps(string $email): void
+    {
+        PasswordResetOtp::query()
+            ->where('email', strtolower($email))
+            ->where('purpose', self::OTP_PURPOSE)
+            ->whereIn('status', self::OTP_STATUS_ACTIVE)
+            ->update([
+                'status' => 'cancelled',
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function latestActiveOtp(string $email): ?PasswordResetOtp
     {
         return PasswordResetOtp::query()
+            ->with('user')
             ->where('email', strtolower($email))
-            ->where('purpose', 'forgot_password')
-            ->where('status', 'pending')
+            ->where('purpose', self::OTP_PURPOSE)
+            ->whereIn('status', self::OTP_STATUS_ACTIVE)
             ->latest('id')
             ->first();
+    }
+
+    private function otpIsExpired(PasswordResetOtp $otp): bool
+    {
+        return $otp->expires_at === null || $otp->expires_at->isPast();
+    }
+
+    private function expireOtp(PasswordResetOtp $otp): void
+    {
+        $otp->forceFill([
+            'status' => 'expired',
+        ])->save();
+    }
+
+    private function registerFailedOtpAttempt(PasswordResetOtp $otp): void
+    {
+        $otp->forceFill([
+            'attempts' => $otp->attempts + 1,
+            'status' => $otp->attempts + 1 >= $otp->max_attempts ? 'cancelled' : $otp->status,
+        ])->save();
     }
 
     private function invalidOtpResponse(string $message = 'Invalid OTP code.'): JsonResponse
