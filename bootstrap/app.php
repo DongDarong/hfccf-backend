@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnsureUserHasPermission;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Application;
@@ -8,6 +7,8 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
@@ -23,12 +24,36 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\Illuminate\Routing\Middleware\ThrottleRequests::class.':global');
 
         $middleware->alias([
-            'auth.token' => AuthenticateApiToken::class,
             'permission' => EnsureUserHasPermission::class,
             'throttle' => ThrottleRequests::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (ValidationException $exception, Request $request) {
+            if ($request->is('api/*')) {
+                $errors = $exception->errors();
+                $firstMessage = collect($errors)->flatten()->first() ?? 'The given data was invalid.';
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $firstMessage,
+                    'data' => [
+                        'errors' => $errors,
+                    ],
+                ], $exception->status);
+            }
+        });
+
+        $exceptions->render(function (AuthenticationException $exception, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                    'data' => null,
+                ], Response::HTTP_UNAUTHORIZED);
+            }
+        });
+
         $exceptions->render(function (TooManyRequestsHttpException $exception, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json([

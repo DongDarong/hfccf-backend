@@ -20,7 +20,7 @@ These project rules should be followed when Codex creates or edits files in this
 ## Database Rules
 
 - Keep string IDs where the frontend contract depends on them, such as `usr_001`.
-- Do not rename `adminscholaship`; the frontend depends on this exact role code.
+- The canonical scholarship admin role code is `adminscholarship` (fix typo consistency across frontend/backend).
 - Keep players and preschool students as data records, not system users.
 - Ensure migrations run from top to bottom without foreign key errors.
 - Update seeders whenever schema columns change.

@@ -124,5 +124,5 @@ Configured in `app/Providers/AppServiceProvider.php` and applied in `bootstrap/a
 ## Notes
 
 - User IDs are sequential string IDs such as `usr_001`, `usr_002`, matching the frontend contract.
-- The role code `adminscholaship` is intentionally unchanged because the frontend depends on that exact value.
+- The role code `adminscholarship` is the canonical scholarship admin role used by the frontend and backend.
 - Players and preschool students are data records, not system users.

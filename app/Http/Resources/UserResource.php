@@ -34,8 +34,7 @@ class UserResource extends JsonResource
             'avatar' => $this->avatar,
             'createdAt' => $this->created_at?->format('Y-m-d H:i:s'),
             'lastLoginAt' => $this->last_login_at?->format('Y-m-d H:i:s'),
-            'role_permission' => $permissionCodes,
+            'permissions' => $permissionCodes,
         ];
     }
 }
-

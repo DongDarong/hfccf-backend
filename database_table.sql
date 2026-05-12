@@ -14,7 +14,7 @@
 --
 -- Important:
 -- 1. User IDs in this system are strings like `usr_001`, not bigint IDs.
--- 2. The role code `adminscholaship` is intentionally kept as-is because the
+-- 2. The role code `adminscholarship` is the canonical scholarship admin role code.
 --    frontend currently uses that exact value.
 -- 3. Frontend RBAC is scope + domain based, so roles should persist both.
 -- 4. Sanctum-style tokens must therefore use a string `tokenable_id`.
@@ -695,7 +695,7 @@ INSERT INTO `roles` (`code`, `name`, `scope`, `domain_code`, `department_code`, 
   ('superadmin', 'Super Admin', 'super_admin', 'global', 'operations', 1),
   ('adminenglish', 'English Admin', 'admin', 'english', 'education', 2),
   ('adminpreschool', 'Preschool Admin', 'admin', 'preschool', 'education', 3),
-  ('adminscholaship', 'Scholarship Admin', 'admin', 'scholarship', 'education', 4),
+  ('adminscholarship', 'Scholarship Admin', 'admin', 'scholarship', 'education', 4),
   ('adminsport', 'Sport Admin', 'admin', 'sport', 'sports', 5),
   ('teacher-english', 'English Teacher', 'staff', 'english', 'education', 6),
   ('teacher-preschool', 'Preschool Teacher', 'staff', 'preschool', 'education', 7),
@@ -737,11 +737,11 @@ INSERT INTO `role_permissions` (`role_code`, `permission_code`) VALUES
   ('adminpreschool', 'attendance:write'),
   ('adminpreschool', 'settings:read'),
 
-  ('adminscholaship', 'dashboard:read'),
-  ('adminscholaship', 'users:read'),
-  ('adminscholaship', 'users:write'),
-  ('adminscholaship', 'reports:read'),
-  ('adminscholaship', 'settings:read'),
+  ('adminscholarship', 'dashboard:read'),
+  ('adminscholarship', 'users:read'),
+  ('adminscholarship', 'users:write'),
+  ('adminscholarship', 'reports:read'),
+  ('adminscholarship', 'settings:read'),
 
   ('adminsport', 'dashboard:read'),
   ('adminsport', 'users:read'),
@@ -824,7 +824,7 @@ INSERT INTO `users` (
     'Sokun Nop',
     'scholarship.admin01@hfccf.org',
     '+855 12 331 031',
-    'adminscholaship',
+    'adminscholarship',
     'education',
     'active',
     'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=80',

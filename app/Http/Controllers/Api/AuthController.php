@@ -4,16 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
-use App\Http\Resources\AuthUserResource;
-use App\Models\PersonalAccessToken;
+use App\Http\Resources\Auth\UserResource;
+use App\Mail\PasswordResetOtpMail;
 use App\Models\PasswordResetOtp;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Symfony\Component\HttpFoundation\Response;
-use App\Mail\PasswordResetOtpMail;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Sanctum\PersonalAccessToken;
+use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
@@ -32,7 +32,7 @@ class AuthController extends Controller
                 'role',
                 'permissions' => fn ($query) => $query->orderBy('permissions.code'),
             ])
-            ->where('email', $credentials['email'])
+            ->where('email', strtolower($credentials['email']))
             ->first();
 
         if (! $user || ! Hash::check($credentials['password'], $user->password)) {
@@ -55,77 +55,70 @@ class AuthController extends Controller
             'last_login_at' => now(),
         ])->save();
 
-        // "Remember me" issues a longer-lived API token.
-        // Frontend still decides whether to persist the token in localStorage or sessionStorage.
+        // Sanctum Bearer token ("Authorization: Bearer {token}").
+        // "Remember me" issues a longer-lived token; frontend still decides where to persist it.
         $expiresAt = $remember ? now()->addDays(30) : now()->addHours(12);
-        [$token, $plainTextToken] = PersonalAccessToken::issueFor($user, 'auth-token', $expiresAt);
-
-        $user->load([
-            'department',
-            'role',
-            'permissions' => fn ($query) => $query->orderBy('permissions.code'),
-        ]);
+        $tokenResult = $user->createToken('auth-token', ['*'], $expiresAt);
 
         return response()->json([
             'success' => true,
             'message' => 'Login successful.',
             'data' => [
-                'token' => $plainTextToken,
-                'expiresAt' => $token->expires_at?->toISOString(),
-                'user' => AuthUserResource::make($user)->resolve($request),
+                'token' => $tokenResult->plainTextToken,
+                'user' => UserResource::make($user)->resolve($request),
             ],
         ], Response::HTTP_OK);
     }
 
     public function forgotPassword(Request $request): JsonResponse
-{
-    $validated = $request->validate([
-        'email' => ['required', 'email'],
-    ]);
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
 
-    $user = $this->findEligibleRecoveryUser($validated['email']);
+        $user = $this->findEligibleRecoveryUser($validated['email']);
 
-    if (! $user) {
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only an active Super Admin account can reset a password.',
+                'data' => null,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        PasswordResetOtp::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'pending')
+            ->update(['status' => 'cancelled']);
+
+        $plainOtp = (string) random_int(100000, 999999);
+
+        $otp = PasswordResetOtp::query()->create([
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'otp_hash' => Hash::make($plainOtp),
+            'purpose' => 'forgot_password',
+            'channel' => 'email',
+            'status' => 'pending',
+            'expires_at' => now()->addMinutes(10),
+            'last_sent_at' => now(),
+            'request_ip' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+        ]);
+
+        Mail::to($user->email)->send(
+            new PasswordResetOtpMail($plainOtp, $user->email)
+        );
+
         return response()->json([
-            'success' => false,
-            'message' => 'Only an active Super Admin account can reset a password.',
-            'data' => null,
-        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            'success' => true,
+            'message' => 'OTP sent successfully.',
+            'data' => [
+                'email' => $otp->email,
+                'expiresAt' => $otp->expires_at?->toISOString(),
+            ],
+        ], Response::HTTP_OK);
     }
-
-    PasswordResetOtp::query()
-        ->where('user_id', $user->id)
-        ->where('status', 'pending')
-        ->update(['status' => 'cancelled']);
-
-    $plainOtp = (string) random_int(100000, 999999);
-
-    $otp = PasswordResetOtp::query()->create([
-        'user_id' => $user->id,
-        'email' => $user->email,
-        'otp_hash' => Hash::make($plainOtp),
-        'purpose' => 'forgot_password',
-        'channel' => 'email',
-        'status' => 'pending',
-        'expires_at' => now()->addMinutes(10),
-        'last_sent_at' => now(),
-        'request_ip' => $request->ip(),
-        'user_agent' => substr((string) $request->userAgent(), 0, 255),
-    ]);
-
-    Mail::to($user->email)->send(
-        new PasswordResetOtpMail($plainOtp, $user->email)
-    );
-
-    return response()->json([
-        'success' => true,
-        'message' => 'OTP sent successfully.',
-        'data' => [
-            'email' => $otp->email,
-            'expiresAt' => $otp->expires_at?->toISOString(),
-        ],
-    ], Response::HTTP_OK);
-}
 
     public function verifyOtp(Request $request): JsonResponse
     {
@@ -195,6 +188,9 @@ class AuthController extends Controller
             'password' => $validated['password'],
         ])->save();
 
+        // Revoke all existing tokens after a password reset for safety.
+        $otp->user->tokens()->delete();
+
         $otp->forceFill([
             'status' => 'used',
             'used_at' => now(),
@@ -209,7 +205,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         $user->loadMissing([
@@ -221,17 +217,28 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Authenticated user retrieved successfully.',
-            'data' => AuthUserResource::make($user)->resolve($request),
+            'data' => UserResource::make($user)->resolve($request),
         ], Response::HTTP_OK);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        /** @var \App\Models\PersonalAccessToken|null $accessToken */
-        $accessToken = $request->attributes->get('accessToken');
+        /** @var User|null $user */
+        $user = $request->user();
 
-        if ($accessToken) {
-            $accessToken->delete();
+        $bearerToken = $request->bearerToken();
+
+        // Prefer revoking the presented Bearer token.
+        if ($bearerToken) {
+            $token = PersonalAccessToken::findToken($bearerToken);
+
+            if ($token && (! $user || (string) $token->tokenable_id === (string) $user->getKey())) {
+                $token->delete();
+            }
+        } else {
+            /** @var PersonalAccessToken|null $currentAccessToken */
+            $currentAccessToken = $user?->currentAccessToken();
+            $currentAccessToken?->delete();
         }
 
         return response()->json([

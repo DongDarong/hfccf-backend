@@ -20,7 +20,7 @@ class EnsureUserHasPermission
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        // `auth.token` loads permissions; keep a safe fallback query in case the relationship is missing.
+        // The request user may or may not have `permissions` eager-loaded; keep a safe fallback query.
         $permissionCodes = $user->relationLoaded('permissions')
             ? $user->permissions->pluck('code')->all()
             : $user->permissions()->pluck('permissions.code')->all();
@@ -36,4 +36,3 @@ class EnsureUserHasPermission
         ], Response::HTTP_FORBIDDEN);
     }
 }
-

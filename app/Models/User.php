@@ -10,10 +10,10 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
     'id',
@@ -36,7 +36,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes, HasAuditFields;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, HasAuditFields;
 
     protected $primaryKey = 'id';
 
@@ -78,11 +78,6 @@ class User extends Authenticatable
             'id',
             'code',
         );
-    }
-
-    public function personalAccessTokens(): HasMany
-    {
-        return $this->hasMany(PersonalAccessToken::class, 'tokenable_id', 'id');
     }
 
     protected static function booted(): void

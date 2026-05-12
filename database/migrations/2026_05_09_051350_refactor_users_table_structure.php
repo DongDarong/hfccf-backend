@@ -15,15 +15,6 @@ return new class extends Migration
             // 1. Add Unique constraint to username
             $table->string('username', 191)->unique()->change();
 
-            // 2. Resolve Soft Delete / Email Unique conflict
-            // Drop existing unique email index
-            $table->dropUnique(['email']);
-            
-            // Create a virtual column for active email to enforce uniqueness only for non-deleted users
-            // This works in MySQL 5.7.6+ and MariaDB 10.2.2+
-            $table->string('active_email_only')->virtualAs('IF(deleted_at IS NULL, email, NULL)')->nullable();
-            $table->unique('active_email_only', 'users_active_email_unique');
-
             // 3. Add Audit Fields
             $table->string('created_by', 16)->nullable()->after('created_at');
             $table->string('updated_by', 16)->nullable()->after('updated_at');
@@ -35,6 +26,19 @@ return new class extends Migration
             $table->index(['email', 'status'], 'users_email_status_index');
             $table->index(['username', 'status'], 'users_username_status_index');
         });
+
+        // 2. Resolve Soft Delete / Email Unique conflict (MySQL/MariaDB only).
+        // SQLite (test DB) does not support MySQL's IF() virtual expression.
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            Schema::table('users', function (Blueprint $table) {
+                // Drop existing unique email index.
+                $table->dropUnique(['email']);
+
+                // Enforce uniqueness only for non-deleted users (MySQL 5.7.6+ / MariaDB 10.2.2+).
+                $table->string('active_email_only')->virtualAs('IF(deleted_at IS NULL, email, NULL)')->nullable();
+                $table->unique('active_email_only', 'users_active_email_unique');
+            });
+        }
     }
 
     /**
@@ -42,17 +46,26 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
+        $driver = Schema::getConnection()->getDriverName();
+
+        Schema::table('users', function (Blueprint $table) use ($driver) {
             $table->dropForeign(['created_by']);
             $table->dropForeign(['updated_by']);
             $table->dropIndex('users_username_status_index');
             $table->dropIndex('users_email_status_index');
-            $table->dropUnique('users_active_email_unique');
-            $table->dropColumn('active_email_only');
+
+            if ($driver !== 'sqlite') {
+                $table->dropUnique('users_active_email_unique');
+                $table->dropColumn('active_email_only');
+            }
+
             $table->dropColumn(['created_by', 'updated_by']);
             
             $table->dropUnique(['username']);
-            $table->unique('email');
+
+            if ($driver !== 'sqlite') {
+                $table->unique('email');
+            }
         });
     }
 };

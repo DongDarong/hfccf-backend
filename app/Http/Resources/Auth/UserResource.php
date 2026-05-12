@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Resources;
+namespace App\Http\Resources\Auth;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /** @mixin \App\Models\User */
-class AuthUserResource extends JsonResource
+class UserResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -23,20 +23,13 @@ class AuthUserResource extends JsonResource
             'id' => $this->id,
             'firstName' => $this->first_name,
             'lastName' => $this->last_name,
-            'username' => $this->username,
             'email' => $this->email,
-            'phone' => $this->phone,
             'role' => $this->role_code,
-            'scope' => $this->role?->scope,
-            'domain' => $this->role?->domain_code,
-            'departmentCode' => $this->department_code,
-            'department' => $this->department?->name,
-            'bio' => $this->bio,
-            'status' => $this->status,
-            'avatar' => $this->avatar,
-            'createdAt' => $this->created_at?->format('Y-m-d H:i:s'),
-            'lastLoginAt' => $this->last_login_at?->format('Y-m-d H:i:s'),
             'permissions' => $permissionCodes,
+            'departmentCode' => $this->department_code,
+            'createdAt' => $this->created_at?->toISOString(),
+            'lastLoginAt' => $this->last_login_at?->toISOString(),
         ];
     }
 }
+

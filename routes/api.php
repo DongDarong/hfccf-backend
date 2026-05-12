@@ -36,7 +36,7 @@ Route::prefix('auth')->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(['auth.token', 'throttle:api'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
         Route::get('me', [AuthController::class, 'me']);
 
@@ -50,7 +50,7 @@ Route::prefix('auth')->group(function (): void {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth.token', 'throttle:api'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
     /*
     |--------------------------------------------------------------------------
