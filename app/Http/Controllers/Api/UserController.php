@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
@@ -79,16 +80,18 @@ class UserController extends Controller
         }
 
         $userId = $this->nextUserId();
-        $departmentCode = $data['departmentCode'] ?? $role->department_code;
+        $departmentCode = $data['department_code'] ?? $role->department_code;
         $username = trim((string) ($data['username'] ?? ''));
         if ($username === '') {
-            $username = trim($data['firstName'].' '.$data['lastName']);
+            $username = trim($data['first_name'].' '.$data['last_name']);
         }
+
+        $avatarUrl = $this->storeAvatarIfUploaded($request);
 
         $user = User::query()->create([
             'id' => $userId,
-            'first_name' => $data['firstName'],
-            'last_name' => $data['lastName'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
             'username' => $username,
             'email' => strtolower($data['email']),
             'phone' => $data['phone'] ?? null,
@@ -96,7 +99,7 @@ class UserController extends Controller
             'department_code' => $departmentCode,
             'bio' => $data['bio'] ?? null,
             'status' => $data['status'] ?? 'active',
-            'avatar' => $data['avatar'] ?? null,
+            'avatar' => $avatarUrl,
             'password' => $data['password'],
         ]);
 
@@ -153,6 +156,8 @@ class UserController extends Controller
         }
 
         $data = $request->validated();
+        $replaceAvatar = $request->hasFile('avatar');
+        $removeAvatar = (bool) ($data['remove_avatar'] ?? false);
 
         if (array_key_exists('role', $data)) {
             $role = Role::query()->with('department')->where('code', $data['role'])->first();
@@ -167,20 +172,20 @@ class UserController extends Controller
             $model->role_code = $role->code;
 
             // If caller did not explicitly set department, keep it consistent with the role.
-            if (! array_key_exists('departmentCode', $data)) {
+            if (! array_key_exists('department_code', $data)) {
                 $model->department_code = $role->department_code;
             }
         }
 
-        if (array_key_exists('departmentCode', $data)) {
-            $model->department_code = $data['departmentCode'] ?: $model->department_code;
+        if (array_key_exists('department_code', $data)) {
+            $model->department_code = $data['department_code'] ?: $model->department_code;
         }
 
-        if (array_key_exists('firstName', $data)) {
-            $model->first_name = $data['firstName'];
+        if (array_key_exists('first_name', $data)) {
+            $model->first_name = $data['first_name'];
         }
-        if (array_key_exists('lastName', $data)) {
-            $model->last_name = $data['lastName'];
+        if (array_key_exists('last_name', $data)) {
+            $model->last_name = $data['last_name'];
         }
         if (array_key_exists('username', $data)) {
             $username = trim((string) $data['username']);
@@ -198,11 +203,16 @@ class UserController extends Controller
         if (array_key_exists('status', $data)) {
             $model->status = $data['status'] ?? $model->status;
         }
-        if (array_key_exists('avatar', $data)) {
-            $model->avatar = $data['avatar'];
-        }
         if (array_key_exists('password', $data) && $data['password']) {
             $model->password = $data['password'];
+        }
+
+        if ($replaceAvatar) {
+            $this->deleteStoredAvatarIfNeeded($model->avatar);
+            $model->avatar = $this->storeAvatarIfUploaded($request);
+        } elseif ($removeAvatar) {
+            $this->deleteStoredAvatarIfNeeded($model->avatar);
+            $model->avatar = null;
         }
 
         $model->save();
@@ -253,5 +263,44 @@ class UserController extends Controller
         $suffix = $next <= 999 ? str_pad((string) $next, 3, '0', STR_PAD_LEFT) : (string) $next;
 
         return 'usr_'.$suffix;
+    }
+
+    private function storeAvatarIfUploaded(Request $request): ?string
+    {
+        if (! $request->hasFile('avatar')) {
+            return null;
+        }
+
+        $path = $request->file('avatar')->store('avatars', 'public');
+
+        return asset('storage/'.$path);
+    }
+
+    private function deleteStoredAvatarIfNeeded(?string $avatarUrl): void
+    {
+        $path = $this->resolvePublicStoragePath($avatarUrl);
+
+        if (! $path) {
+            return;
+        }
+
+        Storage::disk('public')->delete($path);
+    }
+
+    private function resolvePublicStoragePath(?string $avatarUrl): ?string
+    {
+        $value = trim((string) $avatarUrl);
+        if ($value === '') {
+            return null;
+        }
+
+        $path = (string) parse_url($value, PHP_URL_PATH);
+        $storagePrefix = '/storage/';
+
+        if ($path === '' || ! str_contains($path, $storagePrefix)) {
+            return null;
+        }
+
+        return substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix));
     }
 }
