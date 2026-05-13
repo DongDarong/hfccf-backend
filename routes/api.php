@@ -59,10 +59,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
+    Route::get('users', [AdminUserController::class, 'index']);
+
     Route::middleware(['permission:users:read'])->group(function (): void {
-
-        Route::get('users', [AdminUserController::class, 'index']);
-
         Route::get('users/{user}', [UserController::class, 'show']);
     });
 

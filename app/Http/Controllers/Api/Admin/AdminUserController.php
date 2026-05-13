@@ -7,12 +7,17 @@ use App\Http\Requests\Admin\ListAdminUsersRequest;
 use App\Http\Resources\Auth\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class AdminUserController extends Controller
 {
     public function index(ListAdminUsersRequest $request): JsonResponse
     {
+        if ($forbiddenResponse = $this->authorizeViewAllUsers($request->user())) {
+            return $forbiddenResponse;
+        }
+
         $validated = $request->validated();
 
         $page = (int) ($validated['page'] ?? 1);
@@ -27,16 +32,30 @@ class AdminUserController extends Controller
 
         $query = User::query()
             ->with([
+                'role',
                 'permissions' => fn ($builder) => $builder->orderBy('permissions.code'),
-            ])
-            ->whereIn('role_code', User::ADMIN_ROLES);
+            ]);
 
         if ($search !== '') {
             $query->where(function ($builder) use ($search): void {
-                $builder->where('first_name', 'like', '%'.$search.'%')
-                    ->orWhere('last_name', 'like', '%'.$search.'%')
-                    ->orWhere('email', 'like', '%'.$search.'%')
-                    ->orWhere('username', 'like', '%'.$search.'%');
+                $like = '%'.$search.'%';
+
+                $builder->where('first_name', 'like', $like)
+                    ->orWhere('last_name', 'like', $like)
+                    ->orWhere('username', 'like', $like)
+                    ->orWhere('email', 'like', $like)
+                    ->orWhere('role_code', 'like', $like)
+                    ->orWhere('status', 'like', $like)
+                    ->orWhereHas('role', function ($roleQuery) use ($like): void {
+                        $roleQuery->where('code', 'like', $like)
+                            ->orWhere('name', 'like', $like);
+                    });
+
+                if (DB::getDriverName() === 'sqlite') {
+                    $builder->orWhereRaw("(first_name || ' ' || last_name) like ?", [$like]);
+                } else {
+                    $builder->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
+                }
             });
         }
 
@@ -72,7 +91,7 @@ class AdminUserController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Admin users retrieved successfully.',
+            'message' => 'System users retrieved successfully.',
             'data' => [
                 'items' => UserResource::collection($paginator->getCollection())->resolve($request),
                 'pagination' => [
@@ -92,5 +111,34 @@ class AdminUserController extends Controller
                 ],
             ],
         ], Response::HTTP_OK);
+    }
+
+    private function authorizeViewAllUsers(?User $user): ?JsonResponse
+    {
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+                'data' => null,
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if ($user->role_code === 'superadmin') {
+            return null;
+        }
+
+        $permissionCodes = $user->relationLoaded('permissions')
+            ? $user->permissions->pluck('code')->all()
+            : $user->permissions()->pluck('permissions.code')->all();
+
+        if (in_array('all:*', $permissionCodes, true)) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Forbidden.',
+            'data' => null,
+        ], Response::HTTP_FORBIDDEN);
     }
 }

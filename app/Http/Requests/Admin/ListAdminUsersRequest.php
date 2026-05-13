@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -35,7 +34,7 @@ class ListAdminUsersRequest extends FormRequest
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'role' => ['sometimes', 'nullable', 'string', Rule::in(User::ADMIN_ROLES)],
+            'role' => ['sometimes', 'nullable', 'string', Rule::exists('roles', 'code')],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(['active', 'pending', 'inactive', 'suspended'])],
             'sort_by' => ['sometimes', 'nullable', 'string', Rule::in(self::SORTABLE_COLUMNS)],
             'sort_direction' => ['sometimes', 'nullable', 'string', Rule::in(self::SORT_DIRECTIONS)],
