@@ -158,6 +158,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `users_email_unique` (`email`),
   KEY `users_role_code_index` (`role_code`),
   KEY `users_status_index` (`status`),
+  KEY `users_created_at_index` (`created_at`),
   KEY `users_department_code_index` (`department_code`),
   KEY `users_deleted_at_index` (`deleted_at`),
   CONSTRAINT `fk_users_role`
