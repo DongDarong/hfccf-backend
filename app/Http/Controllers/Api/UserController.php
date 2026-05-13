@@ -10,7 +10,6 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -102,13 +101,7 @@ class UserController extends Controller
             'avatar' => $avatarUrl,
             'password' => $data['password'],
         ]);
-
-        if (array_key_exists('permissions', $data) && is_array($data['permissions'])) {
-            $user->permissions()->sync($data['permissions']);
-        } else {
-            // Default: mirror the role permissions for the new user.
-            $user->permissions()->sync($role->permissions()->pluck('permissions.code')->all());
-        }
+        $this->syncPermissionsFromRole($user, $role->code);
 
         $user->load(['department', 'role', 'permissions' => fn ($q) => $q->orderBy('permissions.code')]);
 
@@ -216,10 +209,7 @@ class UserController extends Controller
         }
 
         $model->save();
-
-        if (array_key_exists('permissions', $data)) {
-            $model->permissions()->sync($data['permissions'] ?? []);
-        }
+        $this->syncPermissionsFromRole($model, $model->role_code);
 
         $model->load(['department', 'role', 'permissions' => fn ($q) => $q->orderBy('permissions.code')]);
 
@@ -254,10 +244,13 @@ class UserController extends Controller
 
     private function nextUserId(): string
     {
-        $maxNumeric = (int) User::withTrashed()
-            ->where('id', 'like', 'usr\\_%')
-            ->select(DB::raw('MAX(CAST(SUBSTRING(id, 5) AS UNSIGNED)) AS max_id'))
-            ->value('max_id');
+        $maxNumeric = User::withTrashed()
+            ->where('id', 'like', 'usr_%')
+            ->pluck('id')
+            ->map(static function (string $id): int {
+                return (int) preg_replace('/^usr_/', '', $id);
+            })
+            ->max() ?? 0;
 
         $next = $maxNumeric + 1;
         $suffix = $next <= 999 ? str_pad((string) $next, 3, '0', STR_PAD_LEFT) : (string) $next;
@@ -302,5 +295,17 @@ class UserController extends Controller
         }
 
         return substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix));
+    }
+
+    private function syncPermissionsFromRole(User $user, string $roleCode): void
+    {
+        $role = Role::query()
+            ->with(['permissions' => fn ($query) => $query->orderBy('permissions.code')])
+            ->where('code', $roleCode)
+            ->first();
+
+        $permissionCodes = $role?->permissions->pluck('code')->values()->all() ?? [];
+
+        $user->permissions()->sync($permissionCodes);
     }
 }
