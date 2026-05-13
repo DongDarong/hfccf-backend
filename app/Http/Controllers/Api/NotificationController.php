@@ -26,10 +26,47 @@ class NotificationController extends Controller
         $validated = $request->validated();
         $perPage = min(max((int) ($validated['per_page'] ?? 10), 1), 100);
         $page = max((int) ($validated['page'] ?? 1), 1);
+        $status = strtolower(trim((string) ($validated['status'] ?? 'all')));
+        $type = strtolower(trim((string) ($validated['type'] ?? '')));
+        $module = strtolower(trim((string) ($validated['module'] ?? '')));
+        $search = trim((string) ($validated['search'] ?? ''));
 
-        $notifications = NotificationRecipient::query()
+        $query = NotificationRecipient::query()
             ->with(['notification.creator', 'notification.targets'])
             ->where('user_id', $user->id)
+            ->whereHas('notification');
+
+        if ($status === 'unread') {
+            $query->whereNull('read_at')->whereNull('dismissed_at');
+        } elseif ($status === 'read') {
+            $query->whereNotNull('read_at')->whereNull('dismissed_at');
+        } elseif ($status === 'dismissed') {
+            $query->whereNotNull('dismissed_at');
+        }
+
+        if ($type !== '') {
+            $query->whereHas('notification', static function ($builder) use ($type): void {
+                $builder->where('type', $type);
+            });
+        }
+
+        if ($module !== '') {
+            $query->whereHas('notification', static function ($builder) use ($module): void {
+                $builder->where('module', $module);
+            });
+        }
+
+        if ($search !== '') {
+            $query->whereHas('notification', static function ($builder) use ($search): void {
+                $builder->where(function ($searchQuery) use ($search): void {
+                    $searchQuery->where('title', 'like', '%'.$search.'%')
+                        ->orWhere('message', 'like', '%'.$search.'%')
+                        ->orWhere('action_url', 'like', '%'.$search.'%');
+                });
+            });
+        }
+
+        $notifications = $query
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate($perPage, ['*'], 'page', $page);

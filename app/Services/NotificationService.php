@@ -113,6 +113,10 @@ class NotificationService
         $isSuperAdmin = $creator->role_code === 'superadmin' || $this->hasPermission($creator, 'all:*');
 
         if ($isSuperAdmin) {
+            if (($data['type'] ?? null) === 'system' && ($data['module'] ?? null) !== 'global') {
+                throw new AuthorizationException('System notifications must use the global module.');
+            }
+
             if ($targetType === 'all' && ($data['module'] ?? null) !== 'global') {
                 throw new AuthorizationException('Global notifications must use the global module.');
             }
@@ -130,6 +134,10 @@ class NotificationService
 
         if (($data['module'] ?? null) !== $creatorModule) {
             throw new AuthorizationException('You can only create notifications for your own module.');
+        }
+
+        if (($data['type'] ?? null) === 'system') {
+            throw new AuthorizationException('Only super admins can create system notifications.');
         }
 
         if (in_array($targetType, ['all', 'department'], true)) {
