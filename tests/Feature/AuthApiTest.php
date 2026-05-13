@@ -189,6 +189,21 @@ class AuthApiTest extends TestCase
 
         $createdUserId = $created->json('data.user.id');
 
+        $this->assertDatabaseHas('users', [
+            'id' => $createdUserId,
+            'email' => 'role.tester@hfccf.org',
+            'role_code' => 'adminenglish',
+        ]);
+
+        $this->getJson('/api/super-admin/users/'.$createdUserId, [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.id', $createdUserId)
+            ->assertJsonPath('data.user.role', 'adminenglish')
+            ->assertJsonPath('data.user.permissions.0', 'dashboard:read');
+
         $updated = $this->putJson('/api/users/'.$createdUserId, [
             'first_name' => 'Role',
             'last_name' => 'Tester',

@@ -34,6 +34,7 @@ class UserResource extends JsonResource
             'status' => $this->status,
             'avatar' => $this->avatar,
             'createdAt' => $this->created_at?->format('Y-m-d H:i:s'),
+            'updatedAt' => $this->updated_at?->format('Y-m-d H:i:s'),
             'lastLoginAt' => $this->last_login_at?->format('Y-m-d H:i:s'),
             'permissions' => $permissionCodes,
         ];
