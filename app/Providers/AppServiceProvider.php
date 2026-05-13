@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +22,49 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        RateLimiter::for('global', function (Request $request) {
+            return Limit::perMinute(500)->by($request->ip());
+        });
+
+        RateLimiter::for('api', function (Request $request) {
+            $user = $request->user();
+
+            if ($user) {
+                // Authenticated users get more headroom.
+                return Limit::perMinute(300)->by('api:user:'.$user->id);
+            }
+
+            // Guests are more restricted.
+            return Limit::perMinute(60)->by('api:ip:'.$request->ip());
+        });
+
+        RateLimiter::for('auth-login', function (Request $request) {
+            $email = strtolower((string) $request->input('email', 'guest'));
+
+            // Login is stricter because repeated attempts are usually credential guessing.
+            return [
+                Limit::perMinute(5)->by('login:email:'.$email),
+                Limit::perMinute(20)->by('login:ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('auth-otp', function (Request $request) {
+            $email = strtolower((string) $request->input('email', 'guest'));
+
+            // OTP endpoints are intentionally low to prevent code brute force and resend abuse.
+            return [
+                Limit::perMinute(3)->by('otp:email:'.$email),
+                Limit::perMinute(10)->by('otp:ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('auth-password-reset', function (Request $request) {
+            $email = strtolower((string) $request->input('email', 'guest'));
+
+            return [
+                Limit::perMinute(3)->by('reset:email:'.$email),
+                Limit::perMinute(10)->by('reset:ip:'.$request->ip()),
+            ];
+        });
     }
 }

@@ -11,13 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('products', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->text('description')->nullable();
-            $table->decimal('price', 10, 2);
-            $table->unsignedInteger('stock')->default(0);
-            $table->timestamps();
+        Schema::table('deleted_users', function (Blueprint $table) {
+            $table->dropColumn('password');
         });
     }
 
@@ -26,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('products');
+        Schema::table('deleted_users', function (Blueprint $table) {
+            $table->string('password')->after('avatar');
+        });
     }
 };
