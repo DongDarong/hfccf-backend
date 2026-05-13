@@ -20,12 +20,19 @@ class UserResource extends JsonResource
             ? $this->permissions->pluck('code')->unique()->values()->all()
             : $this->permissions()->orderBy('permissions.code')->pluck('permissions.code')->all();
 
+        $fullName = trim($this->first_name.' '.$this->last_name);
+
         return [
             'id' => $this->id,
             'firstName' => $this->first_name,
             'lastName' => $this->last_name,
+            'name' => $fullName !== '' ? $fullName : $this->username,
+            'username' => $this->username,
             'email' => $this->email,
+            'phone' => $this->phone,
             'role' => $this->role_code,
+            'status' => $this->status,
+            'avatar' => $this->avatar,
             'permissions' => $permissionCodes,
             'departmentCode' => $this->department_code,
             'createdAt' => $this->created_at?->toISOString(),

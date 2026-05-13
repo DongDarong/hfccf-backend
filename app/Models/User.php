@@ -34,6 +34,14 @@ use Laravel\Sanctum\HasApiTokens;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
+    public const ADMIN_ROLES = [
+        'superadmin',
+        'adminenglish',
+        'adminpreschool',
+        'adminscholarship',
+        'adminsport',
+    ];
+
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasAuditFields, HasFactory, Notifiable, SoftDeletes;
 

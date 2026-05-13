@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -60,7 +61,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
     Route::middleware(['permission:users:read'])->group(function (): void {
 
-        Route::get('users', [UserController::class, 'index']);
+        Route::get('users', [AdminUserController::class, 'index']);
 
         Route::get('users/{user}', [UserController::class, 'show']);
     });
