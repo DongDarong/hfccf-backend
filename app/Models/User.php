@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\HasAuditFields;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -57,6 +58,13 @@ class User extends Authenticatable
         ];
     }
 
+    protected function avatar(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $this->resolveAvatarUrl($value),
+        );
+    }
+
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'role_code', 'code');
@@ -77,6 +85,27 @@ class User extends Authenticatable
             'id',
             'code',
         );
+    }
+
+    private function resolveAvatarUrl(mixed $value): ?string
+    {
+        $avatar = trim((string) $value);
+
+        if ($avatar === '' || str_starts_with($avatar, 'blob:')) {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $avatar) === 1) {
+            return $avatar;
+        }
+
+        $path = ltrim($avatar, '/');
+
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        return asset('storage/'.$path);
     }
 
     protected static function booted(): void
