@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -78,5 +79,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::put('users/{user}', [UserController::class, 'update']);
 
         Route::delete('users/{user}', [UserController::class, 'destroy']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('notifications')->group(function (): void {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::get('unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('/', [NotificationController::class, 'store']);
+        Route::patch('{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::patch('read-all', [NotificationController::class, 'markAllAsRead']);
+        Route::delete('{id}/dismiss', [NotificationController::class, 'dismiss']);
     });
 });
