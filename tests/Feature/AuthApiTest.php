@@ -149,6 +149,65 @@ class AuthApiTest extends TestCase
             ]);
     }
 
+    public function test_role_permissions_endpoint_returns_permissions_for_selected_role(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $this->getJson('/api/roles/adminenglish/permissions', [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.role', 'adminenglish')
+            ->assertJsonPath('data.permissions.0.code', 'dashboard:read');
+    }
+
+    public function test_user_creation_and_update_sync_permissions_from_role(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $created = $this->postJson('/api/users', [
+            'first_name' => 'Role',
+            'last_name' => 'Tester',
+            'email' => 'role.tester@hfccf.org',
+            'phone' => '+855 12 888 888',
+            'role' => 'adminenglish',
+            'status' => 'active',
+            'password' => 'secret-pass',
+            'password_confirmation' => 'secret-pass',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ]);
+
+        $created
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.role', 'adminenglish')
+            ->assertJsonPath('data.user.permissions.0', 'dashboard:read');
+
+        $createdUserId = $created->json('data.user.id');
+
+        $updated = $this->putJson('/api/users/'.$createdUserId, [
+            'first_name' => 'Role',
+            'last_name' => 'Tester',
+            'email' => 'role.tester@hfccf.org',
+            'phone' => '+855 12 888 888',
+            'role' => 'coach',
+            'department_code' => 'sports',
+            'status' => 'active',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ]);
+
+        $updated
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.role', 'coach')
+            ->assertJsonPath('data.user.permissions.0', 'athletes:read');
+    }
+
     public function test_forgot_password_does_not_reveal_email_existence(): void
     {
         Mail::fake();
@@ -376,6 +435,17 @@ class AuthApiTest extends TestCase
         ]);
 
         return $user;
+    }
+
+    private function loginAndGetToken(User $user): string
+    {
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret-pass',
+            'remember' => true,
+        ]);
+
+        return (string) $response->json('data.token');
     }
 
     /**

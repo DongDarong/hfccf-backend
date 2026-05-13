@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,12 +56,13 @@ Route::prefix('auth')->group(function (): void {
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
     /*
-    |--------------------------------------------------------------------------
+    |-------------------------------------------------------------------------- 
     | User Read Permissions
-    |--------------------------------------------------------------------------
+    |-------------------------------------------------------------------------- 
     */
 
     Route::get('users', [AdminUserController::class, 'index']);
+    Route::get('roles/{role}/permissions', [RoleController::class, 'permissions']);
 
     Route::middleware(['permission:users:read'])->group(function (): void {
         Route::get('users/{user}', [UserController::class, 'show']);
