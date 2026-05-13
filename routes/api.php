@@ -94,5 +94,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::patch('{id}/read', [NotificationController::class, 'markAsRead']);
         Route::patch('read-all', [NotificationController::class, 'markAllAsRead']);
         Route::delete('{id}/dismiss', [NotificationController::class, 'dismiss']);
+        Route::patch('{id}/undismiss', [NotificationController::class, 'undismiss']);
     });
 });

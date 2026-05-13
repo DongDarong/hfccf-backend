@@ -207,6 +207,33 @@ class NotificationController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function undismiss(Request $request, int $id): JsonResponse
+    {
+        $recipient = $this->recipientForUser($request, $id);
+
+        if (! $recipient) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Notification not found.',
+                'data' => null,
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($recipient->dismissed_at !== null) {
+            $recipient->forceFill(['dismissed_at' => null])->save();
+        }
+
+        $recipient->load('notification');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification restored successfully.',
+            'data' => [
+                'notification' => NotificationResource::make($recipient)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
     private function recipientForUser(Request $request, int $notificationId): ?NotificationRecipient
     {
         return NotificationRecipient::query()
