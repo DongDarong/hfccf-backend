@@ -3,6 +3,10 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\Scholarship\ScholarshipApplicationController;
+use App\Http\Controllers\Api\Scholarship\ScholarshipDashboardController;
+use App\Http\Controllers\Api\Scholarship\ScholarshipReviewController;
+use App\Http\Controllers\Api\Scholarship\ScholarshipStudentController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
@@ -147,5 +151,36 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('payments/{id}', [PreschoolPaymentController::class, 'show']);
         Route::put('payments/{id}', [PreschoolPaymentController::class, 'update']);
         Route::delete('payments/{id}', [PreschoolPaymentController::class, 'destroy']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scholarship Routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('scholarship')->group(function (): void {
+        Route::get('dashboard', [ScholarshipDashboardController::class, 'index']);
+        Route::get('reviewer/dashboard', [ScholarshipDashboardController::class, 'reviewerDashboard']);
+        Route::get('reviewer/my-applications', [ScholarshipApplicationController::class, 'reviewerApplications']);
+
+        Route::get('students', [ScholarshipStudentController::class, 'index']);
+        Route::post('students', [ScholarshipStudentController::class, 'store']);
+        Route::get('students/{id}', [ScholarshipStudentController::class, 'show']);
+        Route::put('students/{id}', [ScholarshipStudentController::class, 'update']);
+        Route::delete('students/{id}', [ScholarshipStudentController::class, 'destroy']);
+
+        Route::get('applications', [ScholarshipApplicationController::class, 'index']);
+        Route::post('applications', [ScholarshipApplicationController::class, 'store']);
+        Route::get('applications/{id}', [ScholarshipApplicationController::class, 'show']);
+        Route::put('applications/{id}', [ScholarshipApplicationController::class, 'update']);
+        Route::delete('applications/{id}', [ScholarshipApplicationController::class, 'destroy']);
+        Route::patch('applications/{id}/approve', [ScholarshipApplicationController::class, 'approve']);
+        Route::patch('applications/{id}/reject', [ScholarshipApplicationController::class, 'reject']);
+        Route::patch('applications/{id}/status', [ScholarshipApplicationController::class, 'updateStatus']);
+
+        Route::get('reviews', [ScholarshipReviewController::class, 'index']);
+        Route::post('reviews', [ScholarshipReviewController::class, 'store']);
+        Route::put('reviews/{id}', [ScholarshipReviewController::class, 'update']);
     });
 });
