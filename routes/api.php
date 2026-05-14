@@ -9,6 +9,12 @@ use App\Http\Controllers\Api\English\EnglishStudentController;
 use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\Sport\SportCoachController;
+use App\Http\Controllers\Api\Sport\SportDashboardController;
+use App\Http\Controllers\Api\Sport\SportMatchController;
+use App\Http\Controllers\Api\Sport\SportMatchEventController;
+use App\Http\Controllers\Api\Sport\SportPlayerController;
+use App\Http\Controllers\Api\Sport\SportTeamController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipApplicationController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipDashboardController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipReviewController;
@@ -230,5 +236,48 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('submissions', [EnglishSubmissionController::class, 'index']);
         Route::post('submissions', [EnglishSubmissionController::class, 'store']);
         Route::put('submissions/{id}', [EnglishSubmissionController::class, 'update']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sport Routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('sport')->group(function (): void {
+        Route::get('dashboard', [SportDashboardController::class, 'index']);
+        Route::get('coach/dashboard', [SportDashboardController::class, 'coach']);
+
+        Route::get('coaches', [SportCoachController::class, 'index']);
+        Route::post('coaches', [SportCoachController::class, 'store']);
+        Route::get('coaches/{id}', [SportCoachController::class, 'show']);
+        Route::put('coaches/{id}', [SportCoachController::class, 'update']);
+        Route::delete('coaches/{id}', [SportCoachController::class, 'destroy']);
+        Route::get('coach/teams', [SportCoachController::class, 'teams']);
+        Route::get('coach/matches', [SportCoachController::class, 'matches']);
+
+        Route::get('teams', [SportTeamController::class, 'index']);
+        Route::post('teams', [SportTeamController::class, 'store']);
+        Route::get('teams/{id}', [SportTeamController::class, 'show']);
+        Route::put('teams/{id}', [SportTeamController::class, 'update']);
+        Route::delete('teams/{id}', [SportTeamController::class, 'destroy']);
+
+        Route::get('players', [SportPlayerController::class, 'index']);
+        Route::post('players', [SportPlayerController::class, 'store']);
+        Route::get('players/{id}', [SportPlayerController::class, 'show']);
+        Route::put('players/{id}', [SportPlayerController::class, 'update']);
+        Route::delete('players/{id}', [SportPlayerController::class, 'destroy']);
+
+        Route::get('matches', [SportMatchController::class, 'index']);
+        Route::post('matches', [SportMatchController::class, 'store']);
+        Route::get('matches/{id}', [SportMatchController::class, 'show']);
+        Route::put('matches/{id}', [SportMatchController::class, 'update']);
+        Route::delete('matches/{id}', [SportMatchController::class, 'destroy']);
+        Route::patch('matches/{id}/status', [SportMatchController::class, 'updateStatus']);
+
+        Route::get('matches/{id}/events', [SportMatchEventController::class, 'index']);
+        Route::post('matches/{id}/events', [SportMatchEventController::class, 'store']);
+        Route::put('events/{id}', [SportMatchEventController::class, 'update']);
+        Route::delete('events/{id}', [SportMatchEventController::class, 'destroy']);
     });
 });
