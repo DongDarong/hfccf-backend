@@ -8,9 +8,9 @@ use App\Http\Requests\Scholarship\UpdateScholarshipApplicationRequest;
 use App\Http\Requests\Scholarship\UpdateScholarshipStatusRequest;
 use App\Http\Resources\Scholarship\ScholarshipApplicationResource;
 use App\Models\ScholarshipApplication;
-use App\Models\ScholarshipStudent;
 use App\Models\User;
 use App\Services\ScholarshipService;
+use App\Support\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -107,14 +107,12 @@ class ScholarshipApplicationController extends Controller
             ->orderBy('id', 'desc')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship applications retrieved successfully.',
-            'data' => [
-                'items' => ScholarshipApplicationResource::collection($paginator->getCollection())->resolve($request),
-                'pagination' => $this->paginationShape($paginator),
-            ],
-        ], Response::HTTP_OK);
+        return ApiResponse::paginatedResponse(
+            'Scholarship applications retrieved successfully.',
+            $paginator,
+            $request,
+            ScholarshipApplicationResource::class,
+        );
     }
 
     public function reviewerApplications(Request $request): JsonResponse
@@ -154,29 +152,28 @@ class ScholarshipApplicationController extends Controller
             $application->load(['student', 'assignedReviewer', 'reviews.reviewer', 'statusHistories.changedBy']);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship application created successfully.',
-            'data' => [
+        return ApiResponse::successResponse(
+            'Scholarship application created successfully.',
+            [
                 'application' => ScholarshipApplicationResource::make($application)->resolve($request),
             ],
-        ], Response::HTTP_CREATED);
+            Response::HTTP_CREATED,
+        );
     }
 
     public function show(Request $request, int $id): JsonResponse
     {
         $application = $this->findApplicationForViewer($request->user(), $id);
         if (! $application) {
-            return response()->json(['success' => false, 'message' => 'Scholarship application not found.', 'data' => null], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship application not found.', null, Response::HTTP_NOT_FOUND);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship application retrieved successfully.',
-            'data' => [
+        return ApiResponse::successResponse(
+            'Scholarship application retrieved successfully.',
+            [
                 'application' => ScholarshipApplicationResource::make($application)->resolve($request),
             ],
-        ], Response::HTTP_OK);
+        );
     }
 
     public function update(UpdateScholarshipApplicationRequest $request, int $id): JsonResponse
@@ -187,7 +184,7 @@ class ScholarshipApplicationController extends Controller
 
         $application = ScholarshipApplication::query()->find($id);
         if (! $application) {
-            return response()->json(['success' => false, 'message' => 'Scholarship application not found.', 'data' => null], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship application not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validated();
@@ -211,13 +208,12 @@ class ScholarshipApplicationController extends Controller
             $application->load(['student', 'assignedReviewer', 'reviews.reviewer', 'statusHistories.changedBy']);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship application updated successfully.',
-            'data' => [
+        return ApiResponse::successResponse(
+            'Scholarship application updated successfully.',
+            [
                 'application' => ScholarshipApplicationResource::make($application)->resolve($request),
             ],
-        ], Response::HTTP_OK);
+        );
     }
 
     public function destroy(Request $request, int $id): JsonResponse
@@ -228,12 +224,12 @@ class ScholarshipApplicationController extends Controller
 
         $application = ScholarshipApplication::query()->find($id);
         if (! $application) {
-            return response()->json(['success' => false, 'message' => 'Scholarship application not found.', 'data' => null], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship application not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $application->delete();
 
-        return response()->json(['success' => true, 'message' => 'Scholarship application deleted successfully.', 'data' => null], Response::HTTP_OK);
+        return ApiResponse::successResponse('Scholarship application deleted successfully.', null);
     }
 
     public function approve(UpdateScholarshipStatusRequest $request, int $id): JsonResponse
@@ -244,7 +240,7 @@ class ScholarshipApplicationController extends Controller
 
         $application = ScholarshipApplication::query()->find($id);
         if (! $application) {
-            return response()->json(['success' => false, 'message' => 'Scholarship application not found.', 'data' => null], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship application not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $application = $this->scholarshipService->applyStatusTransition(
@@ -256,7 +252,12 @@ class ScholarshipApplicationController extends Controller
             $request->filled('assigned_reviewer_user_id') ? (int) $request->input('assigned_reviewer_user_id') : null,
         );
 
-        return response()->json(['success' => true, 'message' => 'Scholarship application approved successfully.', 'data' => ['application' => ScholarshipApplicationResource::make($application)->resolve($request)]], Response::HTTP_OK);
+        return ApiResponse::successResponse(
+            'Scholarship application approved successfully.',
+            [
+                'application' => ScholarshipApplicationResource::make($application)->resolve($request),
+            ],
+        );
     }
 
     public function reject(UpdateScholarshipStatusRequest $request, int $id): JsonResponse
@@ -267,12 +268,12 @@ class ScholarshipApplicationController extends Controller
 
         $data = $request->validated();
         if (blank($data['rejection_reason'] ?? null)) {
-            return response()->json(['success' => false, 'message' => 'Rejection reason is required.', 'data' => null], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return ApiResponse::errorResponse('Rejection reason is required.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $application = ScholarshipApplication::query()->find($id);
         if (! $application) {
-            return response()->json(['success' => false, 'message' => 'Scholarship application not found.', 'data' => null], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship application not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $application = $this->scholarshipService->applyStatusTransition(
@@ -284,7 +285,12 @@ class ScholarshipApplicationController extends Controller
             $request->filled('assigned_reviewer_user_id') ? (int) $request->input('assigned_reviewer_user_id') : null,
         );
 
-        return response()->json(['success' => true, 'message' => 'Scholarship application rejected successfully.', 'data' => ['application' => ScholarshipApplicationResource::make($application)->resolve($request)]], Response::HTTP_OK);
+        return ApiResponse::successResponse(
+            'Scholarship application rejected successfully.',
+            [
+                'application' => ScholarshipApplicationResource::make($application)->resolve($request),
+            ],
+        );
     }
 
     public function updateStatus(UpdateScholarshipStatusRequest $request, int $id): JsonResponse
@@ -296,11 +302,11 @@ class ScholarshipApplicationController extends Controller
         $data = $request->validated();
         $application = ScholarshipApplication::query()->find($id);
         if (! $application) {
-            return response()->json(['success' => false, 'message' => 'Scholarship application not found.', 'data' => null], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship application not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         if (($data['application_status'] ?? '') === 'rejected' && blank($data['rejection_reason'] ?? null)) {
-            return response()->json(['success' => false, 'message' => 'Rejection reason is required.', 'data' => null], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return ApiResponse::errorResponse('Rejection reason is required.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $application = $this->scholarshipService->applyStatusTransition(
@@ -312,7 +318,12 @@ class ScholarshipApplicationController extends Controller
             $request->filled('assigned_reviewer_user_id') ? (int) $request->input('assigned_reviewer_user_id') : null,
         );
 
-        return response()->json(['success' => true, 'message' => 'Scholarship application status updated successfully.', 'data' => ['application' => ScholarshipApplicationResource::make($application)->resolve($request)]], Response::HTTP_OK);
+        return ApiResponse::successResponse(
+            'Scholarship application status updated successfully.',
+            [
+                'application' => ScholarshipApplicationResource::make($application)->resolve($request),
+            ],
+        );
     }
 
     private function buildApplicationQuery(?User $user): Builder
@@ -356,41 +367,31 @@ class ScholarshipApplicationController extends Controller
     private function authorizeScholarshipViewer(?User $user): ?JsonResponse
     {
         if (! $user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated.', 'data' => null], Response::HTTP_UNAUTHORIZED);
+            return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminscholarship', 'teacher-scholarship'], true)) {
             return null;
         }
 
-        return response()->json(['success' => false, 'message' => 'Forbidden.', 'data' => null], Response::HTTP_FORBIDDEN);
+        return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
     }
 
     private function authorizeScholarshipAdmin(?User $user): ?JsonResponse
     {
         if (! $user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated.', 'data' => null], Response::HTTP_UNAUTHORIZED);
+            return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminscholarship'], true)) {
             return null;
         }
 
-        return response()->json(['success' => false, 'message' => 'Forbidden.', 'data' => null], Response::HTTP_FORBIDDEN);
+        return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
     }
 
     private function generateApplicationCode(): string
     {
         return app(\App\Services\ScholarshipService::class)->generateApplicationCode();
-    }
-
-    private function paginationShape($paginator): array
-    {
-        return [
-            'page' => $paginator->currentPage(),
-            'perPage' => $paginator->perPage(),
-            'total' => $paginator->total(),
-            'totalPages' => $paginator->lastPage(),
-        ];
     }
 }

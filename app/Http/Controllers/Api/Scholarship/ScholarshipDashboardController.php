@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Scholarship;
 
 use App\Http\Controllers\Controller;
+use App\Support\ApiResponse;
 use App\Services\ScholarshipService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,11 +24,7 @@ class ScholarshipDashboardController extends Controller
 
         $summary = $this->scholarshipService->dashboardSummary($request->user());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship dashboard retrieved successfully.',
-            'data' => $summary,
-        ], Response::HTTP_OK);
+        return ApiResponse::successResponse('Scholarship dashboard retrieved successfully.', $summary);
     }
 
     public function reviewerDashboard(Request $request): JsonResponse
@@ -38,21 +35,13 @@ class ScholarshipDashboardController extends Controller
     private function authorizeScholarshipViewer(?\App\Models\User $user): ?JsonResponse
     {
         if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.',
-                'data' => null,
-            ], Response::HTTP_UNAUTHORIZED);
+            return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminscholarship', 'teacher-scholarship'], true)) {
             return null;
         }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Forbidden.',
-            'data' => null,
-        ], Response::HTTP_FORBIDDEN);
+        return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
     }
 }

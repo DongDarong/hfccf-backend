@@ -7,6 +7,7 @@ use App\Http\Requests\Scholarship\StoreScholarshipStudentRequest;
 use App\Http\Requests\Scholarship\UpdateScholarshipStudentRequest;
 use App\Http\Resources\Scholarship\ScholarshipStudentResource;
 use App\Models\ScholarshipStudent;
+use App\Support\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -83,14 +84,12 @@ class ScholarshipStudentController extends Controller
             ->orderBy('id', 'desc')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship students retrieved successfully.',
-            'data' => [
-                'items' => ScholarshipStudentResource::collection($paginator->getCollection())->resolve($request),
-                'pagination' => $this->paginationShape($paginator),
-            ],
-        ], Response::HTTP_OK);
+        return ApiResponse::paginatedResponse(
+            'Scholarship students retrieved successfully.',
+            $paginator,
+            $request,
+            ScholarshipStudentResource::class,
+        );
     }
 
     public function store(StoreScholarshipStudentRequest $request): JsonResponse
@@ -117,13 +116,13 @@ class ScholarshipStudentController extends Controller
             'notes' => $data['notes'] ?? null,
         ])->loadCount('applications');
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship student created successfully.',
-            'data' => [
+        return ApiResponse::successResponse(
+            'Scholarship student created successfully.',
+            [
                 'student' => ScholarshipStudentResource::make($student)->resolve($request),
             ],
-        ], Response::HTTP_CREATED);
+            Response::HTTP_CREATED,
+        );
     }
 
     public function show(Request $request, int $id): JsonResponse
@@ -135,20 +134,15 @@ class ScholarshipStudentController extends Controller
         $student = ScholarshipStudent::query()->withCount('applications')->find($id);
 
         if (! $student) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Scholarship student not found.',
-                'data' => null,
-            ], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship student not found.', null, Response::HTTP_NOT_FOUND);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship student retrieved successfully.',
-            'data' => [
+        return ApiResponse::successResponse(
+            'Scholarship student retrieved successfully.',
+            [
                 'student' => ScholarshipStudentResource::make($student)->resolve($request),
             ],
-        ], Response::HTTP_OK);
+        );
     }
 
     public function update(UpdateScholarshipStudentRequest $request, int $id): JsonResponse
@@ -159,11 +153,7 @@ class ScholarshipStudentController extends Controller
 
         $student = ScholarshipStudent::query()->find($id);
         if (! $student) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Scholarship student not found.',
-                'data' => null,
-            ], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship student not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validated();
@@ -176,13 +166,12 @@ class ScholarshipStudentController extends Controller
         $student->save();
         $student->loadCount('applications');
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship student updated successfully.',
-            'data' => [
+        return ApiResponse::successResponse(
+            'Scholarship student updated successfully.',
+            [
                 'student' => ScholarshipStudentResource::make($student)->resolve($request),
             ],
-        ], Response::HTTP_OK);
+        );
     }
 
     public function destroy(Request $request, int $id): JsonResponse
@@ -193,20 +182,12 @@ class ScholarshipStudentController extends Controller
 
         $student = ScholarshipStudent::query()->find($id);
         if (! $student) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Scholarship student not found.',
-                'data' => null,
-            ], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship student not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $student->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship student deleted successfully.',
-            'data' => null,
-        ], Response::HTTP_OK);
+        return ApiResponse::successResponse('Scholarship student deleted successfully.', null);
     }
 
     private function generateStudentCode(): string
@@ -217,23 +198,14 @@ class ScholarshipStudentController extends Controller
     private function authorizeScholarshipAdmin(?\App\Models\User $user): ?JsonResponse
     {
         if (! $user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated.', 'data' => null], Response::HTTP_UNAUTHORIZED);
+            return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminscholarship'], true)) {
             return null;
         }
 
-        return response()->json(['success' => false, 'message' => 'Forbidden.', 'data' => null], Response::HTTP_FORBIDDEN);
+        return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
     }
 
-    private function paginationShape($paginator): array
-    {
-        return [
-            'page' => $paginator->currentPage(),
-            'perPage' => $paginator->perPage(),
-            'total' => $paginator->total(),
-            'totalPages' => $paginator->lastPage(),
-        ];
-    }
 }

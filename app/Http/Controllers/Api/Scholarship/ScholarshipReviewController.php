@@ -10,6 +10,7 @@ use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipReview;
 use App\Models\User;
 use App\Services\ScholarshipService;
+use App\Support\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,14 +63,12 @@ class ScholarshipReviewController extends Controller
             ->orderByDesc('id')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship reviews retrieved successfully.',
-            'data' => [
-                'items' => ScholarshipReviewResource::collection($paginator->getCollection())->resolve($request),
-                'pagination' => $this->paginationShape($paginator),
-            ],
-        ], Response::HTTP_OK);
+        return ApiResponse::paginatedResponse(
+            'Scholarship reviews retrieved successfully.',
+            $paginator,
+            $request,
+            ScholarshipReviewResource::class,
+        );
     }
 
     public function store(StoreScholarshipReviewRequest $request): JsonResponse
@@ -82,7 +81,7 @@ class ScholarshipReviewController extends Controller
         $data = $request->validated();
         $application = $this->findApplicationForReviewer($user, (int) $data['application_id']);
         if (! $application) {
-            return response()->json(['success' => false, 'message' => 'Scholarship application not found.', 'data' => null], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship application not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $review = ScholarshipReview::query()->create([
@@ -105,13 +104,13 @@ class ScholarshipReviewController extends Controller
 
         $review->load(['application.student', 'reviewer']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship review created successfully.',
-            'data' => [
+        return ApiResponse::successResponse(
+            'Scholarship review created successfully.',
+            [
                 'review' => ScholarshipReviewResource::make($review)->resolve($request),
             ],
-        ], Response::HTTP_CREATED);
+            Response::HTTP_CREATED,
+        );
     }
 
     public function update(UpdateScholarshipReviewRequest $request, int $id): JsonResponse
@@ -123,11 +122,11 @@ class ScholarshipReviewController extends Controller
 
         $review = ScholarshipReview::query()->with(['application.student', 'reviewer'])->find($id);
         if (! $review) {
-            return response()->json(['success' => false, 'message' => 'Scholarship review not found.', 'data' => null], Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Scholarship review not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         if (! in_array($user->role_code, ['superadmin', 'adminscholarship'], true) && $review->reviewer_user_id !== $user->id) {
-            return response()->json(['success' => false, 'message' => 'Forbidden.', 'data' => null], Response::HTTP_FORBIDDEN);
+            return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
         }
 
         $data = $request->validated();
@@ -140,39 +139,38 @@ class ScholarshipReviewController extends Controller
         $review->save();
         $review->load(['application.student', 'reviewer']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Scholarship review updated successfully.',
-            'data' => [
+        return ApiResponse::successResponse(
+            'Scholarship review updated successfully.',
+            [
                 'review' => ScholarshipReviewResource::make($review)->resolve($request),
             ],
-        ], Response::HTTP_OK);
+        );
     }
 
     private function authorizeScholarshipAdmin(?User $user): ?JsonResponse
     {
         if (! $user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated.', 'data' => null], Response::HTTP_UNAUTHORIZED);
+            return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminscholarship'], true)) {
             return null;
         }
 
-        return response()->json(['success' => false, 'message' => 'Forbidden.', 'data' => null], Response::HTTP_FORBIDDEN);
+        return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
     }
 
     private function authorizeScholarshipReviewer(?User $user): ?JsonResponse
     {
         if (! $user) {
-            return response()->json(['success' => false, 'message' => 'Unauthenticated.', 'data' => null], Response::HTTP_UNAUTHORIZED);
+            return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminscholarship', 'teacher-scholarship'], true)) {
             return null;
         }
 
-        return response()->json(['success' => false, 'message' => 'Forbidden.', 'data' => null], Response::HTTP_FORBIDDEN);
+        return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
     }
 
     private function findApplicationForReviewer(User $user, int $applicationId): ?ScholarshipApplication
@@ -191,13 +189,4 @@ class ScholarshipReviewController extends Controller
         return $query->first();
     }
 
-    private function paginationShape($paginator): array
-    {
-        return [
-            'page' => $paginator->currentPage(),
-            'perPage' => $paginator->perPage(),
-            'total' => $paginator->total(),
-            'totalPages' => $paginator->lastPage(),
-        ];
-    }
 }
