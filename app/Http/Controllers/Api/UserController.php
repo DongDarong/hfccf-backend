@@ -18,14 +18,19 @@ class UserController extends Controller
     public function index(Request $request): JsonResponse
     {
         $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
-        $search = trim((string) $request->query('q', ''));
+        $page = max((int) $request->query('page', 1), 1);
+        $search = trim((string) $request->query('search', $request->query('q', '')));
         $role = trim((string) $request->query('role', ''));
         $status = trim((string) $request->query('status', ''));
-        $departmentCode = trim((string) $request->query('departmentCode', ''));
+        $departmentCode = trim((string) $request->query('department_code', $request->query('departmentCode', '')));
+        $sortBy = trim((string) $request->query('sort_by', 'created_at'));
+        $sortDirection = strtolower(trim((string) $request->query('sort_direction', 'desc'))) === 'asc'
+            ? 'asc'
+            : 'desc';
 
         $query = User::query()
             ->with(['department', 'role', 'permissions' => fn ($q) => $q->orderBy('permissions.code')])
-            ->orderByDesc('created_at');
+            ->whereNull('deleted_at');
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -48,18 +53,34 @@ class UserController extends Controller
             $query->where('department_code', $departmentCode);
         }
 
-        $users = $query->paginate($perPage);
+        $sortColumn = match ($sortBy) {
+            'first_name' => 'first_name',
+            'last_name' => 'last_name',
+            'username' => 'username',
+            'email' => 'email',
+            'role' => 'role_code',
+            'status' => 'status',
+            default => 'created_at',
+        };
+
+        $users = $query
+            ->orderBy($sortColumn, $sortDirection)
+            ->orderBy('id', 'desc')
+            ->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'success' => true,
             'message' => 'Users retrieved successfully.',
             'data' => [
-                'users' => UserResource::collection($users->getCollection())->resolve($request),
+                'items' => UserResource::collection($users->getCollection())->resolve($request),
                 'pagination' => [
+                    'page' => $users->currentPage(),
+                    'perPage' => $users->perPage(),
+                    'total' => $users->total(),
+                    'totalPages' => $users->lastPage(),
                     'current_page' => $users->currentPage(),
                     'last_page' => $users->lastPage(),
                     'per_page' => $users->perPage(),
-                    'total' => $users->total(),
                 ],
             ],
         ], Response::HTTP_OK);

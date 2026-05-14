@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ChangePasswordRequest;
+use App\Http\Requests\Auth\UpdateProfileRequest;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\Auth\UserResource;
 use App\Mail\PasswordResetOtpMail;
@@ -12,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -223,7 +226,112 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Authenticated user retrieved successfully.',
-            'data' => UserResource::make($user)->resolve($request),
+            'data' => [
+                'user' => UserResource::make($user)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function updateMe(UpdateProfileRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $data = $request->validated();
+
+        if (array_key_exists('first_name', $data)) {
+            $user->first_name = $data['first_name'];
+        }
+
+        if (array_key_exists('last_name', $data)) {
+            $user->last_name = $data['last_name'];
+        }
+
+        if (array_key_exists('username', $data)) {
+            $username = trim((string) $data['username']);
+            $user->username = $username !== '' ? $username : trim($user->first_name.' '.$user->last_name);
+        }
+
+        if (array_key_exists('email', $data)) {
+            $user->email = strtolower($data['email']);
+        }
+
+        if (array_key_exists('phone', $data)) {
+            $user->phone = $data['phone'];
+        }
+
+        if (array_key_exists('department_code', $data)) {
+            $user->department_code = $data['department_code'];
+        }
+
+        if (array_key_exists('bio', $data)) {
+            $user->bio = $data['bio'];
+        }
+
+        $replaceAvatar = $request->hasFile('avatar');
+        $removeAvatar = (bool) ($data['remove_avatar'] ?? false);
+
+        if ($replaceAvatar) {
+            $this->deleteStoredAvatarIfNeeded($user->avatar);
+            $user->avatar = $this->storeAvatarIfUploaded($request);
+        } elseif ($removeAvatar) {
+            $this->deleteStoredAvatarIfNeeded($user->avatar);
+            $user->avatar = null;
+        }
+
+        $user->save();
+        $user->loadMissing([
+            'department',
+            'role',
+            'permissions' => fn ($query) => $query->orderBy('permissions.code'),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile updated successfully.',
+            'data' => [
+                'user' => UserResource::make($user)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $data = $request->validated();
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Current password is incorrect.',
+                'data' => null,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $user->forceFill([
+            'password' => $data['password'],
+        ])->save();
+
+        $currentToken = $user->currentAccessToken();
+
+        if ($currentToken) {
+            $user->tokens()
+                ->where('id', '!=', $currentToken->id)
+                ->delete();
+        }
+
+        $user->loadMissing([
+            'department',
+            'role',
+            'permissions' => fn ($query) => $query->orderBy('permissions.code'),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password updated successfully.',
+            'data' => [
+                'user' => UserResource::make($user)->resolve($request),
+            ],
         ], Response::HTTP_OK);
     }
 
@@ -320,5 +428,45 @@ class AuthController extends Controller
             'message' => $message,
             'data' => null,
         ], Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    private function storeAvatarIfUploaded(Request $request): ?string
+    {
+        if (! $request->hasFile('avatar')) {
+            return null;
+        }
+
+        $path = $request->file('avatar')->store('avatars', 'public');
+
+        return asset('storage/'.$path);
+    }
+
+    private function deleteStoredAvatarIfNeeded(?string $avatarUrl): void
+    {
+        $path = $this->resolvePublicStoragePath($avatarUrl);
+
+        if (! $path) {
+            return;
+        }
+
+        Storage::disk('public')->delete($path);
+    }
+
+    private function resolvePublicStoragePath(?string $avatarUrl): ?string
+    {
+        $value = trim((string) $avatarUrl);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $path = (string) parse_url($value, PHP_URL_PATH);
+        $storagePrefix = '/storage/';
+
+        if ($path === '' || ! str_contains($path, $storagePrefix)) {
+            return null;
+        }
+
+        return substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix));
     }
 }

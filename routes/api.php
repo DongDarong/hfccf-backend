@@ -42,6 +42,8 @@ Route::prefix('auth')->group(function (): void {
     Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
         Route::get('me', [AuthController::class, 'me']);
+        Route::patch('me', [AuthController::class, 'updateMe']);
+        Route::patch('change-password', [AuthController::class, 'changePassword']);
 
         Route::post('logout', [AuthController::class, 'logout']);
     });
