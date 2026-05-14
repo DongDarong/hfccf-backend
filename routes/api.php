@@ -3,6 +3,12 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolClassController;
+use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
+use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
+use App\Http\Controllers\Api\Preschool\PreschoolTeacherController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
@@ -100,5 +106,46 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::patch('read-all', [NotificationController::class, 'markAllAsRead']);
         Route::delete('{id}/dismiss', [NotificationController::class, 'dismiss']);
         Route::patch('{id}/undismiss', [NotificationController::class, 'undismiss']);
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Preschool Routes
+    |----------------------------------------------------------------------
+    */
+
+    Route::prefix('preschool')->group(function (): void {
+        Route::get('dashboard', [PreschoolDashboardController::class, 'index']);
+
+        Route::get('teachers', [PreschoolTeacherController::class, 'index']);
+        Route::post('teachers', [PreschoolTeacherController::class, 'store']);
+        Route::get('teachers/{id}', [PreschoolTeacherController::class, 'show']);
+        Route::put('teachers/{id}', [PreschoolTeacherController::class, 'update']);
+        Route::delete('teachers/{id}', [PreschoolTeacherController::class, 'destroy']);
+        Route::get('teacher/my-students', [PreschoolTeacherController::class, 'myStudents']);
+        Route::get('teacher/my-classes', [PreschoolTeacherController::class, 'myClasses']);
+        Route::get('teacher/attendance', [PreschoolAttendanceController::class, 'teacherAttendance']);
+
+        Route::get('classes', [PreschoolClassController::class, 'index']);
+        Route::post('classes', [PreschoolClassController::class, 'store']);
+        Route::get('classes/{id}', [PreschoolClassController::class, 'show']);
+        Route::put('classes/{id}', [PreschoolClassController::class, 'update']);
+        Route::delete('classes/{id}', [PreschoolClassController::class, 'destroy']);
+
+        Route::get('students', [PreschoolStudentController::class, 'index']);
+        Route::post('students', [PreschoolStudentController::class, 'store']);
+        Route::get('students/{id}', [PreschoolStudentController::class, 'show']);
+        Route::put('students/{id}', [PreschoolStudentController::class, 'update']);
+        Route::delete('students/{id}', [PreschoolStudentController::class, 'destroy']);
+
+        Route::get('attendance', [PreschoolAttendanceController::class, 'index']);
+        Route::post('attendance', [PreschoolAttendanceController::class, 'store']);
+        Route::put('attendance/{id}', [PreschoolAttendanceController::class, 'update']);
+
+        Route::get('payments', [PreschoolPaymentController::class, 'index']);
+        Route::post('payments', [PreschoolPaymentController::class, 'store']);
+        Route::get('payments/{id}', [PreschoolPaymentController::class, 'show']);
+        Route::put('payments/{id}', [PreschoolPaymentController::class, 'update']);
+        Route::delete('payments/{id}', [PreschoolPaymentController::class, 'destroy']);
     });
 });
