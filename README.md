@@ -23,24 +23,31 @@ Laravel 13 API backend for the HFCCF admin system. The current backend slice sup
 
 ## Setup
 
-### 1. Install Dependencies
+### 1. Prerequisites
+
+- PHP 8.3+
+- Composer
+- Node.js 20+
+- MySQL or MariaDB
+- Laragon or another local PHP web stack
+
+### 2. Backend Setup
+
+From `C:/laragon/www/hfccf-backend`:
 
 ```bash
 composer install
 npm install
-```
-
-### 2. Configure Environment
-
-```bash
 copy .env.example .env
 php artisan key:generate
+php artisan migrate:fresh --seed
+php artisan storage:link
+php artisan serve
 ```
 
-Use MySQL/MariaDB for local development:
+Set these in `.env`:
 
 ```env
-APP_NAME=hfccf-backend
 APP_URL=http://hfccf-backend.test
 FRONTEND_URLS=http://localhost:5173,http://127.0.0.1:5173
 
@@ -50,23 +57,64 @@ DB_PORT=3306
 DB_DATABASE=hfccf_backend
 DB_USERNAME=root
 DB_PASSWORD=
-
-SESSION_DRIVER=file
-CACHE_STORE=file
-QUEUE_CONNECTION=sync
 ```
 
-### 3. Run Migrations and Seeders
+### 3. Frontend Setup
+
+From `D:/Thesis2026/hfccf-project/hfccf-frontend`:
 
 ```bash
-php artisan migrate:fresh --seed
+npm install
+npm run dev
 ```
 
-### 4. Start the Backend
+Set `D:/Thesis2026/hfccf-project/hfccf-frontend/.env.development` to:
+
+```env
+VITE_API_BASE_URL=/api
+```
+
+### 4. Local Domain Setup
+
+Map `hfccf-backend.test` to `127.0.0.1` in the hosts file.
+
+Use:
+
+- `hfccf-backend.test` for Laravel
+- `localhost:5173` for Vite
+
+This keeps API requests same-origin in development when the frontend proxies `/api` to `http://hfccf-backend.test`.
+
+### 5. Verify Everything
+
+Backend:
 
 ```bash
-php artisan serve
+php artisan test
+php artisan route:list
 ```
+
+Frontend:
+
+```bash
+npm run lint
+npm run build
+```
+
+### 6. Seeded Login Accounts
+
+- Super Admin: `superadmin01@hfccf.org` / `superadmin@123`
+- Super Admin: `dngdarong@gmail.com` / `Darong@123`
+- Sport Admin: `sport.admin01@hfccf.org` / `sportAdmin@123`
+
+### 7. Team Workflow Recommendation
+
+- One person runs backend and database.
+- One person runs frontend.
+- Everyone works on the same branch or feature branch.
+- Do not commit `node_modules`, `dist`, or `.eslintcache`.
+- After backend changes, rerun `php artisan test`.
+- After frontend changes, rerun `npm run lint` and `npm run build`.
 
 ## API Response Format
 
