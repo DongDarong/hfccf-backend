@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Sport;
 use App\Http\Controllers\Controller;
 use App\Models\SportMatch;
 use App\Models\SportPlayer;
+use App\Models\SportTournament;
 use App\Models\SportTeam;
 use App\Models\User;
 use App\Support\ApiResponse;
@@ -128,6 +129,38 @@ abstract class SportController extends Controller
                     ->orWhereRaw('LOWER(last_name) = ?', [mb_strtolower($reference)]);
             })
             ->first();
+    }
+
+    protected function resolveTournamentReference(?string $value): ?SportTournament
+    {
+        $reference = trim((string) $value);
+
+        if ($reference === '') {
+            return null;
+        }
+
+        return SportTournament::query()
+            ->where(function ($query) use ($reference): void {
+                $query->where('id', $reference)
+                    ->orWhere('tournament_code', $reference)
+                    ->orWhere('name', $reference);
+            })
+            ->first();
+    }
+
+    protected function canAccessTournament(?User $user, SportTournament $tournament): bool
+    {
+        if ($this->isSportAdmin($user)) {
+            return true;
+        }
+
+        if (! $this->isSportCoach($user)) {
+            return false;
+        }
+
+        return $tournament->teams()
+            ->where('coach_user_id', $user?->id)
+            ->exists();
     }
 
     protected function storeSportFile(?UploadedFile $file, string $directory): ?string

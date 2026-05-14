@@ -20,6 +20,7 @@ class UpdateSportMatchRequest extends FormRequest
         $this->merge([
             'home_team' => $this->input('home_team', $this->input('homeTeam')),
             'away_team' => $this->input('away_team', $this->input('awayTeam')),
+            'tournament_id' => $this->input('tournament_id', $this->input('tournamentId')),
             'competition_type' => $this->input('competition_type', $this->input('competitionType')),
             'tournament_name' => $this->input('tournament_name', $this->input('tournament')),
             'scheduled_at' => $this->input('scheduled_at', $this->input('date_time', $this->input('dateTime'))),
@@ -36,6 +37,7 @@ class UpdateSportMatchRequest extends FormRequest
             'match_code' => ['sometimes', 'nullable', 'string', 'max:32', 'unique:sport_matches,match_code,'.$matchId.',id'],
             'home_team' => ['sometimes', 'required', 'string', 'max:191'],
             'away_team' => ['sometimes', 'required', 'string', 'max:191'],
+            'tournament_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_tournaments,id'],
             'competition_type' => ['sometimes', 'nullable', 'string', 'max:64'],
             'tournament_name' => ['sometimes', 'nullable', 'string', 'max:191'],
             'venue' => ['sometimes', 'nullable', 'string', 'max:191'],
@@ -46,4 +48,3 @@ class UpdateSportMatchRequest extends FormRequest
         ];
     }
 }
-

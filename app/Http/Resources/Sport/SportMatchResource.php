@@ -17,6 +17,7 @@ class SportMatchResource extends JsonResource
             'matchCode' => $this->match_code,
             'homeTeamId' => $this->home_team_id,
             'awayTeamId' => $this->away_team_id,
+            'tournamentId' => $this->tournament_id,
             'homeTeam' => $this->whenLoaded('homeTeam', fn (): array => [
                 'id' => $this->homeTeam?->id,
                 'teamCode' => $this->homeTeam?->team_code,
@@ -30,6 +31,14 @@ class SportMatchResource extends JsonResource
                 'name' => $this->awayTeam?->name,
                 'shortName' => $this->awayTeam?->short_name,
                 'logo' => SportMedia::resolveUrl($this->awayTeam?->logo),
+            ]),
+            'tournament' => $this->whenLoaded('tournament', fn (): array => [
+                'id' => $this->tournament?->id,
+                'tournamentCode' => $this->tournament?->tournament_code,
+                'name' => $this->tournament?->name,
+                'season' => $this->tournament?->season,
+                'tournamentType' => $this->tournament?->tournament_type,
+                'status' => $this->tournament?->status,
             ]),
             'competitionType' => $this->competition_type,
             'tournamentName' => $this->tournament_name,
@@ -51,4 +60,3 @@ class SportMatchResource extends JsonResource
         ];
     }
 }
-

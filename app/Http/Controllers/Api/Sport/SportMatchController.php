@@ -7,18 +7,22 @@ use App\Http\Requests\Sport\UpdateSportMatchRequest;
 use App\Http\Requests\Sport\UpdateSportMatchStatusRequest;
 use App\Http\Resources\Sport\SportMatchResource;
 use App\Models\SportMatch;
-use App\Models\SportMatchEvent;
+use App\Models\SportTournament;
 use App\Support\ApiResponse;
 use App\Support\SportMatchScoreService;
+use App\Support\SportStandingsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
 
 class SportMatchController extends SportController
 {
-    public function __construct(private readonly SportMatchScoreService $scoreService)
-    {
+    public function __construct(
+        private readonly SportMatchScoreService $scoreService,
+        private readonly SportStandingsService $standingsService,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -45,7 +49,7 @@ class SportMatchController extends SportController
         $sortBy = (string) ($validated['sort_by'] ?? 'scheduled_at');
         $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $query = SportMatch::query()->with(['homeTeam', 'awayTeam', 'events'])->withCount('events');
+        $query = SportMatch::query()->with(['homeTeam', 'awayTeam', 'tournament', 'events'])->withCount('events');
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -55,7 +59,8 @@ class SportMatchController extends SportController
                     ->orWhere('tournament_name', 'like', $like)
                     ->orWhere('venue', 'like', $like)
                     ->orWhere('status', 'like', $like)
-                    ->orWhere('current_period', 'like', $like);
+                    ->orWhere('current_period', 'like', $like)
+                    ->orWhereHas('tournament', fn ($builder) => $builder->where('tournament_code', 'like', $like)->orWhere('name', 'like', $like));
             });
         }
 
@@ -96,6 +101,7 @@ class SportMatchController extends SportController
         $data = $request->validated();
         $homeTeam = $this->resolveTeamReference($data['home_team']);
         $awayTeam = $this->resolveTeamReference($data['away_team']);
+        $tournament = $this->resolveTournament($data['tournament_id'] ?? null);
 
         if (! $homeTeam || ! $awayTeam) {
             return ApiResponse::errorResponse('One or both teams could not be found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -109,8 +115,9 @@ class SportMatchController extends SportController
             'match_code' => $data['match_code'] ?? $this->makeSportCode('match'),
             'home_team_id' => $homeTeam->id,
             'away_team_id' => $awayTeam->id,
-            'competition_type' => $data['competition_type'] ?? null,
-            'tournament_name' => $data['tournament_name'] ?? null,
+            'tournament_id' => $tournament?->id,
+            'competition_type' => $data['competition_type'] ?? ($tournament ? 'tournament' : null),
+            'tournament_name' => $data['tournament_name'] ?? $tournament?->name,
             'venue' => $data['venue'] ?? null,
             'scheduled_at' => $data['scheduled_at'] ?? null,
             'status' => $data['status'],
@@ -122,7 +129,9 @@ class SportMatchController extends SportController
         ]);
 
         $this->scoreService->recalculate($match);
-        $match->loadMissing(['homeTeam', 'awayTeam'])->loadCount('events');
+        $this->syncTournamentMembership($tournament, $homeTeam->id, $awayTeam->id);
+        $this->refreshStandingsForTournamentIds([$match->tournament_id]);
+        $match->loadMissing(['homeTeam', 'awayTeam', 'tournament'])->loadCount('events');
 
         return ApiResponse::successResponse(
             'Sport match created successfully.',
@@ -139,7 +148,7 @@ class SportMatchController extends SportController
             return $response;
         }
 
-        $match = SportMatch::query()->with(['homeTeam', 'awayTeam', 'events.team', 'events.player'])->withCount('events')->find($id);
+        $match = SportMatch::query()->with(['homeTeam', 'awayTeam', 'tournament', 'events.team', 'events.player'])->withCount('events')->find($id);
 
         if (! $match) {
             return ApiResponse::errorResponse('Match not found.', null, Response::HTTP_NOT_FOUND);
@@ -163,9 +172,11 @@ class SportMatchController extends SportController
         }
 
         $data = $request->validated();
+        $originalTournamentId = $match->tournament_id ? (int) $match->tournament_id : null;
 
         $homeTeam = null;
         $awayTeam = null;
+        $tournament = array_key_exists('tournament_id', $data) ? $this->resolveTournament($data['tournament_id']) : $match->tournament;
 
         if (array_key_exists('home_team', $data)) {
             $homeTeam = $this->resolveTeamReference($data['home_team']);
@@ -189,9 +200,24 @@ class SportMatchController extends SportController
             return ApiResponse::errorResponse('Teams cannot be changed after events exist.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        foreach (['competition_type', 'tournament_name', 'venue', 'scheduled_at', 'current_period', 'notes'] as $field) {
+        if ($match->events_count > 0 && array_key_exists('tournament_id', $data) && $originalTournamentId !== (int) ($tournament?->id ?? 0)) {
+            return ApiResponse::errorResponse('Tournament cannot be changed after events exist.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        foreach (['competition_type', 'venue', 'scheduled_at', 'current_period', 'notes'] as $field) {
             if (array_key_exists($field, $data)) {
                 $match->{$field} = $data[$field];
+            }
+        }
+
+        if (array_key_exists('tournament_name', $data)) {
+            $match->tournament_name = $data['tournament_name'] ?: $tournament?->name;
+        }
+
+        if (array_key_exists('tournament_id', $data)) {
+            $match->tournament_id = $tournament?->id;
+            if (! array_key_exists('competition_type', $data) && $tournament) {
+                $match->competition_type = 'tournament';
             }
         }
 
@@ -213,7 +239,9 @@ class SportMatchController extends SportController
 
         $match->save();
         $this->scoreService->recalculate($match);
-        $match->loadMissing(['homeTeam', 'awayTeam'])->loadCount('events');
+        $this->syncTournamentMembership($tournament, $match->home_team_id, $match->away_team_id);
+        $this->refreshStandingsForTournamentIds([$originalTournamentId, $match->tournament_id]);
+        $match->loadMissing(['homeTeam', 'awayTeam', 'tournament'])->loadCount('events');
 
         return ApiResponse::successResponse(
             'Sport match updated successfully.',
@@ -235,7 +263,9 @@ class SportMatchController extends SportController
             return ApiResponse::errorResponse('Match not found.', null, Response::HTTP_NOT_FOUND);
         }
 
+        $tournamentId = $match->tournament_id ? (int) $match->tournament_id : null;
         $match->delete();
+        $this->refreshStandingsForTournamentIds([$tournamentId]);
 
         return ApiResponse::successResponse('Sport match deleted successfully.');
     }
@@ -287,7 +317,8 @@ class SportMatchController extends SportController
         }
 
         $match->save();
-        $match->loadMissing(['homeTeam', 'awayTeam'])->loadCount('events');
+        $this->refreshStandingsForTournamentIds([$match->tournament_id]);
+        $match->loadMissing(['homeTeam', 'awayTeam', 'tournament'])->loadCount('events');
 
         return ApiResponse::successResponse(
             'Match status updated successfully.',
@@ -311,5 +342,36 @@ class SportMatchController extends SportController
 
         return in_array($next, $map[$current] ?? [], true);
     }
-}
 
+    private function resolveTournament(mixed $value): ?SportTournament
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return SportTournament::query()->find($value);
+    }
+
+    private function syncTournamentMembership(?SportTournament $tournament, int $homeTeamId, int $awayTeamId): void
+    {
+        if (! $tournament) {
+            return;
+        }
+
+        $now = Carbon::now();
+        $tournament->teams()->syncWithoutDetaching([
+            $homeTeamId => ['joined_at' => $now],
+            $awayTeamId => ['joined_at' => $now],
+        ]);
+    }
+
+    /**
+     * @param  array<int, int|null>  $tournamentIds
+     */
+    private function refreshStandingsForTournamentIds(array $tournamentIds): void
+    {
+        foreach (array_unique(array_filter(array_map('intval', $tournamentIds))) as $tournamentId) {
+            $this->standingsService->rebuildTournamentById($tournamentId);
+        }
+    }
+}

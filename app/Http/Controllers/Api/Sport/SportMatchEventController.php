@@ -9,13 +9,17 @@ use App\Models\SportMatch;
 use App\Models\SportMatchEvent;
 use App\Support\ApiResponse;
 use App\Support\SportMatchScoreService;
+use App\Support\SportStandingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class SportMatchEventController extends SportController
 {
-    public function __construct(private readonly SportMatchScoreService $scoreService)
+    public function __construct(
+        private readonly SportMatchScoreService $scoreService,
+        private readonly SportStandingsService $standingsService,
+    )
     {
     }
 
@@ -88,6 +92,7 @@ class SportMatchEventController extends SportController
         ]);
 
         $this->scoreService->recalculate($match);
+        $this->refreshStandingsForMatch($match);
         $event->loadMissing(['team', 'player']);
 
         return ApiResponse::successResponse(
@@ -156,6 +161,7 @@ class SportMatchEventController extends SportController
         $event->save();
 
         $this->scoreService->recalculate($match);
+        $this->refreshStandingsForMatch($match);
         $event->loadMissing(['team', 'player']);
 
         return ApiResponse::successResponse(
@@ -188,6 +194,7 @@ class SportMatchEventController extends SportController
 
         if ($match) {
             $this->scoreService->recalculate($match);
+            $this->refreshStandingsForMatch($match);
         }
 
         return ApiResponse::successResponse('Match event deleted successfully.');
@@ -206,5 +213,14 @@ class SportMatchEventController extends SportController
         }
 
         return $metadata;
+    }
+
+    private function refreshStandingsForMatch(?SportMatch $match): void
+    {
+        if (! $match || ! $match->tournament_id) {
+            return;
+        }
+
+        $this->standingsService->rebuildTournamentById((int) $match->tournament_id);
     }
 }

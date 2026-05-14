@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportMatchController;
 use App\Http\Controllers\Api\Sport\SportMatchEventController;
 use App\Http\Controllers\Api\Sport\SportPlayerController;
+use App\Http\Controllers\Api\Sport\SportTournamentController;
 use App\Http\Controllers\Api\Sport\SportTeamController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipApplicationController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipDashboardController;
@@ -247,6 +248,16 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     Route::prefix('sport')->group(function (): void {
         Route::get('dashboard', [SportDashboardController::class, 'index']);
         Route::get('coach/dashboard', [SportDashboardController::class, 'coach']);
+
+        Route::get('tournaments', [SportTournamentController::class, 'index']);
+        Route::post('tournaments', [SportTournamentController::class, 'store']);
+        Route::get('tournaments/{id}', [SportTournamentController::class, 'show']);
+        Route::put('tournaments/{id}', [SportTournamentController::class, 'update']);
+        Route::delete('tournaments/{id}', [SportTournamentController::class, 'destroy']);
+        Route::post('tournaments/{id}/teams', [SportTournamentController::class, 'addTeam']);
+        Route::delete('tournaments/{id}/teams/{teamId}', [SportTournamentController::class, 'removeTeam']);
+        Route::get('tournaments/{id}/standings', [SportTournamentController::class, 'standings']);
+        Route::post('tournaments/{id}/recalculate-standings', [SportTournamentController::class, 'recalculateStandings']);
 
         Route::get('coaches', [SportCoachController::class, 'index']);
         Route::post('coaches', [SportCoachController::class, 'store']);

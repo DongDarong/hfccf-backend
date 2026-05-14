@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SportMatch;
 use App\Models\SportTeam;
+use App\Models\SportTournament;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -238,6 +239,158 @@ class SportApiTest extends TestCase
         $match->refresh();
         $this->assertSame(0, (int) $match->home_score);
         $this->assertSame(0, (int) $match->away_score);
+    }
+
+    public function test_adminsport_can_manage_tournaments_and_tournament_teams(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_935', 'sport.admin935@hfccf.org');
+        $tournament = $this->createTournament('TRN-935', 'League Alpha');
+        $team = $this->createTeam('TEAM-935-A', 'Tournament Team');
+
+        $this->postJson('/api/sport/tournaments/'.$tournament->id.'/teams', [
+            'team_id' => $team->id,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('sport_tournament_teams', [
+            'tournament_id' => $tournament->id,
+            'team_id' => $team->id,
+        ]);
+
+        $this->deleteJson('/api/sport/tournaments/'.$tournament->id.'/teams/'.$team->id)
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('sport_tournament_teams', [
+            'tournament_id' => $tournament->id,
+            'team_id' => $team->id,
+        ]);
+    }
+
+    public function test_standings_are_calculated_from_completed_tournament_matches(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_936', 'sport.admin936@hfccf.org');
+
+        $teamA = $this->createTeam('TEAM-936-A', 'Alpha FC');
+        $teamB = $this->createTeam('TEAM-936-B', 'Bravo FC');
+        $teamC = $this->createTeam('TEAM-936-C', 'Charlie FC');
+        $tournament = $this->createTournament('TRN-936', 'League 936');
+        $this->attachTeamsToTournament($tournament, [$teamA, $teamB, $teamC]);
+
+        $this->finishTournamentMatch($teamA, $teamB, $tournament, $teamA->id);
+        $this->finishTournamentMatch($teamB, $teamC, $tournament, $teamB->id);
+        $this->finishTournamentMatch($teamC, $teamA, $tournament, $teamC->id);
+
+        $response = $this->getJson('/api/sport/tournaments/'.$tournament->id.'/standings')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $items = $response->json('data.items');
+
+        $this->assertCount(3, $items);
+        $this->assertSame('Alpha FC', $items[0]['team']['name']);
+        $this->assertSame(1, (int) $items[0]['rankPosition']);
+        $this->assertSame(3, (int) $items[0]['points']);
+        $this->assertSame('Bravo FC', $items[1]['team']['name']);
+        $this->assertSame(2, (int) $items[1]['rankPosition']);
+        $this->assertSame(3, (int) $items[1]['points']);
+        $this->assertSame('Charlie FC', $items[2]['team']['name']);
+        $this->assertSame(3, (int) $items[2]['rankPosition']);
+        $this->assertSame(3, (int) $items[2]['points']);
+    }
+
+    public function test_friendly_matches_do_not_affect_tournament_standings(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_937', 'sport.admin937@hfccf.org');
+
+        $teamA = $this->createTeam('TEAM-937-A', 'Friendly Alpha');
+        $teamB = $this->createTeam('TEAM-937-B', 'Friendly Bravo');
+        $tournament = $this->createTournament('TRN-937', 'League 937');
+        $this->attachTeamsToTournament($tournament, [$teamA, $teamB]);
+
+        $match = $this->createMatch($teamA, $teamB, 'live', true, null);
+        $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $teamA->id,
+            'event_type' => 'goal',
+            'minute' => 12,
+        ])->assertCreated();
+
+        $this->patchJson('/api/sport/matches/'.$match->id.'/status', [
+            'status' => 'completed',
+            'current_period' => 'final',
+        ])->assertOk();
+
+        $response = $this->getJson('/api/sport/tournaments/'.$tournament->id.'/standings')
+            ->assertOk();
+
+        foreach ($response->json('data.items') as $standing) {
+            $this->assertSame(0, (int) $standing['points']);
+            $this->assertSame(0, (int) $standing['played']);
+        }
+    }
+
+    public function test_reopening_completed_match_rolls_back_standings(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_938', 'sport.admin938@hfccf.org');
+
+        $homeTeam = $this->createTeam('TEAM-938-A', 'Rollback Alpha');
+        $awayTeam = $this->createTeam('TEAM-938-B', 'Rollback Bravo');
+        $tournament = $this->createTournament('TRN-938', 'League 938');
+        $this->attachTeamsToTournament($tournament, [$homeTeam, $awayTeam]);
+
+        $match = $this->createMatch($homeTeam, $awayTeam, 'live', true, $tournament->id);
+
+        $goal = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $homeTeam->id,
+            'event_type' => 'goal',
+            'minute' => 14,
+        ]);
+
+        $goal->assertCreated();
+
+        $this->patchJson('/api/sport/matches/'.$match->id.'/status', [
+            'status' => 'completed',
+            'current_period' => 'final',
+        ])->assertOk();
+
+        $completed = $this->getJson('/api/sport/tournaments/'.$tournament->id.'/standings')->json('data.items');
+        $this->assertSame(3, (int) $completed[0]['points']);
+
+        $this->patchJson('/api/sport/matches/'.$match->id.'/status', [
+            'status' => 'live',
+            'current_period' => 'second_half',
+        ])->assertOk();
+
+        $reopened = $this->getJson('/api/sport/tournaments/'.$tournament->id.'/standings')->json('data.items');
+        $this->assertSame(0, (int) $reopened[0]['points']);
+        $this->assertSame(0, (int) $reopened[0]['played']);
+    }
+
+    public function test_coach_can_read_own_tournament_standings_and_cannot_manage_tournaments(): void
+    {
+        $coach = $this->createCoachUser('usr_939', 'Coach Sport');
+        $team = $this->createTeam('TEAM-939-A', 'Coach Team', $coach->id, 'Coach Sport');
+        $tournament = $this->createTournament('TRN-939', 'League 939');
+
+        $this->actingAsRole('adminsport', 'usr_939_admin', 'sport.admin939@hfccf.org');
+        $this->attachTeamsToTournament($tournament, [$team]);
+
+        Sanctum::actingAs($coach);
+        $this->getJson('/api/sport/tournaments/'.$tournament->id.'/standings')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->postJson('/api/sport/tournaments', [
+            'name' => 'Unauthorized Tournament',
+            'status' => 'draft',
+        ])->assertForbidden();
+    }
+
+    public function test_unauthorized_users_are_blocked_from_tournament_endpoints(): void
+    {
+        $this->getJson('/api/sport/tournaments')
+            ->assertUnauthorized();
     }
 
     public function test_score_recalculates_for_event_mutations(): void
@@ -621,7 +774,7 @@ class SportApiTest extends TestCase
         ]);
     }
 
-    private function createMatch(SportTeam $homeTeam, SportTeam $awayTeam, string $status = 'scheduled', bool $useDistinctTeams = true): SportMatch
+    private function createMatch(SportTeam $homeTeam, SportTeam $awayTeam, string $status = 'scheduled', bool $useDistinctTeams = true, ?int $tournamentId = null): SportMatch
     {
         if (! $useDistinctTeams) {
             $awayTeam = $homeTeam;
@@ -631,9 +784,50 @@ class SportApiTest extends TestCase
             'match_code' => 'MATCH-'.strtoupper(substr((string) microtime(true), -6)),
             'home_team_id' => $homeTeam->id,
             'away_team_id' => $awayTeam->id,
+            'tournament_id' => $tournamentId,
             'status' => $status,
             'scheduled_at' => now()->addDay(),
             'created_by_user_id' => auth()->id(),
         ]);
+    }
+
+    private function createTournament(string $code, string $name, string $status = 'active'): SportTournament
+    {
+        return SportTournament::query()->create([
+            'tournament_code' => $code,
+            'name' => $name,
+            'tournament_type' => 'league',
+            'status' => $status,
+        ]);
+    }
+
+    /**
+     * @param  array<int, SportTeam>  $teams
+     */
+    private function attachTeamsToTournament(SportTournament $tournament, array $teams): void
+    {
+        foreach ($teams as $team) {
+            $this->postJson('/api/sport/tournaments/'.$tournament->id.'/teams', [
+                'team_id' => $team->id,
+            ])->assertOk();
+        }
+    }
+
+    private function finishTournamentMatch(SportTeam $homeTeam, SportTeam $awayTeam, SportTournament $tournament, int $scoringTeamId): SportMatch
+    {
+        $match = $this->createMatch($homeTeam, $awayTeam, 'live', true, $tournament->id);
+
+        $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $scoringTeamId,
+            'event_type' => 'goal',
+            'minute' => 10,
+        ])->assertCreated();
+
+        $this->patchJson('/api/sport/matches/'.$match->id.'/status', [
+            'status' => 'completed',
+            'current_period' => 'final',
+        ])->assertOk();
+
+        return $match->refresh();
     }
 }

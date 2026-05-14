@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api\Sport;
 use App\Http\Resources\Sport\SportMatchEventResource;
 use App\Http\Resources\Sport\SportMatchResource;
 use App\Http\Resources\Sport\SportPlayerResource;
+use App\Http\Resources\Sport\SportStandingResource;
 use App\Http\Resources\Sport\SportTeamResource;
 use App\Models\SportMatch;
 use App\Models\SportMatchEvent;
+use App\Models\SportStanding;
 use App\Models\SportPlayer;
 use App\Models\SportTeam;
+use App\Models\SportTournament;
 use App\Models\User;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -64,8 +67,20 @@ class SportDashboardController extends SportController
     {
         $teams = SportTeam::query()->with(['coach'])->orderBy('name')->get();
         $players = SportPlayer::query()->with(['team'])->orderBy('first_name')->orderBy('last_name')->get();
-        $recentMatches = SportMatch::query()->with(['homeTeam', 'awayTeam', 'events'])->withCount('events')->orderByDesc('scheduled_at')->orderByDesc('id')->limit(10)->get();
+        $recentMatches = SportMatch::query()->with(['homeTeam', 'awayTeam', 'tournament', 'events'])->withCount('events')->orderByDesc('scheduled_at')->orderByDesc('id')->limit(10)->get();
         $recentEvents = SportMatchEvent::query()->with(['match.homeTeam', 'match.awayTeam', 'team', 'player'])->orderByDesc('id')->limit(10)->get();
+        $tournamentCount = SportTournament::query()->count();
+        $activeTournamentCount = SportTournament::query()->where('status', 'active')->count();
+        $tournaments = SportTournament::query()
+            ->withCount(['teams', 'matches', 'standings'])
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 WHEN status = 'draft' THEN 1 WHEN status = 'completed' THEN 2 ELSE 3 END")
+            ->orderByDesc('updated_at')
+            ->limit(6)
+            ->get();
+        $featuredTournament = $tournaments->firstWhere('status', 'active') ?? $tournaments->first();
+        $featuredStandings = $featuredTournament
+            ? SportStanding::query()->with(['team'])->where('tournament_id', $featuredTournament->id)->orderBy('rank_position')->orderBy('id')->limit(10)->get()
+            : collect();
 
         return [
             'summary' => [
@@ -76,11 +91,16 @@ class SportDashboardController extends SportController
                 'liveMatches' => SportMatch::query()->where('status', 'live')->count(),
                 'completedMatches' => SportMatch::query()->where('status', 'completed')->count(),
                 'coaches' => User::query()->where('role_code', 'coach')->count(),
+                'tournaments' => $tournamentCount,
+                'activeTournaments' => $activeTournamentCount,
             ],
             'teams' => SportTeamResource::collection($teams)->resolve($request),
             'players' => SportPlayerResource::collection($players)->resolve($request),
             'matches' => SportMatchResource::collection($recentMatches)->resolve($request),
             'events' => SportMatchEventResource::collection($recentEvents)->resolve($request),
+            'tournaments' => \App\Http\Resources\Sport\SportTournamentResource::collection($tournaments)->resolve($request),
+            'featuredTournament' => $featuredTournament ? \App\Http\Resources\Sport\SportTournamentResource::make($featuredTournament)->resolve($request) : null,
+            'standings' => SportStandingResource::collection($featuredStandings)->resolve($request),
         ];
     }
 }

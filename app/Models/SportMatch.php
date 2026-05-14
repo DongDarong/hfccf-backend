@@ -15,6 +15,7 @@ class SportMatch extends Model
         'match_code',
         'home_team_id',
         'away_team_id',
+        'tournament_id',
         'competition_type',
         'tournament_name',
         'venue',
@@ -48,6 +49,11 @@ class SportMatch extends Model
     public function awayTeam(): BelongsTo
     {
         return $this->belongsTo(SportTeam::class, 'away_team_id');
+    }
+
+    public function tournament(): BelongsTo
+    {
+        return $this->belongsTo(SportTournament::class, 'tournament_id');
     }
 
     public function events(): HasMany
