@@ -2,6 +2,12 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
+use App\Http\Controllers\Api\English\EnglishClassController;
+use App\Http\Controllers\Api\English\EnglishDashboardController;
+use App\Http\Controllers\Api\English\EnglishSubmissionController;
+use App\Http\Controllers\Api\English\EnglishStudentController;
+use App\Http\Controllers\Api\English\EnglishTaskController;
+use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipApplicationController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipDashboardController;
@@ -182,5 +188,47 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('reviews', [ScholarshipReviewController::class, 'index']);
         Route::post('reviews', [ScholarshipReviewController::class, 'store']);
         Route::put('reviews/{id}', [ScholarshipReviewController::class, 'update']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | English Routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('english')->group(function (): void {
+        Route::get('dashboard', [EnglishDashboardController::class, 'index']);
+        Route::get('teacher/dashboard', [EnglishTeacherController::class, 'dashboard']);
+        Route::get('teacher/classes', [EnglishTeacherController::class, 'classes']);
+        Route::get('teacher/students', [EnglishTeacherController::class, 'students']);
+        Route::get('teacher/tasks', [EnglishTeacherController::class, 'tasks']);
+
+        Route::get('teachers', [EnglishTeacherController::class, 'index']);
+        Route::post('teachers', [EnglishTeacherController::class, 'store']);
+        Route::get('teachers/{id}', [EnglishTeacherController::class, 'show']);
+        Route::put('teachers/{id}', [EnglishTeacherController::class, 'update']);
+        Route::delete('teachers/{id}', [EnglishTeacherController::class, 'destroy']);
+
+        Route::get('students', [EnglishStudentController::class, 'index']);
+        Route::post('students', [EnglishStudentController::class, 'store']);
+        Route::get('students/{id}', [EnglishStudentController::class, 'show']);
+        Route::put('students/{id}', [EnglishStudentController::class, 'update']);
+        Route::delete('students/{id}', [EnglishStudentController::class, 'destroy']);
+
+        Route::get('classes', [EnglishClassController::class, 'index']);
+        Route::post('classes', [EnglishClassController::class, 'store']);
+        Route::get('classes/{id}', [EnglishClassController::class, 'show']);
+        Route::put('classes/{id}', [EnglishClassController::class, 'update']);
+        Route::delete('classes/{id}', [EnglishClassController::class, 'destroy']);
+
+        Route::get('tasks', [EnglishTaskController::class, 'index']);
+        Route::post('tasks', [EnglishTaskController::class, 'store']);
+        Route::get('tasks/{id}', [EnglishTaskController::class, 'show']);
+        Route::put('tasks/{id}', [EnglishTaskController::class, 'update']);
+        Route::delete('tasks/{id}', [EnglishTaskController::class, 'destroy']);
+
+        Route::get('submissions', [EnglishSubmissionController::class, 'index']);
+        Route::post('submissions', [EnglishSubmissionController::class, 'store']);
+        Route::put('submissions/{id}', [EnglishSubmissionController::class, 'update']);
     });
 });
