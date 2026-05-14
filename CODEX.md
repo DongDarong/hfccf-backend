@@ -49,3 +49,6 @@ These project rules should be followed when Codex creates or edits files in this
 - Commit the task with a concise conventional commit message.
 - Do not include unrelated dirty worktree changes in the commit.
 - Do not amend commits unless explicitly requested.
+
+
+codex resume 019e1f17-b352-7302-9ea8-6e4f1f1ee4bb
