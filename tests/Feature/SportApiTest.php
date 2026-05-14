@@ -240,6 +240,223 @@ class SportApiTest extends TestCase
         $this->assertSame(0, (int) $match->away_score);
     }
 
+    public function test_score_recalculates_for_event_mutations(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_931', 'sport.admin931@hfccf.org');
+        $homeTeam = $this->createTeam('TEAM-931-A', 'Mutation Home');
+        $awayTeam = $this->createTeam('TEAM-931-B', 'Mutation Away');
+        $match = $this->createMatch($homeTeam, $awayTeam, 'live');
+
+        $goal = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $homeTeam->id,
+            'event_type' => 'goal',
+            'minute' => 11,
+        ]);
+
+        $goal->assertCreated()->assertJsonPath('data.event.eventType', 'goal');
+
+        $eventId = $goal->json('data.event.id');
+
+        $this->putJson('/api/sport/events/'.$eventId, [
+            'minute' => 12,
+            'event_type' => 'goal',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.event.minute', 12)
+            ->assertJsonPath('data.event.eventType', 'goal');
+
+        $match->refresh();
+        $this->assertSame(1, (int) $match->home_score);
+        $this->assertSame(0, (int) $match->away_score);
+
+        $this->putJson('/api/sport/events/'.$eventId, [
+            'team_id' => $awayTeam->id,
+            'event_type' => 'goal',
+            'minute' => 13,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.event.teamId', $awayTeam->id)
+            ->assertJsonPath('data.event.eventType', 'goal');
+
+        $match->refresh();
+        $this->assertSame(0, (int) $match->home_score);
+        $this->assertSame(1, (int) $match->away_score);
+
+        $this->putJson('/api/sport/events/'.$eventId, [
+            'team_id' => $awayTeam->id,
+            'event_type' => 'own_goal',
+            'minute' => 14,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.event.eventType', 'own_goal');
+
+        $match->refresh();
+        $this->assertSame(1, (int) $match->home_score);
+        $this->assertSame(0, (int) $match->away_score);
+
+        $this->putJson('/api/sport/events/'.$eventId, [
+            'team_id' => $awayTeam->id,
+            'event_type' => 'goal',
+            'minute' => 15,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.event.eventType', 'goal');
+
+        $match->refresh();
+        $this->assertSame(0, (int) $match->home_score);
+        $this->assertSame(1, (int) $match->away_score);
+
+        $penalty = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $homeTeam->id,
+            'event_type' => 'penalty_goal',
+            'minute' => 22,
+        ]);
+
+        $penalty->assertCreated()->assertJsonPath('data.event.eventType', 'penalty_goal');
+
+        $match->refresh();
+        $this->assertSame(1, (int) $match->home_score);
+        $this->assertSame(1, (int) $match->away_score);
+
+        $this->deleteJson('/api/sport/events/'.$penalty->json('data.event.id'))
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $match->refresh();
+        $this->assertSame(0, (int) $match->home_score);
+        $this->assertSame(1, (int) $match->away_score);
+
+        $this->deleteJson('/api/sport/events/'.$eventId)
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $match->refresh();
+        $this->assertSame(0, (int) $match->home_score);
+        $this->assertSame(0, (int) $match->away_score);
+    }
+
+    public function test_timeline_events_are_ordered_by_minute_and_extra_time(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_932', 'sport.admin932@hfccf.org');
+        $homeTeam = $this->createTeam('TEAM-932-A', 'Timeline Home');
+        $awayTeam = $this->createTeam('TEAM-932-B', 'Timeline Away');
+        $match = $this->createMatch($homeTeam, $awayTeam, 'live');
+
+        $sameMinuteFirst = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $homeTeam->id,
+            'event_type' => 'goal',
+            'minute' => 12,
+        ]);
+        $sameMinuteSecond = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $awayTeam->id,
+            'event_type' => 'substitution',
+            'minute' => 12,
+        ]);
+        $fortyFive = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $homeTeam->id,
+            'event_type' => 'goal',
+            'minute' => 45,
+        ]);
+        $fortyFivePlusOne = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $awayTeam->id,
+            'event_type' => 'goal',
+            'minute' => 45,
+            'extra_time_minute' => 1,
+        ]);
+        $ninetyPlusOne = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $homeTeam->id,
+            'event_type' => 'goal',
+            'minute' => 90,
+            'extra_time_minute' => 1,
+        ]);
+        $ninetyPlusFive = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $awayTeam->id,
+            'event_type' => 'goal',
+            'minute' => 90,
+            'extra_time_minute' => 5,
+        ]);
+
+        $response = $this->getJson('/api/sport/matches/'.$match->id.'/events')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $items = $response->json('data.items');
+
+        $this->assertCount(6, $items);
+        $this->assertSame(12, (int) $items[0]['minute']);
+        $this->assertSame($sameMinuteFirst->json('data.event.id'), $items[0]['id']);
+        $this->assertSame(12, (int) $items[1]['minute']);
+        $this->assertSame($sameMinuteSecond->json('data.event.id'), $items[1]['id']);
+        $this->assertSame(45, (int) $items[2]['minute']);
+        $this->assertNull($items[2]['extraTimeMinute']);
+        $this->assertSame($fortyFive->json('data.event.id'), $items[2]['id']);
+        $this->assertSame(45, (int) $items[3]['minute']);
+        $this->assertSame(1, (int) $items[3]['extraTimeMinute']);
+        $this->assertSame($fortyFivePlusOne->json('data.event.id'), $items[3]['id']);
+        $this->assertSame(90, (int) $items[4]['minute']);
+        $this->assertSame(1, (int) $items[4]['extraTimeMinute']);
+        $this->assertSame($ninetyPlusOne->json('data.event.id'), $items[4]['id']);
+        $this->assertSame(90, (int) $items[5]['minute']);
+        $this->assertSame(5, (int) $items[5]['extraTimeMinute']);
+        $this->assertSame($ninetyPlusFive->json('data.event.id'), $items[5]['id']);
+    }
+
+    public function test_completed_match_can_reopen_and_edit_events(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_933', 'sport.admin933@hfccf.org');
+        $homeTeam = $this->createTeam('TEAM-933-A', 'Reopen Home');
+        $awayTeam = $this->createTeam('TEAM-933-B', 'Reopen Away');
+        $match = $this->createMatch($homeTeam, $awayTeam, 'live');
+
+        $goal = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $homeTeam->id,
+            'event_type' => 'goal',
+            'minute' => 10,
+        ]);
+
+        $goal->assertCreated();
+        $eventId = $goal->json('data.event.id');
+
+        $this->patchJson('/api/sport/matches/'.$match->id.'/status', [
+            'status' => 'completed',
+            'current_period' => 'final',
+        ])->assertOk();
+
+        $reopen = $this->patchJson('/api/sport/matches/'.$match->id.'/status', [
+            'status' => 'live',
+            'current_period' => 'second_half',
+        ]);
+
+        $reopen
+            ->assertOk()
+            ->assertJsonPath('data.match.status', 'live');
+
+        $this->putJson('/api/sport/events/'.$eventId, [
+            'minute' => 11,
+            'event_type' => 'goal',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.event.minute', 11);
+
+        $match->refresh();
+        $this->assertSame(1, (int) $match->home_score);
+        $this->assertSame(0, (int) $match->away_score);
+    }
+
+    public function test_coach_cannot_mutate_sport_events(): void
+    {
+        $this->actingAsRole('coach', 'usr_934', 'coach.sport934@hfccf.org');
+        $homeTeam = $this->createTeam('TEAM-934-A', 'Coach Event Home');
+        $awayTeam = $this->createTeam('TEAM-934-B', 'Coach Event Away');
+        $match = $this->createMatch($homeTeam, $awayTeam, 'live');
+
+        $this->postJson('/api/sport/matches/'.$match->id.'/events', [
+            'team_id' => $homeTeam->id,
+            'event_type' => 'goal',
+            'minute' => 8,
+        ])->assertForbidden();
+    }
+
     public function test_own_goals_are_counted_for_the_opponent_team(): void
     {
         $this->actingAsRole('adminsport', 'usr_940', 'sport.admin940@hfccf.org');

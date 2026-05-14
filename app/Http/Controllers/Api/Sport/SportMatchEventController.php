@@ -118,6 +118,8 @@ class SportMatchEventController extends SportController
         }
 
         $data = $request->validated();
+        $playerProvided = array_key_exists('player_id', $data) || array_key_exists('player_name', $data);
+        $player = $event->player;
 
         if (array_key_exists('team_id', $data)) {
             $teamId = (int) $data['team_id'];
@@ -127,16 +129,20 @@ class SportMatchEventController extends SportController
             $event->team_id = $teamId;
         }
 
-        $player = null;
-
         if (array_key_exists('player_id', $data) && $data['player_id']) {
             $player = $this->resolvePlayerReference((string) $data['player_id']);
         } elseif (! empty($data['player_name'])) {
             $player = $this->resolvePlayerReference($data['player_name']);
+        } elseif ($playerProvided && empty($data['player_id']) && empty($data['player_name'])) {
+            $player = null;
         }
 
         if ($player && (int) $player->team_id !== (int) $event->team_id) {
             return ApiResponse::errorResponse('Player must belong to the selected team.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! $playerProvided && $event->player_id && (int) $event->player?->team_id !== (int) $event->team_id) {
+            $player = null;
         }
 
         foreach (['event_type', 'minute', 'extra_time_minute'] as $field) {

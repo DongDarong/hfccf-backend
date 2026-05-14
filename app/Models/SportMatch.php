@@ -52,7 +52,10 @@ class SportMatch extends Model
 
     public function events(): HasMany
     {
-        return $this->hasMany(SportMatchEvent::class, 'match_id');
+        return $this->hasMany(SportMatchEvent::class, 'match_id')
+            ->orderBy('minute')
+            ->orderBy('extra_time_minute')
+            ->orderBy('id');
     }
 
     public function creator(): BelongsTo
@@ -60,4 +63,3 @@ class SportMatch extends Model
         return $this->belongsTo(User::class, 'created_by_user_id', 'id');
     }
 }
-
