@@ -49,5 +49,4 @@ These project rules should be followed when Codex creates or edits files in this
 - Do not amend commits unless explicitly requested.
 
 
-
-run codex resume 019e1f17-b352-7302-9ea8-6e4f1f1ee4bb
+codex resume 019e1f17-b352-7302-9ea8-6e4f1f1ee4bb
