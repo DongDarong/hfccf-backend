@@ -24,7 +24,7 @@ class UserFactory extends Factory
         $lastName = fake()->lastName();
 
         return [
-            'id' => 'usr_'.fake()->unique()->numerify('###'),
+            'id' => 'usr_'.fake()->unique()->numerify('####'),
             'first_name' => $firstName,
             'last_name' => $lastName,
             'username' => $firstName.' '.$lastName,
