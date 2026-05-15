@@ -458,96 +458,145 @@ class AuthApiTest extends TestCase
     public function test_authenticated_user_can_update_profile_avatar_only(): void
     {
         Storage::fake('public');
+        Storage::fake('r2');
 
-        $user = $this->createUser([
-            'avatar' => null,
-        ]);
-        $token = $this->loginAndGetToken($user);
-        $avatar = UploadedFile::fake()->image('avatar.jpg', 320, 320);
-
-        $response = $this->post('/api/auth/me', [
-            '_method' => 'PATCH',
-            'avatar' => $avatar,
-        ], [
-            'Authorization' => 'Bearer '.$token,
+        $originalImageDisk = config('filesystems.image_disk');
+        $originalR2Url = config('filesystems.disks.r2.url');
+        config([
+            'filesystems.image_disk' => 'r2',
+            'filesystems.disks.r2.url' => 'https://cdn.example.test',
         ]);
 
-        $response
-            ->assertOk()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('data.user.id', $user->id);
+        try {
+            $user = $this->createUser([
+                'avatar' => null,
+            ]);
+            $token = $this->loginAndGetToken($user);
+            $avatar = UploadedFile::fake()->image('avatar.jpg', 320, 320);
 
-        $avatarUrl = (string) $response->json('data.user.avatar');
-        $this->assertNotEmpty($avatarUrl);
-        $this->assertStringContainsString('/storage/avatars/', $avatarUrl);
+            $response = $this->post('/api/auth/me', [
+                '_method' => 'PATCH',
+                'avatar' => $avatar,
+            ], [
+                'Authorization' => 'Bearer '.$token,
+            ]);
 
-        $avatarPath = Str::after((string) parse_url($avatarUrl, PHP_URL_PATH), '/storage/');
-        Storage::disk('public')->assertExists($avatarPath);
+            $response
+                ->assertOk()
+                ->assertJsonPath('success', true)
+                ->assertJsonPath('data.user.id', $user->id);
 
-        $this->assertDatabaseHas('users', [
-            'id' => $user->id,
-            'avatar' => $avatarPath,
-        ]);
+            $avatarUrl = (string) $response->json('data.user.avatar');
+            $this->assertNotEmpty($avatarUrl);
+            $this->assertStringContainsString('/storage/avatars/', $avatarUrl);
+
+            $avatarPath = ImageStorage::resolvePath($avatarUrl);
+            $this->assertNotNull($avatarPath);
+            Storage::disk('r2')->assertExists($avatarPath);
+
+            $this->assertDatabaseHas('users', [
+                'id' => $user->id,
+                'avatar' => $avatarPath,
+            ]);
+        } finally {
+            config([
+                'filesystems.image_disk' => $originalImageDisk,
+                'filesystems.disks.r2.url' => $originalR2Url,
+            ]);
+        }
     }
 
     public function test_authenticated_user_can_replace_avatar_and_remove_old_file(): void
     {
         Storage::fake('public');
-        Storage::disk('public')->put('avatars/old-avatar.jpg', 'old-avatar');
+        Storage::fake('r2');
 
-        $oldAvatarUrl = asset('storage/avatars/old-avatar.jpg');
-        $user = $this->createUser([
-            'avatar' => $oldAvatarUrl,
-        ]);
-        $token = $this->loginAndGetToken($user);
-        $avatar = UploadedFile::fake()->image('new-avatar.jpg', 320, 320);
-
-        $response = $this->post('/api/auth/me', [
-            '_method' => 'PATCH',
-            'avatar' => $avatar,
-        ], [
-            'Authorization' => 'Bearer '.$token,
+        $originalImageDisk = config('filesystems.image_disk');
+        $originalR2Url = config('filesystems.disks.r2.url');
+        config([
+            'filesystems.image_disk' => 'r2',
+            'filesystems.disks.r2.url' => 'https://cdn.example.test',
         ]);
 
-        $response->assertOk()->assertJsonPath('success', true);
+        try {
+            Storage::disk('r2')->put('avatars/old-avatar.jpg', 'old-avatar');
 
-        Storage::disk('public')->assertMissing('avatars/old-avatar.jpg');
+            $oldAvatarUrl = Storage::disk('r2')->url('avatars/old-avatar.jpg');
+            $user = $this->createUser([
+                'avatar' => $oldAvatarUrl,
+            ]);
+            $token = $this->loginAndGetToken($user);
+            $avatar = UploadedFile::fake()->image('new-avatar.jpg', 320, 320);
 
-        $newAvatarUrl = (string) $response->json('data.user.avatar');
-        $newAvatarPath = Str::after((string) parse_url($newAvatarUrl, PHP_URL_PATH), '/storage/');
-        Storage::disk('public')->assertExists($newAvatarPath);
+            $response = $this->post('/api/auth/me', [
+                '_method' => 'PATCH',
+                'avatar' => $avatar,
+            ], [
+                'Authorization' => 'Bearer '.$token,
+            ]);
 
-        $this->assertDatabaseHas('users', [
-            'id' => $user->id,
-            'avatar' => $newAvatarPath,
-        ]);
+            $response->assertOk()->assertJsonPath('success', true);
+
+            Storage::disk('r2')->assertMissing('avatars/old-avatar.jpg');
+
+            $newAvatarUrl = (string) $response->json('data.user.avatar');
+            $newAvatarPath = ImageStorage::resolvePath($newAvatarUrl);
+            $this->assertNotNull($newAvatarPath);
+            Storage::disk('r2')->assertExists($newAvatarPath);
+
+            $this->assertDatabaseHas('users', [
+                'id' => $user->id,
+                'avatar' => $newAvatarPath,
+            ]);
+        } finally {
+            config([
+                'filesystems.image_disk' => $originalImageDisk,
+                'filesystems.disks.r2.url' => $originalR2Url,
+            ]);
+        }
     }
 
     public function test_authenticated_user_can_remove_existing_avatar(): void
     {
         Storage::fake('public');
-        Storage::disk('public')->put('avatars/remove-avatar.jpg', 'avatar');
+        Storage::fake('r2');
 
-        $avatarUrl = asset('storage/avatars/remove-avatar.jpg');
-        $user = $this->createUser([
-            'avatar' => $avatarUrl,
+        $originalImageDisk = config('filesystems.image_disk');
+        $originalR2Url = config('filesystems.disks.r2.url');
+        config([
+            'filesystems.image_disk' => 'r2',
+            'filesystems.disks.r2.url' => 'https://cdn.example.test',
         ]);
-        $token = $this->loginAndGetToken($user);
 
-        $this->patchJson('/api/auth/me', [
-            'remove_avatar' => true,
-        ], [
-            'Authorization' => 'Bearer '.$token,
-        ])
-            ->assertOk()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('data.user.avatar', null);
+        try {
+            Storage::disk('r2')->put('avatars/remove-avatar.jpg', 'avatar');
 
-        Storage::disk('public')->assertMissing('avatars/remove-avatar.jpg');
-        $this->assertDatabaseHas('users', [
-            'id' => $user->id,
-            'avatar' => null,
-        ]);
+            $avatarUrl = Storage::disk('r2')->url('avatars/remove-avatar.jpg');
+            $user = $this->createUser([
+                'avatar' => $avatarUrl,
+            ]);
+            $token = $this->loginAndGetToken($user);
+
+            $this->patchJson('/api/auth/me', [
+                'remove_avatar' => true,
+            ], [
+                'Authorization' => 'Bearer '.$token,
+            ])
+                ->assertOk()
+                ->assertJsonPath('success', true)
+                ->assertJsonPath('data.user.avatar', null);
+
+            Storage::disk('r2')->assertMissing('avatars/remove-avatar.jpg');
+            $this->assertDatabaseHas('users', [
+                'id' => $user->id,
+                'avatar' => null,
+            ]);
+        } finally {
+            config([
+                'filesystems.image_disk' => $originalImageDisk,
+                'filesystems.disks.r2.url' => $originalR2Url,
+            ]);
+        }
     }
 
     public function test_authenticated_user_can_store_avatar_on_r2_disk_without_changing_response_shape(): void

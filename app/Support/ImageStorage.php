@@ -2,8 +2,11 @@
 
 namespace App\Support;
 
+use App\Jobs\ProcessUploadedImage;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class ImageStorage
 {
@@ -34,7 +37,23 @@ class ImageStorage
             return null;
         }
 
-        return $file->store($directory, self::diskName());
+        $path = $file->store($directory, self::diskName());
+
+        if (! $path) {
+            return null;
+        }
+
+        try {
+            ProcessUploadedImage::dispatch(self::diskName(), $path);
+        } catch (Throwable $exception) {
+            Log::warning('Image optimization job dispatch failed.', [
+                'disk' => self::diskName(),
+                'path' => $path,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
+
+        return $path;
     }
 
     public static function url(mixed $value): ?string
