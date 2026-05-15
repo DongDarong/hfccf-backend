@@ -11,6 +11,8 @@ class StoreUserRequest extends FormRequest
         $this->merge([
             'first_name' => $this->input('first_name', $this->input('firstName')),
             'last_name' => $this->input('last_name', $this->input('lastName')),
+            'role' => $this->input('role', $this->input('role_code')),
+            'role_code' => $this->input('role_code', $this->input('role')),
             'department_code' => $this->input('department_code', $this->input('departmentCode')),
             'confirm_password' => $this->input('confirm_password', $this->input('confirmPassword')),
         ]);
@@ -33,13 +35,12 @@ class StoreUserRequest extends FormRequest
             'email' => ['required', 'email', 'max:191', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:32'],
             'role' => ['required', 'string', 'max:32', 'exists:roles,code'],
+            'role_code' => ['sometimes', 'string', 'max:32', 'exists:roles,code'],
             'department_code' => ['nullable', 'string', 'max:32', 'exists:departments,code'],
             'bio' => ['nullable', 'string'],
             'status' => ['nullable', 'in:active,pending,inactive,suspended'],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_avatar' => ['sometimes', 'boolean'],
-            'permissions' => ['nullable', 'array', 'min:1'],
-            'permissions.*' => ['string', 'max:64', 'exists:permissions,code'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ];
     }

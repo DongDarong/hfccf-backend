@@ -22,6 +22,7 @@ These project rules should be followed when Codex creates or edits files in this
 - Keep string IDs where the frontend contract depends on them, such as `usr_001`.
 - The canonical scholarship admin role code is `adminscholarship` (fix typo consistency across frontend/backend).
 - Keep players and preschool students as data records, not system users.
+- Resolve user permissions from `role_permissions`; treat frontend permission selections as display-only.
 - Ensure migrations run from top to bottom without foreign key errors.
 - Update seeders whenever schema columns change.
 - Avoid adding scaffold/demo tables that are not part of the HFCCF system.
@@ -31,6 +32,7 @@ These project rules should be followed when Codex creates or edits files in this
 - Use consistent JSON responses with `success`, `message`, and `data`.
 - Protect authenticated routes with bearer-token middleware.
 - Apply rate limiting to public auth endpoints and general API routes.
+- Keep the super-admin user detail alias (`/api/super-admin/users/{id}`) aligned with `/api/users/{id}` and persist all create/update changes in the database.
 - Keep frontend/API mapper compatibility in mind before changing response fields.
 
 ## Verification Rules
@@ -47,3 +49,6 @@ These project rules should be followed when Codex creates or edits files in this
 - Commit the task with a concise conventional commit message.
 - Do not include unrelated dirty worktree changes in the commit.
 - Do not amend commits unless explicitly requested.
+
+
+codex resume 019e1f17-b352-7302-9ea8-6e4f1f1ee4bb

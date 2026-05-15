@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Http\Requests\Sport;
+
+use App\Models\User;
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreSportCoachRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        /** @var User|null $user */
+        $user = $this->user();
+
+        return (bool) $user && in_array($user->role_code, ['superadmin', 'adminsport'], true);
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $name = trim((string) $this->input('name', $this->input('full_name', '')));
+        [$firstName, $lastName] = $this->splitName($name);
+
+        $this->merge([
+            'first_name' => $this->input('first_name', $firstName),
+            'last_name' => $this->input('last_name', $lastName),
+            'username' => $this->input('username', $name),
+            'status' => $this->input('status', 'active'),
+            'password_confirmation' => $this->input('password_confirmation', $this->input('confirmPassword')),
+        ]);
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => ['sometimes', 'nullable', 'string', 'max:191'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'username' => ['nullable', 'string', 'max:191'],
+            'email' => ['required', 'email', 'max:191', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:32'],
+            'status' => ['required', 'in:active,pending,inactive,suspended'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'remove_avatar' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /**
+     * @return array{0:string,1:string}
+     */
+    private function splitName(string $name): array
+    {
+        $name = trim(preg_replace('/\s+/', ' ', $name) ?? $name);
+
+        if ($name === '') {
+            return ['', ''];
+        }
+
+        $parts = preg_split('/\s+/', $name, 2) ?: [$name, ''];
+
+        return [
+            trim((string) ($parts[0] ?? '')),
+            trim((string) ($parts[1] ?? '')),
+        ];
+    }
+}
+

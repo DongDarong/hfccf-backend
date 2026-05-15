@@ -158,6 +158,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `users_email_unique` (`email`),
   KEY `users_role_code_index` (`role_code`),
   KEY `users_status_index` (`status`),
+  KEY `users_created_at_index` (`created_at`),
   KEY `users_department_code_index` (`department_code`),
   KEY `users_deleted_at_index` (`deleted_at`),
   CONSTRAINT `fk_users_role`
@@ -165,6 +166,65 @@ CREATE TABLE `users` (
     ON UPDATE CASCADE,
   CONSTRAINT `fk_users_department`
     FOREIGN KEY (`department_code`) REFERENCES `departments` (`code`)
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `notifications` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `type` ENUM('info', 'success', 'warning', 'error', 'system') NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `message` TEXT NOT NULL,
+  `module` ENUM('global', 'english', 'preschool', 'scholarship', 'sport') NOT NULL,
+  `action_url` VARCHAR(2048) DEFAULT NULL,
+  `metadata` JSON DEFAULT NULL,
+  `created_by` VARCHAR(16) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `notifications_type_index` (`type`),
+  KEY `notifications_module_index` (`module`),
+  KEY `notifications_created_by_index` (`created_by`),
+  KEY `notifications_created_at_index` (`created_at`),
+  CONSTRAINT `fk_notifications_created_by`
+    FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `notification_targets` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `notification_id` BIGINT UNSIGNED NOT NULL,
+  `target_type` ENUM('all', 'role', 'department', 'module', 'user') NOT NULL,
+  `target_value` VARCHAR(191) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `notification_targets_notification_type_index` (`notification_id`, `target_type`),
+  KEY `notification_targets_target_type_index` (`target_type`),
+  KEY `notification_targets_target_value_index` (`target_value`),
+  CONSTRAINT `fk_notification_targets_notification`
+    FOREIGN KEY (`notification_id`) REFERENCES `notifications` (`id`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `notification_recipients` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `notification_id` BIGINT UNSIGNED NOT NULL,
+  `user_id` VARCHAR(16) NOT NULL,
+  `read_at` TIMESTAMP NULL DEFAULT NULL,
+  `dismissed_at` TIMESTAMP NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `notification_recipients_notification_user_unique` (`notification_id`, `user_id`),
+  KEY `notification_recipients_user_index` (`user_id`),
+  KEY `notification_recipients_read_at_index` (`read_at`),
+  KEY `notification_recipients_dismissed_at_index` (`dismissed_at`),
+  KEY `notification_recipients_created_at_index` (`created_at`),
+  CONSTRAINT `fk_notification_recipients_notification`
+    FOREIGN KEY (`notification_id`) REFERENCES `notifications` (`id`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_notification_recipients_user`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON DELETE CASCADE
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
