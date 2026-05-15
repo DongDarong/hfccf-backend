@@ -6,6 +6,7 @@ use App\Mail\PasswordResetOtpMail;
 use App\Models\PasswordResetOtp;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\ImageStorage;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -485,7 +486,7 @@ class AuthApiTest extends TestCase
 
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
-            'avatar' => $avatarUrl,
+            'avatar' => $avatarPath,
         ]);
     }
 
@@ -518,7 +519,7 @@ class AuthApiTest extends TestCase
 
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
-            'avatar' => $newAvatarUrl,
+            'avatar' => $newAvatarPath,
         ]);
     }
 
@@ -547,6 +548,83 @@ class AuthApiTest extends TestCase
             'id' => $user->id,
             'avatar' => null,
         ]);
+    }
+
+    public function test_authenticated_user_can_store_avatar_on_r2_disk_without_changing_response_shape(): void
+    {
+        Storage::fake('public');
+        Storage::fake('r2');
+
+        $originalImageDisk = config('filesystems.image_disk');
+        $originalR2Url = config('filesystems.disks.r2.url');
+
+        config([
+            'filesystems.image_disk' => 'r2',
+            'filesystems.disks.r2.url' => 'https://cdn.example.test',
+        ]);
+
+        try {
+            $user = $this->createUser([
+                'avatar' => null,
+            ]);
+            $token = $this->loginAndGetToken($user);
+            $avatar = UploadedFile::fake()->image('avatar.jpg', 320, 320);
+
+            $response = $this->post('/api/auth/me', [
+                '_method' => 'PATCH',
+                'avatar' => $avatar,
+            ], [
+                'Authorization' => 'Bearer '.$token,
+            ]);
+
+            $response
+                ->assertOk()
+                ->assertJsonPath('success', true)
+                ->assertJsonPath('data.user.id', $user->id);
+
+            $avatarUrl = (string) $response->json('data.user.avatar');
+
+            $avatarPath = ImageStorage::resolvePath($avatarUrl);
+            $this->assertNotNull($avatarPath);
+            $this->assertSame(Storage::disk('r2')->url($avatarPath), $avatarUrl);
+            Storage::disk('r2')->assertExists($avatarPath);
+
+            $this->assertDatabaseHas('users', [
+                'id' => $user->id,
+                'avatar' => $avatarPath,
+            ]);
+        } finally {
+            config([
+                'filesystems.image_disk' => $originalImageDisk,
+                'filesystems.disks.r2.url' => $originalR2Url,
+            ]);
+        }
+    }
+
+    public function test_authenticated_user_avatar_upload_rejects_invalid_file_and_oversized_image(): void
+    {
+        $user = $this->createUser([
+            'avatar' => null,
+        ]);
+        $token = $this->loginAndGetToken($user);
+
+        $this->post('/api/auth/me', [
+            '_method' => 'PATCH',
+            'avatar' => UploadedFile::fake()->create('avatar.txt', 4, 'text/plain'),
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
+
+        $this->post('/api/auth/me', [
+            '_method' => 'PATCH',
+            'avatar' => UploadedFile::fake()->image('large-avatar.jpg')->size(2050),
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
     }
 
     public function test_authenticated_user_can_update_department_code_and_partial_profile_fields(): void

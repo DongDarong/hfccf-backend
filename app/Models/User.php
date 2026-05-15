@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\ImageStorage;
 use App\Traits\HasAuditFields;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -95,23 +96,7 @@ class User extends Authenticatable
 
     private function resolveAvatarUrl(mixed $value): ?string
     {
-        $avatar = trim((string) $value);
-
-        if ($avatar === '' || str_starts_with($avatar, 'blob:')) {
-            return null;
-        }
-
-        if (preg_match('/^https?:\/\//i', $avatar) === 1) {
-            return $avatar;
-        }
-
-        $path = ltrim($avatar, '/');
-
-        if (str_starts_with($path, 'storage/')) {
-            return asset($path);
-        }
-
-        return asset('storage/'.$path);
+        return ImageStorage::url($value);
     }
 
     protected static function booted(): void
