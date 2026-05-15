@@ -49,4 +49,49 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    public function suspended(): static
+    {
+        return $this->state(['status' => 'inactive']);
+    }
+
+    public function asAdminEnglish(): static
+    {
+        return $this->state(['role_code' => 'adminenglish', 'department_code' => 'education']);
+    }
+
+    public function asAdminPreschool(): static
+    {
+        return $this->state(['role_code' => 'adminpreschool', 'department_code' => 'education']);
+    }
+
+    public function asAdminScholarship(): static
+    {
+        return $this->state(['role_code' => 'adminscholarship', 'department_code' => 'education']);
+    }
+
+    public function asAdminSport(): static
+    {
+        return $this->state(['role_code' => 'adminsport', 'department_code' => 'sports']);
+    }
+
+    public function asCoach(): static
+    {
+        return $this->state(['role_code' => 'coach', 'department_code' => 'sports']);
+    }
+
+    public function asTeacherEnglish(): static
+    {
+        return $this->state(['role_code' => 'teacher-english', 'department_code' => 'education']);
+    }
+
+    public function asTeacherPreschool(): static
+    {
+        return $this->state(['role_code' => 'teacher-preschool', 'department_code' => 'education']);
+    }
+
+    public function asTeacherScholarship(): static
+    {
+        return $this->state(['role_code' => 'teacher-scholarship', 'department_code' => 'education']);
+    }
 }

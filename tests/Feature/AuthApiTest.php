@@ -21,7 +21,7 @@ class AuthApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const OTP_TEST_IP = '10.10.10.10';
+    protected const OTP_TEST_IP = '10.10.10.10';
 
     protected function setUp(): void
     {
@@ -694,11 +694,11 @@ class AuthApiTest extends TestCase
         return $user;
     }
 
-    private function loginAndGetToken(User $user): string
+    protected function loginAndGetToken(User $user, string $password = 'secret-pass'): string
     {
         $response = $this->postJson('/api/auth/login', [
             'email' => $user->email,
-            'password' => 'secret-pass',
+            'password' => $password,
             'remember' => true,
         ]);
 
@@ -708,7 +708,7 @@ class AuthApiTest extends TestCase
     /**
      * @return array{0: string, 1: PasswordResetOtp}
      */
-    private function issueOtpForEmail(string $email): array
+    protected function issueOtpForEmail(string $email): array
     {
         Mail::fake();
         $this->clearOtpRateLimit($email);
@@ -735,7 +735,7 @@ class AuthApiTest extends TestCase
         return [$otpCode, $otp];
     }
 
-    private function clearOtpRateLimit(string $email): void
+    protected function clearOtpRateLimit(string $email): void
     {
         $normalizedEmail = strtolower($email);
 
@@ -743,7 +743,7 @@ class AuthApiTest extends TestCase
         RateLimiter::clear('otp:ip:'.self::OTP_TEST_IP);
     }
 
-    private function otpPostJson(string $uri, array $data = [])
+    protected function otpPostJson(string $uri, array $data = [])
     {
         return $this->withServerVariables([
             'REMOTE_ADDR' => self::OTP_TEST_IP,

@@ -20,10 +20,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
-    private const RECOVERY_ROLE = 'superadmin';
-
-    private const RECOVERY_PERMISSION = 'all:*';
-
     private const OTP_PURPOSE = 'forgot_password';
 
     private const OTP_STATUS_ACTIVE = ['pending', 'verified'];
@@ -364,18 +360,10 @@ class AuthController extends Controller
 
     private function findEligibleRecoveryUser(string $email): ?User
     {
-        $user = User::query()
-            ->with('permissions')
+        return User::query()
             ->where('email', strtolower($email))
-            ->where('role_code', self::RECOVERY_ROLE)
             ->where('status', 'active')
             ->first();
-
-        if (! $user || ! $user->permissions->contains('code', self::RECOVERY_PERMISSION)) {
-            return null;
-        }
-
-        return $user;
     }
 
     private function invalidateActiveOtps(string $email): void
