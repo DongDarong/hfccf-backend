@@ -1,6 +1,6 @@
 # HFCCF Backend
 
-Laravel 13 API backend for the HFCCF admin system. The current backend slice supports authentication, RBAC, forgot-password OTP flow, personal access tokens, and API rate limiting for the Vue frontend.
+Laravel 13 API backend for the HFCCF admin system. The current backend supports authentication, RBAC, user management, Preschool, Scholarship, English, and Sport foundation APIs, along with forgot-password OTP flow, personal access tokens, and API rate limiting for the Vue frontend.
 
 ## Stack
 
@@ -16,10 +16,26 @@ Laravel 13 API backend for the HFCCF admin system. The current backend slice sup
 - Logout with token revocation
 - Forgot password OTP request, OTP verification, and password reset
 - Role, permission, department, and user seed data aligned with the frontend contract
+- User CRUD with permission syncing, avatar upload, and archived deletion flow
+- Preschool module APIs for classes, students, teachers, attendance, and payments
+- Scholarship module APIs for students, applications, reviews, and status workflow
+- English module APIs for classes, students, teachers, tasks, and submissions
+- Sport foundation APIs for teams, players, coaches, matches, events, tournaments, and standings
 - API rate limiting for general API traffic, login, OTP, and password reset endpoints
 - Automatic user archiving to `deleted_users` table upon deletion
 - Standardized sequential user ID indexing (`usr_001`, `usr_002`, etc.)
 - Consistent JSON error responses for missing API routes and rate-limit failures
+
+## Module Coverage
+
+The backend currently exposes these stabilized domain areas:
+
+- Core auth and RBAC
+- User management and profile updates
+- Preschool module
+- Scholarship module
+- English module
+- Sport foundation, including event-driven match scores and tournament standings
 
 ## Setup
 
@@ -115,6 +131,11 @@ Configured in `app/Providers/AppServiceProvider.php` and applied in `bootstrap/a
 
 - `routes/api.php`: API routes and route-level rate limiter middleware
 - `app/Http/Controllers/Api/AuthController.php`: auth and password reset flow
+- `app/Http/Controllers/Api/UserController.php`: user CRUD
+- `app/Http/Controllers/Api/Preschool/`: preschool module controllers
+- `app/Http/Controllers/Api/Scholarship/`: scholarship module controllers
+- `app/Http/Controllers/Api/English/`: english module controllers
+- `app/Http/Controllers/Api/Sport/`: sport module controllers
 - `app/Http/Middleware/AuthenticateApiToken.php`: bearer token authentication
 - `app/Models/User.php`: Main user model with automatic archiving logic
 - `app/Models/DeletedUser.php`: Archive model for deleted users
@@ -126,3 +147,5 @@ Configured in `app/Providers/AppServiceProvider.php` and applied in `bootstrap/a
 - User IDs are sequential string IDs such as `usr_001`, `usr_002`, matching the frontend contract.
 - The role code `adminscholarship` is the canonical scholarship admin role used by the frontend and backend.
 - Players and preschool students are data records, not system users.
+- Sport matches derive score snapshots from match events; standings are derived from completed tournament matches.
+- Frontend module integration uses standardized JSON response envelopes with `success`, `message`, and `data`.

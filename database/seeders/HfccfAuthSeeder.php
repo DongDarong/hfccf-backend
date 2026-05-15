@@ -13,6 +13,9 @@ class HfccfAuthSeeder extends Seeder
      */
     public function run(): void
     {
+        DB::table('notification_recipients')->delete();
+        DB::table('notification_targets')->delete();
+        DB::table('notifications')->delete();
         DB::table('personal_access_tokens')->delete();
         DB::table('password_reset_otps')->delete();
         DB::table('user_permissions')->delete();

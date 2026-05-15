@@ -8,10 +8,13 @@ use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -112,8 +115,8 @@ class AuthApiTest extends TestCase
             'Authorization' => 'Bearer '.$token,
         ])
             ->assertOk()
-            ->assertJsonPath('data.email', $user->email)
-            ->assertJsonPath('data.permissions.0', 'all:*');
+            ->assertJsonPath('data.user.email', $user->email)
+            ->assertJsonPath('data.user.permissions.0', 'all:*');
 
         $this->postJson('/api/auth/logout', [], [
             'Authorization' => 'Bearer '.$token,
@@ -147,6 +150,105 @@ class AuthApiTest extends TestCase
                 'message' => 'Unauthenticated.',
                 'data' => null,
             ]);
+    }
+
+    public function test_user_list_returns_normalized_pagination_shape(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $this->getJson('/api/users?page=1&per_page=5&search=Test&sort_by=created_at&sort_direction=desc', [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'items',
+                    'pagination' => [
+                        'page',
+                        'perPage',
+                        'total',
+                        'totalPages',
+                    ],
+                ],
+            ]);
+    }
+
+    public function test_role_permissions_endpoint_returns_permissions_for_selected_role(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $this->getJson('/api/roles/adminenglish/permissions', [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.role', 'adminenglish')
+            ->assertJsonPath('data.permissions.0.code', 'dashboard:read');
+    }
+
+    public function test_user_creation_and_update_sync_permissions_from_role(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $created = $this->postJson('/api/users', [
+            'first_name' => 'Role',
+            'last_name' => 'Tester',
+            'email' => 'role.tester@hfccf.org',
+            'phone' => '+855 12 888 888',
+            'role' => 'adminenglish',
+            'status' => 'active',
+            'password' => 'secret-pass',
+            'password_confirmation' => 'secret-pass',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ]);
+
+        $created
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.role', 'adminenglish')
+            ->assertJsonPath('data.user.permissions.0', 'dashboard:read');
+
+        $createdUserId = $created->json('data.user.id');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $createdUserId,
+            'email' => 'role.tester@hfccf.org',
+            'role_code' => 'adminenglish',
+        ]);
+
+        $this->getJson('/api/super-admin/users/'.$createdUserId, [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.id', $createdUserId)
+            ->assertJsonPath('data.user.role', 'adminenglish')
+            ->assertJsonPath('data.user.permissions.0', 'dashboard:read');
+
+        $updated = $this->putJson('/api/users/'.$createdUserId, [
+            'first_name' => 'Role',
+            'last_name' => 'Tester',
+            'email' => 'role.tester@hfccf.org',
+            'phone' => '+855 12 888 888',
+            'role' => 'coach',
+            'department_code' => 'sports',
+            'status' => 'active',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ]);
+
+        $updated
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.role', 'coach')
+            ->assertJsonPath('data.user.permissions.0', 'athletes:read');
     }
 
     public function test_forgot_password_does_not_reveal_email_existence(): void
@@ -352,6 +454,220 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
+    public function test_authenticated_user_can_update_profile_avatar_only(): void
+    {
+        Storage::fake('public');
+
+        $user = $this->createUser([
+            'avatar' => null,
+        ]);
+        $token = $this->loginAndGetToken($user);
+        $avatar = UploadedFile::fake()->image('avatar.jpg', 320, 320);
+
+        $response = $this->post('/api/auth/me', [
+            '_method' => 'PATCH',
+            'avatar' => $avatar,
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.id', $user->id);
+
+        $avatarUrl = (string) $response->json('data.user.avatar');
+        $this->assertNotEmpty($avatarUrl);
+        $this->assertStringContainsString('/storage/avatars/', $avatarUrl);
+
+        $avatarPath = Str::after((string) parse_url($avatarUrl, PHP_URL_PATH), '/storage/');
+        Storage::disk('public')->assertExists($avatarPath);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'avatar' => $avatarUrl,
+        ]);
+    }
+
+    public function test_authenticated_user_can_replace_avatar_and_remove_old_file(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('avatars/old-avatar.jpg', 'old-avatar');
+
+        $oldAvatarUrl = asset('storage/avatars/old-avatar.jpg');
+        $user = $this->createUser([
+            'avatar' => $oldAvatarUrl,
+        ]);
+        $token = $this->loginAndGetToken($user);
+        $avatar = UploadedFile::fake()->image('new-avatar.jpg', 320, 320);
+
+        $response = $this->post('/api/auth/me', [
+            '_method' => 'PATCH',
+            'avatar' => $avatar,
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+
+        Storage::disk('public')->assertMissing('avatars/old-avatar.jpg');
+
+        $newAvatarUrl = (string) $response->json('data.user.avatar');
+        $newAvatarPath = Str::after((string) parse_url($newAvatarUrl, PHP_URL_PATH), '/storage/');
+        Storage::disk('public')->assertExists($newAvatarPath);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'avatar' => $newAvatarUrl,
+        ]);
+    }
+
+    public function test_authenticated_user_can_remove_existing_avatar(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('avatars/remove-avatar.jpg', 'avatar');
+
+        $avatarUrl = asset('storage/avatars/remove-avatar.jpg');
+        $user = $this->createUser([
+            'avatar' => $avatarUrl,
+        ]);
+        $token = $this->loginAndGetToken($user);
+
+        $this->patchJson('/api/auth/me', [
+            'remove_avatar' => true,
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.avatar', null);
+
+        Storage::disk('public')->assertMissing('avatars/remove-avatar.jpg');
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'avatar' => null,
+        ]);
+    }
+
+    public function test_authenticated_user_can_update_department_code_and_partial_profile_fields(): void
+    {
+        $user = $this->createUser([
+            'department_code' => 'operations',
+        ]);
+        $token = $this->loginAndGetToken($user);
+
+        $this->patchJson('/api/auth/me', [
+            'first_name' => 'Updated',
+            'department_code' => 'education',
+            'bio' => 'Updated bio',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.firstName', 'Updated')
+            ->assertJsonPath('data.user.departmentCode', 'education')
+            ->assertJsonPath('data.user.bio', 'Updated bio');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'first_name' => 'Updated',
+            'last_name' => $user->last_name,
+            'email' => $user->email,
+            'department_code' => 'education',
+            'bio' => 'Updated bio',
+        ]);
+    }
+
+    public function test_authenticated_user_rejects_invalid_department_code_on_profile_update(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $this->patchJson('/api/auth/me', [
+            'department_code' => 'invalid-department',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'errors' => [
+                        'department_code',
+                    ],
+                ],
+            ]);
+    }
+
+    public function test_authenticated_user_can_change_password(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $this->patchJson('/api/auth/change-password', [
+            'current_password' => 'secret-pass',
+            'password' => 'new-secret-pass',
+            'password_confirmation' => 'new-secret-pass',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'new-secret-pass',
+        ])->assertOk();
+
+        $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret-pass',
+        ])->assertUnauthorized();
+    }
+
+    public function test_authenticated_user_change_password_rejects_wrong_current_password(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $this->patchJson('/api/auth/change-password', [
+            'current_password' => 'wrong-pass',
+            'password' => 'new-secret-pass',
+            'password_confirmation' => 'new-secret-pass',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_authenticated_user_change_password_requires_confirmation(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+
+        $this->patchJson('/api/auth/change-password', [
+            'current_password' => 'secret-pass',
+            'password' => 'new-secret-pass',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'errors' => [
+                        'password',
+                    ],
+                ],
+            ]);
+    }
+
     private function createUser(array $overrides = []): User
     {
         $role = Role::query()->findOrFail('superadmin');
@@ -376,6 +692,17 @@ class AuthApiTest extends TestCase
         ]);
 
         return $user;
+    }
+
+    private function loginAndGetToken(User $user): string
+    {
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret-pass',
+            'remember' => true,
+        ]);
+
+        return (string) $response->json('data.token');
     }
 
     /**

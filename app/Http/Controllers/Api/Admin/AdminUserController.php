@@ -95,6 +95,9 @@ class AdminUserController extends Controller
             'data' => [
                 'items' => UserResource::collection($paginator->getCollection())->resolve($request),
                 'pagination' => [
+                    'page' => $paginator->currentPage(),
+                    'perPage' => $paginator->perPage(),
+                    'totalPages' => $paginator->lastPage(),
                     'current_page' => $paginator->currentPage(),
                     'last_page' => $paginator->lastPage(),
                     'per_page' => $paginator->perPage(),

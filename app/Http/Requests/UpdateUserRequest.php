@@ -11,6 +11,8 @@ class UpdateUserRequest extends FormRequest
         $this->merge([
             'first_name' => $this->input('first_name', $this->input('firstName')),
             'last_name' => $this->input('last_name', $this->input('lastName')),
+            'role' => $this->input('role', $this->input('role_code')),
+            'role_code' => $this->input('role_code', $this->input('role')),
             'department_code' => $this->input('department_code', $this->input('departmentCode')),
             'confirm_password' => $this->input('confirm_password', $this->input('confirmPassword')),
         ]);
@@ -35,13 +37,12 @@ class UpdateUserRequest extends FormRequest
             'email' => ['sometimes', 'required', 'email', 'max:191', 'unique:users,email,'.$userId.',id'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:32'],
             'role' => ['sometimes', 'required', 'string', 'max:32', 'exists:roles,code'],
+            'role_code' => ['sometimes', 'string', 'max:32', 'exists:roles,code'],
             'department_code' => ['sometimes', 'nullable', 'string', 'max:32', 'exists:departments,code'],
             'bio' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'nullable', 'in:active,pending,inactive,suspended'],
             'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_avatar' => ['sometimes', 'boolean'],
-            'permissions' => ['sometimes', 'array', 'min:1'],
-            'permissions.*' => ['string', 'max:64', 'exists:permissions,code'],
             'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
         ];
     }
