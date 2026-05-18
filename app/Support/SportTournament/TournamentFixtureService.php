@@ -7,7 +7,6 @@ use App\Models\SportTournament;
 use App\Models\SportTournamentGroup;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class TournamentFixtureService
@@ -100,7 +99,7 @@ class TournamentFixtureService
             ->all();
 
         if (count($teamIds) < 2) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         $pairs = $this->buildPairs($teamIds);

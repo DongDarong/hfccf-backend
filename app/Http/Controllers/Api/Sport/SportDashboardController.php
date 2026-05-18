@@ -7,20 +7,26 @@ use App\Http\Resources\Sport\SportMatchResource;
 use App\Http\Resources\Sport\SportPlayerResource;
 use App\Http\Resources\Sport\SportStandingResource;
 use App\Http\Resources\Sport\SportTeamResource;
+use App\Http\Resources\Sport\SportTournamentResource;
 use App\Models\SportMatch;
 use App\Models\SportMatchEvent;
-use App\Models\SportStanding;
 use App\Models\SportPlayer;
+use App\Models\SportStanding;
 use App\Models\SportTeam;
 use App\Models\SportTournament;
 use App\Models\User;
 use App\Support\ApiResponse;
+use App\Support\SportCoachAssignmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class SportDashboardController extends SportController
 {
+    public function __construct(
+        private readonly SportCoachAssignmentService $assignmentService,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         if ($response = $this->authorizeSportAdmin($request->user())) {
@@ -37,14 +43,16 @@ class SportDashboardController extends SportController
         }
 
         $coach = $request->user();
-        $teams = SportTeam::query()->with(['coach'])->where('coach_user_id', $coach->id)->orderBy('name')->get();
+        $teams = $this->assignmentService->assignedTeamsForCoach($coach)->loadMissing(['coach', 'activeCoachAssignment.coach', 'activeCoachAssignment.assignedBy']);
+
+        $teamIds = $this->assignmentService->assignedTeamsForCoach($coach)->pluck('id')->all();
 
         $matches = SportMatch::query()
             ->with(['homeTeam', 'awayTeam', 'events'])
             ->withCount('events')
-            ->where(function ($query) use ($coach): void {
-                $query->whereHas('homeTeam', fn ($builder) => $builder->where('coach_user_id', $coach->id))
-                    ->orWhereHas('awayTeam', fn ($builder) => $builder->where('coach_user_id', $coach->id));
+            ->where(function ($query) use ($teamIds): void {
+                $query->whereIn('home_team_id', $teamIds)
+                    ->orWhereIn('away_team_id', $teamIds);
             })
             ->orderByDesc('scheduled_at')
             ->orderByDesc('id')
@@ -98,8 +106,8 @@ class SportDashboardController extends SportController
             'players' => SportPlayerResource::collection($players)->resolve($request),
             'matches' => SportMatchResource::collection($recentMatches)->resolve($request),
             'events' => SportMatchEventResource::collection($recentEvents)->resolve($request),
-            'tournaments' => \App\Http\Resources\Sport\SportTournamentResource::collection($tournaments)->resolve($request),
-            'featuredTournament' => $featuredTournament ? \App\Http\Resources\Sport\SportTournamentResource::make($featuredTournament)->resolve($request) : null,
+            'tournaments' => SportTournamentResource::collection($tournaments)->resolve($request),
+            'featuredTournament' => $featuredTournament ? SportTournamentResource::make($featuredTournament)->resolve($request) : null,
             'standings' => SportStandingResource::collection($featuredStandings)->resolve($request),
         ];
     }

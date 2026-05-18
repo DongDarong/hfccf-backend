@@ -7,6 +7,7 @@ use App\Http\Requests\Sport\UpdateSportEventRequest;
 use App\Http\Resources\Sport\SportMatchEventResource;
 use App\Models\SportMatch;
 use App\Models\SportMatchEvent;
+use App\Models\SportPlayer;
 use App\Support\ApiResponse;
 use App\Support\SportMatchScoreService;
 use App\Support\SportStandingsService;
@@ -19,9 +20,7 @@ class SportMatchEventController extends SportController
     public function __construct(
         private readonly SportMatchScoreService $scoreService,
         private readonly SportStandingsService $standingsService,
-    )
-    {
-    }
+    ) {}
 
     public function index(Request $request, string $id): JsonResponse
     {
@@ -200,7 +199,7 @@ class SportMatchEventController extends SportController
         return ApiResponse::successResponse('Match event deleted successfully.');
     }
 
-    private function mergeEventMetadata(array $data, ?\App\Models\SportPlayer $player = null, array $fallback = []): array
+    private function mergeEventMetadata(array $data, ?SportPlayer $player = null, array $fallback = []): array
     {
         $metadata = array_merge($fallback, $data['metadata'] ?? []);
 

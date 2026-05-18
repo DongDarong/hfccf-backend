@@ -22,6 +22,25 @@ class SportPlayerResource extends JsonResource
             'position' => $this->position,
             'teamId' => $this->team_id,
             'division' => $this->division,
+            'approvalStatus' => $this->approval_status,
+            'createdByUserId' => $this->created_by_user_id,
+            'approvedByUserId' => $this->approved_by_user_id,
+            'approvedAt' => $this->approved_at?->toISOString(),
+            'rejectionReason' => $this->rejection_reason,
+            'createdBy' => $this->whenLoaded('createdBy', fn (): array => [
+                'id' => $this->createdBy?->id,
+                'firstName' => $this->createdBy?->first_name,
+                'lastName' => $this->createdBy?->last_name,
+                'username' => $this->createdBy?->username,
+                'email' => $this->createdBy?->email,
+            ]),
+            'approvedBy' => $this->whenLoaded('approvedBy', fn (): array => [
+                'id' => $this->approvedBy?->id,
+                'firstName' => $this->approvedBy?->first_name,
+                'lastName' => $this->approvedBy?->last_name,
+                'username' => $this->approvedBy?->username,
+                'email' => $this->approvedBy?->email,
+            ]),
             'team' => $this->whenLoaded('team', fn (): array => [
                 'id' => $this->team?->id,
                 'teamCode' => $this->team?->team_code,
@@ -29,6 +48,15 @@ class SportPlayerResource extends JsonResource
                 'shortName' => $this->team?->short_name,
                 'logo' => SportMedia::resolveUrl($this->team?->logo),
             ]),
+            'memberships' => $this->whenLoaded('memberships', fn (): array => $this->memberships->map(static function ($membership): array {
+                return [
+                    'id' => $membership->id,
+                    'teamId' => $membership->team_id,
+                    'status' => $membership->status,
+                    'joinedAt' => $membership->joined_at?->toISOString(),
+                    'leftAt' => $membership->left_at?->toISOString(),
+                ];
+            })->values()->all()),
             'gender' => $this->gender,
             'age' => $this->age,
             'dateOfBirth' => $this->date_of_birth?->toDateString(),

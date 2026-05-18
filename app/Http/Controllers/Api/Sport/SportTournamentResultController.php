@@ -23,8 +23,7 @@ class SportTournamentResultController extends SportController
         private readonly TournamentResultService $resultService,
         private readonly TournamentStandingsService $standingsService,
         private readonly TournamentStatisticsService $statisticsService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request, string $id): JsonResponse
     {

@@ -19,6 +19,7 @@ class SportMatch extends Model
         'group_id',
         'knockout_round_id',
         'competition_type',
+        'match_type',
         'tournament_name',
         'round_name',
         'matchday',
@@ -27,6 +28,11 @@ class SportMatch extends Model
         'started_at',
         'completed_at',
         'status',
+        'approval_status',
+        'approved_by_user_id',
+        'approved_at',
+        'rejection_reason',
+        'requested_by_role',
         'current_period',
         'home_score',
         'away_score',
@@ -54,6 +60,7 @@ class SportMatch extends Model
             'penalty_away_score' => 'integer',
             'matchday' => 'integer',
             'metadata' => 'array',
+            'approved_at' => 'datetime',
         ];
     }
 
@@ -98,5 +105,10 @@ class SportMatch extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id', 'id');
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by_user_id', 'id');
     }
 }

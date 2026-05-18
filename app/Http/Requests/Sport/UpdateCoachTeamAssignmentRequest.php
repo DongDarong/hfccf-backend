@@ -5,7 +5,7 @@ namespace App\Http\Requests\Sport;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateSportMatchStatusRequest extends FormRequest
+class UpdateCoachTeamAssignmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,11 +15,17 @@ class UpdateSportMatchStatusRequest extends FormRequest
         return (bool) $user && in_array($user->role_code, ['superadmin', 'adminsport'], true);
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'status' => $this->input('status', 'active'),
+        ]);
+    }
+
     public function rules(): array
     {
         return [
-            'status' => ['required', 'in:draft,scheduled,live,halftime,completed,postponed,cancelled'],
-            'current_period' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'status' => ['sometimes', 'required', 'in:active,inactive'],
         ];
     }
 }

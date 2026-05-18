@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Api\Sport;
 
 use App\Http\Requests\Sport\GenerateTournamentKnockoutRequest;
-use App\Http\Resources\Sport\SportTournamentGroupResource;
-use App\Http\Resources\Sport\SportTournamentKnockoutResource;
 use App\Http\Resources\Sport\SportTournamentMatchResource;
 use App\Models\SportTournament;
 use App\Support\ApiResponse;
@@ -19,8 +17,7 @@ class SportTournamentKnockoutController extends SportController
     public function __construct(
         private readonly TournamentKnockoutService $knockoutService,
         private readonly TournamentQualificationService $qualificationService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request, string $id): JsonResponse
     {

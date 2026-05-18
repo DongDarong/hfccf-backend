@@ -12,9 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SportTournamentStatisticsController extends SportController
 {
-    public function __construct(private readonly TournamentStatisticsService $statisticsService)
-    {
-    }
+    public function __construct(private readonly TournamentStatisticsService $statisticsService) {}
 
     public function index(Request $request, string $id): JsonResponse
     {

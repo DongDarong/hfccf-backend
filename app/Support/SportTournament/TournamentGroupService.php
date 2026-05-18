@@ -55,7 +55,7 @@ class TournamentGroupService
             ->values();
 
         if ($teams->isEmpty()) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         $groups = $this->buildGroups($resolvedTournament, $groupCount, $qualificationSlots);

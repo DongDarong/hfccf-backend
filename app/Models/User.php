@@ -94,6 +94,16 @@ class User extends Authenticatable
         return $this->hasMany(SportTeam::class, 'coach_user_id', 'id');
     }
 
+    public function coachTeamAssignments(): HasMany
+    {
+        return $this->hasMany(CoachTeamAssignment::class, 'coach_user_id', 'id');
+    }
+
+    public function activeCoachTeamAssignments(): HasMany
+    {
+        return $this->hasMany(CoachTeamAssignment::class, 'coach_user_id', 'id')->where('status', 'active');
+    }
+
     private function resolveAvatarUrl(mixed $value): ?string
     {
         return ImageStorage::url($value);

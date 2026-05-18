@@ -5,14 +5,14 @@ namespace App\Http\Requests\Sport;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreSportPlayerRequest extends FormRequest
+class StoreCoachTeamPlayerRequest extends FormRequest
 {
     public function authorize(): bool
     {
         /** @var User|null $user */
         $user = $this->user();
 
-        return (bool) $user && in_array($user->role_code, ['superadmin', 'adminsport'], true);
+        return (bool) $user && in_array($user->role_code, ['superadmin', 'adminsport', 'coach'], true);
     }
 
     protected function prepareForValidation(): void
@@ -23,9 +23,9 @@ class StoreSportPlayerRequest extends FormRequest
         $this->merge([
             'first_name' => $this->input('first_name', $firstName),
             'last_name' => $this->input('last_name', $lastName),
+            'team_id' => $this->input('team_id', $this->input('teamId', $this->route('team'))),
             'jersey_number' => $this->input('jersey_number', $this->input('jerseyNumber')),
             'position' => $this->input('position', $this->input('primaryPosition')),
-            'team' => $this->input('team', $this->input('team_name')),
             'date_of_birth' => $this->input('date_of_birth', $this->input('dateOfBirth')),
             'height_cm' => $this->input('height_cm', $this->input('heightCm')),
             'weight_kg' => $this->input('weight_kg', $this->input('weightKg')),
@@ -34,10 +34,7 @@ class StoreSportPlayerRequest extends FormRequest
             'current_school' => $this->input('current_school', $this->input('currentSchool')),
             'grade_year' => $this->input('grade_year', $this->input('gradeYear')),
             'primary_position' => $this->input('primary_position', $this->input('primaryPosition')),
-            'registration_status' => $this->input('registration_status', $this->input('registrationStatus')),
-            'matches_played' => $this->input('matches_played', $this->input('matchesPlayed')),
-            'goals_scored' => $this->input('goals_scored', $this->input('goalsScored')),
-            'remove_photo' => $this->boolean('remove_photo'),
+            'registration_status' => $this->input('registration_status', 'pending'),
         ]);
     }
 
@@ -48,9 +45,10 @@ class StoreSportPlayerRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'player_code' => ['sometimes', 'nullable', 'string', 'max:32', 'unique:sport_players,player_code'],
+            'team_id' => ['required', 'integer', 'exists:sport_teams,id'],
             'jersey_number' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'position' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'team' => ['required', 'string', 'max:191'],
+            'division' => ['sometimes', 'nullable', 'string', 'max:100'],
             'gender' => ['sometimes', 'nullable', 'string', 'max:32'],
             'age' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'date_of_birth' => ['sometimes', 'nullable', 'date'],
@@ -71,10 +69,8 @@ class StoreSportPlayerRequest extends FormRequest
             'registration_status' => ['sometimes', 'nullable', 'string', 'max:32'],
             'matches_played' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'goals_scored' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'status' => ['required', 'in:active,pending,inactive,suspended'],
-            'approval_status' => ['sometimes', 'nullable', 'in:pending,approved,rejected'],
             'notes' => ['sometimes', 'nullable', 'string'],
-            'division' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'status' => ['sometimes', 'nullable', 'in:active,pending,inactive,suspended'],
         ];
     }
 

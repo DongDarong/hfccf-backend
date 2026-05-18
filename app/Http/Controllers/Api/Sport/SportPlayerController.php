@@ -6,13 +6,20 @@ use App\Http\Requests\Sport\StoreSportPlayerRequest;
 use App\Http\Requests\Sport\UpdateSportPlayerRequest;
 use App\Http\Resources\Sport\SportPlayerResource;
 use App\Models\SportPlayer;
+use App\Support\ApiResponse;
+use App\Support\SportPlayerMembershipService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
 
 class SportPlayerController extends SportController
 {
+    public function __construct(
+        private readonly SportPlayerMembershipService $membershipService,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         if ($response = $this->authorizeSportAdmin($request->user())) {
@@ -41,7 +48,7 @@ class SportPlayerController extends SportController
         $sortBy = (string) ($validated['sort_by'] ?? 'created_at');
         $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $query = SportPlayer::query()->with(['team']);
+        $query = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy', 'memberships']);
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -86,7 +93,7 @@ class SportPlayerController extends SportController
             ->orderBy('id', 'desc')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        return \App\Support\ApiResponse::paginatedResponse(
+        return ApiResponse::paginatedResponse(
             'Sport players retrieved successfully.',
             $paginator,
             $request,
@@ -100,7 +107,7 @@ class SportPlayerController extends SportController
         $team = $this->resolveTeamReference($data['team']);
 
         if (! $team) {
-            return \App\Support\ApiResponse::errorResponse('Team not found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+            return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $player = SportPlayer::query()->create([
@@ -128,15 +135,26 @@ class SportPlayerController extends SportController
             'grade_year' => $data['grade_year'] ?? null,
             'primary_position' => $data['primary_position'] ?? null,
             'registration_status' => $data['registration_status'] ?? 'registered',
+            'approval_status' => $data['approval_status'] ?? (($data['status'] ?? 'active') === 'pending' ? 'pending' : 'approved'),
+            'created_by_user_id' => $request->user()?->id,
+            'approved_by_user_id' => (($data['approval_status'] ?? null) === 'pending' || ($data['status'] ?? 'active') === 'pending') ? null : $request->user()?->id,
+            'approved_at' => (($data['approval_status'] ?? null) === 'pending' || ($data['status'] ?? 'active') === 'pending') ? null : Carbon::now(),
+            'rejection_reason' => null,
             'matches_played' => (int) ($data['matches_played'] ?? 0),
             'goals_scored' => (int) ($data['goals_scored'] ?? 0),
             'status' => $data['status'],
             'notes' => $data['notes'] ?? null,
         ]);
 
-        $player->loadMissing(['team']);
+        if ($player->approval_status === 'pending') {
+            $this->membershipService->createPendingMembership($player, $team, $request->user());
+        } else {
+            $this->membershipService->activateMembership($player, $team, $request->user(), true);
+        }
 
-        return \App\Support\ApiResponse::successResponse(
+        $player->loadMissing(['team', 'createdBy', 'approvedBy', 'memberships']);
+
+        return ApiResponse::successResponse(
             'Sport player created successfully.',
             [
                 'player' => SportPlayerResource::make($player)->resolve($request),
@@ -151,13 +169,13 @@ class SportPlayerController extends SportController
             return $response;
         }
 
-        $player = SportPlayer::query()->with(['team'])->find($id);
+        $player = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy', 'memberships'])->find($id);
 
         if (! $player) {
-            return \App\Support\ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);
         }
 
-        return \App\Support\ApiResponse::successResponse(
+        return ApiResponse::successResponse(
             'Sport player retrieved successfully.',
             [
                 'player' => SportPlayerResource::make($player)->resolve($request),
@@ -170,7 +188,7 @@ class SportPlayerController extends SportController
         $player = SportPlayer::query()->find($id);
 
         if (! $player) {
-            return \App\Support\ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validated();
@@ -180,7 +198,7 @@ class SportPlayerController extends SportController
             $team = $this->resolveTeamReference($data['team']);
 
             if (! $team) {
-                return \App\Support\ApiResponse::errorResponse('Team not found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+                return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
             }
         }
 
@@ -216,9 +234,17 @@ class SportPlayerController extends SportController
         }
 
         if (array_key_exists('team', $data) && $team) {
+            $previousTeamId = (int) $player->team_id;
             $player->team_id = $team->id;
             if (! array_key_exists('division', $data) || trim((string) $data['division']) === '') {
                 $player->division = $team->division;
+            }
+
+            if (($player->approval_status ?? 'approved') === 'pending' || ($player->status ?? 'active') === 'pending') {
+                $this->membershipService->deactivateAllMembershipsForPlayer($player);
+                $this->membershipService->createPendingMembership($player, $team, $request->user());
+            } elseif ($previousTeamId !== (int) $team->id) {
+                $this->membershipService->activateMembership($player, $team, $request->user(), true);
             }
         }
 
@@ -235,9 +261,9 @@ class SportPlayerController extends SportController
         }
 
         $player->save();
-        $player->loadMissing(['team']);
+        $player->loadMissing(['team', 'createdBy', 'approvedBy', 'memberships']);
 
-        return \App\Support\ApiResponse::successResponse(
+        return ApiResponse::successResponse(
             'Sport player updated successfully.',
             [
                 'player' => SportPlayerResource::make($player)->resolve($request),
@@ -254,13 +280,12 @@ class SportPlayerController extends SportController
         $player = SportPlayer::query()->find($id);
 
         if (! $player) {
-            return \App\Support\ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $this->deleteSportFile($player->photo);
         $player->delete();
 
-        return \App\Support\ApiResponse::successResponse('Sport player deleted successfully.');
+        return ApiResponse::successResponse('Sport player deleted successfully.');
     }
 }
-

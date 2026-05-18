@@ -64,10 +64,12 @@ class UpdateSportMatchRequest extends FormRequest
             'away_team' => ['sometimes', 'required', 'string', 'max:191'],
             'tournament_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_tournaments,id'],
             'competition_type' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'match_type' => ['sometimes', 'nullable', 'in:training,friendly,tournament'],
             'tournament_name' => ['sometimes', 'nullable', 'string', 'max:191'],
             'venue' => ['sometimes', 'nullable', 'string', 'max:191'],
             'scheduled_at' => ['sometimes', 'nullable', 'date'],
             'status' => ['sometimes', 'required', 'in:draft,scheduled,live,halftime,completed,postponed,cancelled'],
+            'approval_status' => ['sometimes', 'nullable', 'in:pending,approved,rejected'],
             'current_period' => ['sometimes', 'nullable', 'string', 'max:64'],
             'notes' => ['sometimes', 'nullable', 'string'],
         ];

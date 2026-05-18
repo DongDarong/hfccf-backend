@@ -13,9 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SportTournamentFixtureController extends SportController
 {
-    public function __construct(private readonly TournamentFixtureService $fixtureService)
-    {
-    }
+    public function __construct(private readonly TournamentFixtureService $fixtureService) {}
 
     public function index(Request $request, string $id): JsonResponse
     {

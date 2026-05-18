@@ -15,8 +15,7 @@ class TournamentKnockoutService
 {
     public function __construct(
         private readonly TournamentQualificationService $qualificationService,
-    ) {
-    }
+    ) {}
 
     /**
      * Create a knockout bracket from the currently qualified teams.
@@ -59,7 +58,7 @@ class TournamentKnockoutService
 
         $roundSizes = $this->buildRoundSizes($qualifierCount);
         $rounds = collect();
-        $previousRoundMatches = new EloquentCollection();
+        $previousRoundMatches = new EloquentCollection;
 
         foreach ($roundSizes as $index => $matchCount) {
             $roundPosition = $index + 1;

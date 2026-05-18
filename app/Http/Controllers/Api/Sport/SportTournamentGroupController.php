@@ -18,8 +18,7 @@ class SportTournamentGroupController extends SportController
     public function __construct(
         private readonly TournamentGroupService $groupService,
         private readonly TournamentStandingsService $standingsService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request, string $id): JsonResponse
     {

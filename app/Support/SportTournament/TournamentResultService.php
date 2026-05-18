@@ -14,8 +14,7 @@ class TournamentResultService
     public function __construct(
         private readonly SportMatchScoreService $scoreService,
         private readonly TournamentKnockoutService $knockoutService,
-    ) {
-    }
+    ) {}
 
     /**
      * Save the final score snapshot for a tournament match.

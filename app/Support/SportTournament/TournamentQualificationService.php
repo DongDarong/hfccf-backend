@@ -6,9 +6,7 @@ use App\Models\SportTournament;
 
 class TournamentQualificationService
 {
-    public function __construct(private readonly TournamentStandingsService $standingsService)
-    {
-    }
+    public function __construct(private readonly TournamentStandingsService $standingsService) {}
 
     /**
      * Build the set of qualifiers from the calculated standings.

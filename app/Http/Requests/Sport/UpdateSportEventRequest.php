@@ -38,4 +38,3 @@ class UpdateSportEventRequest extends FormRequest
         ];
     }
 }
-

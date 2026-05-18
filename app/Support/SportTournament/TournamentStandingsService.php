@@ -5,8 +5,6 @@ namespace App\Support\SportTournament;
 use App\Models\SportMatch;
 use App\Models\SportTournament;
 use App\Models\SportTournamentGroup;
-use App\Models\SportTournamentGroupTeam;
-use App\Models\SportTeam;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
@@ -121,6 +119,7 @@ class TournamentStandingsService
                 $teamRows[$homeTeamId]['wins']++;
                 $teamRows[$homeTeamId]['points'] += 3;
                 $teamRows[$awayTeamId]['losses']++;
+
                 continue;
             }
 
@@ -128,6 +127,7 @@ class TournamentStandingsService
                 $teamRows[$awayTeamId]['wins']++;
                 $teamRows[$awayTeamId]['points'] += 3;
                 $teamRows[$homeTeamId]['losses']++;
+
                 continue;
             }
 
@@ -239,6 +239,7 @@ class TournamentStandingsService
                     $leftPoints++;
                     $rightPoints++;
                 }
+
                 continue;
             }
 

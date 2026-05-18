@@ -38,4 +38,3 @@ class StoreSportEventRequest extends FormRequest
         ];
     }
 }
-

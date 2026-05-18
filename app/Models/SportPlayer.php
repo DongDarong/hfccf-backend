@@ -36,6 +36,11 @@ class SportPlayer extends Model
         'grade_year',
         'primary_position',
         'registration_status',
+        'approval_status',
+        'created_by_user_id',
+        'approved_by_user_id',
+        'approved_at',
+        'rejection_reason',
         'matches_played',
         'goals_scored',
         'status',
@@ -52,6 +57,7 @@ class SportPlayer extends Model
             'weight_kg' => 'decimal:2',
             'matches_played' => 'integer',
             'goals_scored' => 'integer',
+            'approved_at' => 'datetime',
         ];
     }
 
@@ -60,8 +66,23 @@ class SportPlayer extends Model
         return $this->belongsTo(SportTeam::class, 'team_id');
     }
 
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id', 'id');
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by_user_id', 'id');
+    }
+
     public function events(): HasMany
     {
         return $this->hasMany(SportMatchEvent::class, 'player_id');
+    }
+
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(SportPlayerTeamMembership::class, 'player_id');
     }
 }

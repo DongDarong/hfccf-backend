@@ -7,14 +7,11 @@ use App\Models\SportMatchEvent;
 use App\Models\SportPlayer;
 use App\Models\SportTeam;
 use App\Models\SportTournament;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 class TournamentStatisticsService
 {
-    public function __construct(private readonly TournamentStandingsService $standingsService)
-    {
-    }
+    public function __construct(private readonly TournamentStandingsService $standingsService) {}
 
     /**
      * Build tournament statistics from the same match/event source used for
@@ -44,6 +41,7 @@ class TournamentStatisticsService
         $matches = $resolvedTournament->matches;
         $events = $matches->flatMap(fn (SportMatch $match): Collection => $match->events->map(function (SportMatchEvent $event) use ($match): SportMatchEvent {
             $event->setRelation('match', $match);
+
             return $event;
         }));
 
@@ -90,6 +88,7 @@ class TournamentStatisticsService
                     $rows[$assistId]['assists']++;
                     $rows[$assistId]['appearances'][$event->match_id] = true;
                 }
+
                 continue;
             }
 
@@ -97,21 +96,25 @@ class TournamentStatisticsService
                 if ($playerId > 0) {
                     $rows[$playerId]['assists']++;
                 }
+
                 continue;
             }
 
             if ($type === 'own_goal' && $playerId > 0) {
                 $rows[$playerId]['own_goals']++;
+
                 continue;
             }
 
             if ($type === 'yellow_card' && $playerId > 0) {
                 $rows[$playerId]['yellow_cards']++;
+
                 continue;
             }
 
             if ($type === 'red_card' && $playerId > 0) {
                 $rows[$playerId]['red_cards']++;
+
                 continue;
             }
 
@@ -169,12 +172,14 @@ class TournamentStatisticsService
             if ($homeGoals > $awayGoals) {
                 $rows[$homeTeamId]['wins']++;
                 $rows[$awayTeamId]['losses']++;
+
                 continue;
             }
 
             if ($awayGoals > $homeGoals) {
                 $rows[$awayTeamId]['wins']++;
                 $rows[$homeTeamId]['losses']++;
+
                 continue;
             }
 
