@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\SportMatch;
+use App\Models\SportMatchEvent;
 use Illuminate\Support\Collection;
 
 class SportMatchScoreService
@@ -15,7 +16,7 @@ class SportMatchScoreService
         $match->load([
             'homeTeam',
             'awayTeam',
-            'events' => fn ($query) => $query->orderBy('minute')->orderBy('extra_time_minute')->orderBy('id'),
+            'events' => fn ($query) => $query->orderBy('minute')->orderBy('stoppage_minute')->orderBy('extra_time_minute')->orderBy('id'),
         ]);
 
         $scores = $this->calculateFromEvents($match->events, (int) $match->home_team_id, (int) $match->away_team_id);
@@ -29,7 +30,7 @@ class SportMatchScoreService
     }
 
     /**
-     * @param  Collection<int, \App\Models\SportMatchEvent>  $events
+     * @param  Collection<int, SportMatchEvent>  $events
      * @return array{home:int, away:int}
      */
     public function calculateFromEvents(Collection $events, int $homeTeamId, int $awayTeamId): array

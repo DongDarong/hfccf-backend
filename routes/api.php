@@ -1,25 +1,14 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\English\EnglishClassController;
 use App\Http\Controllers\Api\English\EnglishDashboardController;
-use App\Http\Controllers\Api\English\EnglishSubmissionController;
 use App\Http\Controllers\Api\English\EnglishStudentController;
+use App\Http\Controllers\Api\English\EnglishSubmissionController;
 use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
-use App\Http\Controllers\Api\Sport\SportCoachController;
-use App\Http\Controllers\Api\Sport\SportDashboardController;
-use App\Http\Controllers\Api\Sport\SportMatchController;
-use App\Http\Controllers\Api\Sport\SportMatchEventController;
-use App\Http\Controllers\Api\Sport\SportPlayerController;
-use App\Http\Controllers\Api\Sport\SportTournamentController;
-use App\Http\Controllers\Api\Sport\SportTeamController;
-use App\Http\Controllers\Api\Scholarship\ScholarshipApplicationController;
-use App\Http\Controllers\Api\Scholarship\ScholarshipDashboardController;
-use App\Http\Controllers\Api\Scholarship\ScholarshipReviewController;
-use App\Http\Controllers\Api\Scholarship\ScholarshipStudentController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
@@ -27,6 +16,22 @@ use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\Scholarship\ScholarshipApplicationController;
+use App\Http\Controllers\Api\Scholarship\ScholarshipDashboardController;
+use App\Http\Controllers\Api\Scholarship\ScholarshipReviewController;
+use App\Http\Controllers\Api\Scholarship\ScholarshipStudentController;
+use App\Http\Controllers\Api\Sport\SportCoachController;
+use App\Http\Controllers\Api\Sport\SportDashboardController;
+use App\Http\Controllers\Api\Sport\SportMatchController;
+use App\Http\Controllers\Api\Sport\SportMatchEventController;
+use App\Http\Controllers\Api\Sport\SportPlayerController;
+use App\Http\Controllers\Api\Sport\SportTeamController;
+use App\Http\Controllers\Api\Sport\SportTournamentController;
+use App\Http\Controllers\Api\Sport\SportTournamentFixtureController;
+use App\Http\Controllers\Api\Sport\SportTournamentGroupController;
+use App\Http\Controllers\Api\Sport\SportTournamentKnockoutController;
+use App\Http\Controllers\Api\Sport\SportTournamentResultController;
+use App\Http\Controllers\Api\Sport\SportTournamentStatisticsController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -81,9 +86,9 @@ Route::prefix('auth')->group(function (): void {
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
     /*
-    |-------------------------------------------------------------------------- 
+    |--------------------------------------------------------------------------
     | User Read Permissions
-    |-------------------------------------------------------------------------- 
+    |--------------------------------------------------------------------------
     */
 
     Route::get('users', [AdminUserController::class, 'index']);
@@ -258,6 +263,23 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::delete('tournaments/{id}/teams/{teamId}', [SportTournamentController::class, 'removeTeam']);
         Route::get('tournaments/{id}/standings', [SportTournamentController::class, 'standings']);
         Route::post('tournaments/{id}/recalculate-standings', [SportTournamentController::class, 'recalculateStandings']);
+
+        Route::get('tournaments/{id}/groups', [SportTournamentGroupController::class, 'index']);
+        Route::post('tournaments/{id}/groups/draw', [SportTournamentGroupController::class, 'draw']);
+        Route::post('tournaments/{id}/groups/finalize', [SportTournamentGroupController::class, 'finalize']);
+
+        Route::get('tournaments/{id}/fixtures', [SportTournamentFixtureController::class, 'index']);
+        Route::post('tournaments/{id}/fixtures/generate', [SportTournamentFixtureController::class, 'generate']);
+
+        Route::get('tournaments/{id}/results', [SportTournamentResultController::class, 'index']);
+        Route::get('tournaments/{id}/results/{matchId}', [SportTournamentResultController::class, 'show']);
+        Route::put('tournaments/{id}/results/{matchId}', [SportTournamentResultController::class, 'update']);
+        Route::post('tournaments/{id}/results/{matchId}/events', [SportTournamentResultController::class, 'storeEvent']);
+
+        Route::get('tournaments/{id}/statistics', [SportTournamentStatisticsController::class, 'index']);
+
+        Route::get('tournaments/{id}/knockout', [SportTournamentKnockoutController::class, 'index']);
+        Route::post('tournaments/{id}/knockout/generate', [SportTournamentKnockoutController::class, 'generate']);
 
         Route::get('coaches', [SportCoachController::class, 'index']);
         Route::post('coaches', [SportCoachController::class, 'store']);
