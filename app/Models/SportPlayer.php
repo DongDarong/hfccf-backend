@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SportPlayer extends Model
@@ -37,6 +38,11 @@ class SportPlayer extends Model
         'primary_position',
         'registration_status',
         'approval_status',
+        'roster_status',
+        'disciplinary_status',
+        'injury_status',
+        'archived_at',
+        'status_notes',
         'created_by_user_id',
         'approved_by_user_id',
         'approved_at',
@@ -58,6 +64,7 @@ class SportPlayer extends Model
             'matches_played' => 'integer',
             'goals_scored' => 'integer',
             'approved_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -84,5 +91,10 @@ class SportPlayer extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(SportPlayerTeamMembership::class, 'player_id');
+    }
+
+    public function activeMembership(): HasOne
+    {
+        return $this->hasOne(SportPlayerTeamMembership::class, 'player_id')->where('status', 'active');
     }
 }

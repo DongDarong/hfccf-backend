@@ -104,7 +104,7 @@ class SportCoachTeamManagementTest extends TestCase
         $this->assertDatabaseHas('sport_player_team_memberships', [
             'player_id' => $playerId,
             'team_id' => $team->id,
-            'status' => 'pending',
+            'status' => 'inactive',
         ]);
 
         Sanctum::actingAs($admin);

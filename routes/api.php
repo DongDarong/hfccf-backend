@@ -28,7 +28,9 @@ use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportMatchController;
 use App\Http\Controllers\Api\Sport\SportMatchEventController;
 use App\Http\Controllers\Api\Sport\SportPlayerController;
+use App\Http\Controllers\Api\Sport\SportPlayerLifecycleController;
 use App\Http\Controllers\Api\Sport\SportTeamController;
+use App\Http\Controllers\Api\Sport\SportTeamRosterController;
 use App\Http\Controllers\Api\Sport\SportTournamentController;
 use App\Http\Controllers\Api\Sport\SportTournamentFixtureController;
 use App\Http\Controllers\Api\Sport\SportTournamentGroupController;
@@ -312,12 +314,22 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('teams/{id}', [SportTeamController::class, 'show']);
         Route::put('teams/{id}', [SportTeamController::class, 'update']);
         Route::delete('teams/{id}', [SportTeamController::class, 'destroy']);
+        Route::get('teams/{team}/roster', [SportTeamRosterController::class, 'index']);
+        Route::post('teams/{team}/roster', [SportTeamRosterController::class, 'store']);
+        Route::patch('roster/{membership}', [SportTeamRosterController::class, 'update']);
+        Route::delete('roster/{membership}', [SportTeamRosterController::class, 'destroy']);
 
         Route::get('players', [SportPlayerController::class, 'index']);
         Route::post('players', [SportPlayerController::class, 'store']);
         Route::get('players/{id}', [SportPlayerController::class, 'show']);
         Route::put('players/{id}', [SportPlayerController::class, 'update']);
         Route::delete('players/{id}', [SportPlayerController::class, 'destroy']);
+        Route::get('players/{player}/history', [SportPlayerLifecycleController::class, 'history']);
+        Route::patch('players/{player}/status', [SportPlayerLifecycleController::class, 'updateStatus']);
+        Route::patch('players/{player}/injury', [SportPlayerLifecycleController::class, 'injury']);
+        Route::patch('players/{player}/suspension', [SportPlayerLifecycleController::class, 'suspension']);
+        Route::patch('players/{player}/release', [SportPlayerLifecycleController::class, 'release']);
+        Route::patch('players/{player}/archive', [SportPlayerLifecycleController::class, 'archive']);
 
         Route::get('matches', [SportMatchController::class, 'index']);
         Route::post('matches', [SportMatchController::class, 'store']);

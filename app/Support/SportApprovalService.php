@@ -43,8 +43,9 @@ class SportApprovalService
             }
 
             $player->forceFill([
-                'approval_status' => 'approved',
-                'status' => 'active',
+                'approval_status' => SportPlayerApprovalStatus::APPROVED,
+                'roster_status' => SportPlayerRosterStatus::ACTIVE,
+                'status' => SportPlayerRosterStatus::ACTIVE,
                 'approved_by_user_id' => $approver->id,
                 'approved_at' => Carbon::now(),
                 'rejection_reason' => null,
@@ -60,11 +61,12 @@ class SportApprovalService
     public function rejectPlayer(SportPlayer $player, User $approver, ?string $reason = null): SportPlayer
     {
         return DB::transaction(function () use ($player, $approver, $reason): SportPlayer {
-            $this->membershipService->deactivateAllMembershipsForPlayer($player);
+            $this->membershipService->deactivateAllMembershipsForPlayer($player, $approver);
 
             $player->forceFill([
-                'approval_status' => 'rejected',
-                'status' => 'inactive',
+                'approval_status' => SportPlayerApprovalStatus::REJECTED,
+                'roster_status' => SportPlayerRosterStatus::INACTIVE,
+                'status' => SportPlayerRosterStatus::INACTIVE,
                 'approved_by_user_id' => $approver->id,
                 'approved_at' => Carbon::now(),
                 'rejection_reason' => $reason,

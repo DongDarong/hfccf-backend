@@ -14,6 +14,10 @@ class SportPlayerTeamMembership extends Model
         'joined_at',
         'left_at',
         'created_by_user_id',
+        'updated_by_user_id',
+        'suspension_until',
+        'injury_notes',
+        'notes',
     ];
 
     protected function casts(): array
@@ -21,6 +25,7 @@ class SportPlayerTeamMembership extends Model
         return [
             'joined_at' => 'datetime',
             'left_at' => 'datetime',
+            'suspension_until' => 'datetime',
         ];
     }
 
@@ -37,5 +42,10 @@ class SportPlayerTeamMembership extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id', 'id');
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by_user_id', 'id');
     }
 }

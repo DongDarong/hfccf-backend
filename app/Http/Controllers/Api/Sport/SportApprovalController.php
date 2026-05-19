@@ -48,7 +48,7 @@ class SportApprovalController extends SportController
             return $response;
         }
 
-        $player = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy'])->find($id);
+        $player = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy', 'activeMembership', 'memberships'])->find($id);
 
         if (! $player) {
             return ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);
@@ -82,7 +82,7 @@ class SportApprovalController extends SportController
             'rejection_reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $player = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy'])->find($id);
+        $player = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy', 'activeMembership', 'memberships'])->find($id);
 
         if (! $player) {
             return ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);

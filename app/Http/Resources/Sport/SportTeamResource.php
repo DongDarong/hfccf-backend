@@ -39,6 +39,7 @@ class SportTeamResource extends JsonResource
             'division' => $this->division,
             'captainName' => $this->captain_name,
             'playersCount' => $this->players_count ?? $this->whenCounted('players'),
+            'activePlayersCount' => $this->whenLoaded('players', fn (): int => $this->players->where('roster_status', 'active')->count()),
             'matchesCount' => (int) ($this->matches_count ?? (($this->home_matches_count ?? 0) + ($this->away_matches_count ?? 0))),
             'wins' => (int) $this->wins,
             'draws' => (int) $this->draws,

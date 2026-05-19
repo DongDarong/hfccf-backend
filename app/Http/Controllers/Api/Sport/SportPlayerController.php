@@ -8,6 +8,7 @@ use App\Http\Resources\Sport\SportPlayerResource;
 use App\Models\SportPlayer;
 use App\Support\ApiResponse;
 use App\Support\SportPlayerMembershipService;
+use App\Support\SportPlayerRosterStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,7 +49,7 @@ class SportPlayerController extends SportController
         $sortBy = (string) ($validated['sort_by'] ?? 'created_at');
         $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $query = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy', 'memberships']);
+        $query = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy', 'activeMembership', 'memberships']);
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -136,6 +137,16 @@ class SportPlayerController extends SportController
             'primary_position' => $data['primary_position'] ?? null,
             'registration_status' => $data['registration_status'] ?? 'registered',
             'approval_status' => $data['approval_status'] ?? (($data['status'] ?? 'active') === 'pending' ? 'pending' : 'approved'),
+            'roster_status' => match ($data['status'] ?? 'active') {
+                'pending' => SportPlayerRosterStatus::INACTIVE,
+                'inactive' => SportPlayerRosterStatus::INACTIVE,
+                'suspended' => SportPlayerRosterStatus::SUSPENDED,
+                'injured' => SportPlayerRosterStatus::INJURED,
+                'released' => SportPlayerRosterStatus::RELEASED,
+                'graduated' => SportPlayerRosterStatus::GRADUATED,
+                'archived' => SportPlayerRosterStatus::ARCHIVED,
+                default => SportPlayerRosterStatus::ACTIVE,
+            },
             'created_by_user_id' => $request->user()?->id,
             'approved_by_user_id' => (($data['approval_status'] ?? null) === 'pending' || ($data['status'] ?? 'active') === 'pending') ? null : $request->user()?->id,
             'approved_at' => (($data['approval_status'] ?? null) === 'pending' || ($data['status'] ?? 'active') === 'pending') ? null : Carbon::now(),
@@ -169,7 +180,7 @@ class SportPlayerController extends SportController
             return $response;
         }
 
-        $player = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy', 'memberships'])->find($id);
+        $player = SportPlayer::query()->with(['team', 'createdBy', 'approvedBy', 'activeMembership', 'memberships'])->find($id);
 
         if (! $player) {
             return ApiResponse::errorResponse('Player not found.', null, Response::HTTP_NOT_FOUND);
@@ -233,6 +244,19 @@ class SportPlayerController extends SportController
             }
         }
 
+        if (array_key_exists('status', $data)) {
+            $player->roster_status = match ($data['status']) {
+                'pending' => SportPlayerRosterStatus::INACTIVE,
+                'inactive' => SportPlayerRosterStatus::INACTIVE,
+                'suspended' => SportPlayerRosterStatus::SUSPENDED,
+                'injured' => SportPlayerRosterStatus::INJURED,
+                'released' => SportPlayerRosterStatus::RELEASED,
+                'graduated' => SportPlayerRosterStatus::GRADUATED,
+                'archived' => SportPlayerRosterStatus::ARCHIVED,
+                default => SportPlayerRosterStatus::ACTIVE,
+            };
+        }
+
         if (array_key_exists('team', $data) && $team) {
             $previousTeamId = (int) $player->team_id;
             $player->team_id = $team->id;
@@ -246,6 +270,17 @@ class SportPlayerController extends SportController
             } elseif ($previousTeamId !== (int) $team->id) {
                 $this->membershipService->activateMembership($player, $team, $request->user(), true);
             }
+
+            $player->roster_status = match ($player->status ?? 'active') {
+                'pending' => SportPlayerRosterStatus::INACTIVE,
+                'inactive' => SportPlayerRosterStatus::INACTIVE,
+                'suspended' => SportPlayerRosterStatus::SUSPENDED,
+                'injured' => SportPlayerRosterStatus::INJURED,
+                'released' => SportPlayerRosterStatus::RELEASED,
+                'graduated' => SportPlayerRosterStatus::GRADUATED,
+                'archived' => SportPlayerRosterStatus::ARCHIVED,
+                default => SportPlayerRosterStatus::ACTIVE,
+            };
         }
 
         if (array_key_exists('player_code', $data)) {
@@ -261,7 +296,7 @@ class SportPlayerController extends SportController
         }
 
         $player->save();
-        $player->loadMissing(['team', 'createdBy', 'approvedBy', 'memberships']);
+        $player->loadMissing(['team', 'createdBy', 'approvedBy', 'activeMembership', 'memberships']);
 
         return ApiResponse::successResponse(
             'Sport player updated successfully.',

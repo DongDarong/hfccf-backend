@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('coach_team_assignments', function (Blueprint $table): void {
             $table->id();
-            $table->string('coach_user_id', 32)->index();
+            $table->string('coach_user_id', 32)->nullable()->index();
             $table->foreignId('team_id')->constrained('sport_teams')->cascadeOnDelete();
-            $table->string('assigned_by_user_id', 32)->index();
+            $table->string('assigned_by_user_id', 32)->nullable()->index();
             $table->string('status', 16)->default('active')->index();
             $table->timestamp('assigned_at')->nullable();
             $table->timestamp('ended_at')->nullable();

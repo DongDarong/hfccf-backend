@@ -17,7 +17,7 @@ class SportPlayerMembershipService
         return SportPlayerTeamMembership::query()
             ->with(['team', 'player'])
             ->where('player_id', $player->id)
-            ->where('status', 'active')
+            ->where('status', SportMembershipStatus::ACTIVE)
             ->orderByDesc('joined_at')
             ->orderByDesc('id')
             ->first();
@@ -28,7 +28,7 @@ class SportPlayerMembershipService
         return SportPlayerTeamMembership::query()
             ->with(['team', 'player'])
             ->where('player_id', $player->id)
-            ->where('status', 'active')
+            ->where('status', SportMembershipStatus::ACTIVE)
             ->orderByDesc('joined_at')
             ->orderByDesc('id')
             ->get();
@@ -49,10 +49,11 @@ class SportPlayerMembershipService
         ]);
 
         $membership->forceFill([
-            'status' => 'pending',
+            'status' => SportMembershipStatus::INACTIVE,
             'joined_at' => $membership->joined_at ?? Carbon::now(),
             'left_at' => null,
             'created_by_user_id' => $createdBy?->id ?? $membership->created_by_user_id,
+            'updated_by_user_id' => $createdBy?->id ?? $membership->updated_by_user_id,
         ])->save();
 
         return $membership->refresh()->loadMissing(['team', 'player']);
@@ -70,8 +71,9 @@ class SportPlayerMembershipService
                 }
 
                 $existingActive->forceFill([
-                    'status' => 'inactive',
+                    'status' => SportMembershipStatus::INACTIVE,
                     'left_at' => $now,
+                    'updated_by_user_id' => $changedBy?->id,
                 ])->save();
             }
 
@@ -81,10 +83,11 @@ class SportPlayerMembershipService
             ]);
 
             $membership->forceFill([
-                'status' => 'active',
+                'status' => SportMembershipStatus::ACTIVE,
                 'joined_at' => $membership->joined_at ?? $now,
                 'left_at' => null,
                 'created_by_user_id' => $membership->created_by_user_id ?? $changedBy?->id,
+                'updated_by_user_id' => $changedBy?->id,
             ])->save();
 
             $player->forceFill([
@@ -98,21 +101,33 @@ class SportPlayerMembershipService
     public function deactivateMembership(SportPlayerTeamMembership $membership, ?User $changedBy = null): SportPlayerTeamMembership
     {
         $membership->forceFill([
-            'status' => 'inactive',
+            'status' => SportMembershipStatus::INACTIVE,
             'left_at' => Carbon::now(),
+            'updated_by_user_id' => $changedBy?->id,
         ])->save();
 
         return $membership->refresh()->loadMissing(['team', 'player']);
     }
 
-    public function deactivateAllMembershipsForPlayer(SportPlayer $player): void
+    public function deactivateAllMembershipsForPlayer(SportPlayer $player, ?User $changedBy = null): void
     {
         SportPlayerTeamMembership::query()
             ->where('player_id', $player->id)
-            ->whereIn('status', ['active', 'pending'])
+            ->whereIn('status', [SportMembershipStatus::ACTIVE, SportMembershipStatus::INACTIVE, SportMembershipStatus::SUSPENDED])
             ->update([
-                'status' => 'inactive',
+                'status' => SportMembershipStatus::INACTIVE,
                 'left_at' => Carbon::now(),
+                'updated_by_user_id' => $changedBy?->id,
             ]);
+    }
+
+    public function playerHasMembershipHistory(SportPlayer $player): Collection
+    {
+        return SportPlayerTeamMembership::query()
+            ->with(['team', 'player', 'createdBy', 'updatedBy'])
+            ->where('player_id', $player->id)
+            ->orderByDesc('joined_at')
+            ->orderByDesc('id')
+            ->get();
     }
 }
