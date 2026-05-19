@@ -11,6 +11,9 @@ class SportMatchEvent extends Model
         'tournament_id',
         'match_id',
         'team_id',
+        'squad_id',
+        'squad_player_id',
+        'related_squad_player_id',
         'player_id',
         'assist_player_id',
         'player_in_id',
@@ -20,7 +23,11 @@ class SportMatchEvent extends Model
         'extra_time_minute',
         'stoppage_minute',
         'side',
+        'period',
         'description',
+        'player_name_snapshot',
+        'jersey_number_snapshot',
+        'position_snapshot',
         'metadata',
         'created_by_user_id',
     ];
@@ -31,6 +38,7 @@ class SportMatchEvent extends Model
             'minute' => 'integer',
             'extra_time_minute' => 'integer',
             'stoppage_minute' => 'integer',
+            'jersey_number_snapshot' => 'integer',
             'metadata' => 'array',
         ];
     }
@@ -48,6 +56,21 @@ class SportMatchEvent extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(SportTeam::class, 'team_id');
+    }
+
+    public function squad(): BelongsTo
+    {
+        return $this->belongsTo(SportMatchSquad::class, 'squad_id');
+    }
+
+    public function squadPlayer(): BelongsTo
+    {
+        return $this->belongsTo(SportMatchSquadPlayer::class, 'squad_player_id');
+    }
+
+    public function relatedSquadPlayer(): BelongsTo
+    {
+        return $this->belongsTo(SportMatchSquadPlayer::class, 'related_squad_player_id');
     }
 
     public function player(): BelongsTo

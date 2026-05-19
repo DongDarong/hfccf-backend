@@ -42,7 +42,7 @@ class SportMatchScoreService
             $eventType = strtolower(trim((string) $event->event_type));
             $teamId = (int) $event->team_id;
 
-            if (! in_array($eventType, ['goal', 'own_goal', 'penalty_goal'], true)) {
+            if (! in_array($eventType, ['goal', 'own_goal', 'penalty_goal', 'extra_time_goal'], true)) {
                 continue;
             }
 

@@ -350,6 +350,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
         Route::get('matches/{id}/events', [SportMatchEventController::class, 'index']);
         Route::post('matches/{id}/events', [SportMatchEventController::class, 'store']);
+        Route::patch('match-events/{id}', [SportMatchEventController::class, 'update']);
+        Route::delete('match-events/{id}', [SportMatchEventController::class, 'destroy']);
         Route::put('events/{id}', [SportMatchEventController::class, 'update']);
         Route::delete('events/{id}', [SportMatchEventController::class, 'destroy']);
     });
