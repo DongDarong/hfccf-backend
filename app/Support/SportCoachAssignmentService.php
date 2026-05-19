@@ -5,12 +5,17 @@ namespace App\Support;
 use App\Models\CoachTeamAssignment;
 use App\Models\SportTeam;
 use App\Models\User;
+use App\Services\SportActivityRecorder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class SportCoachAssignmentService
 {
+    public function __construct(
+        private readonly SportActivityRecorder $activityRecorder,
+    ) {}
+
     public function activeAssignmentsForCoach(User $coach): Collection
     {
         return CoachTeamAssignment::query()
@@ -87,12 +92,15 @@ class SportCoachAssignmentService
                     'status' => 'inactive',
                     'ended_at' => $now,
                 ])->save();
+
+                $this->activityRecorder->coachAssignmentChanged($currentActive->refresh()->loadMissing(['team', 'coach', 'assignedBy']), $assignedBy, SportAuditAction::COACH_ASSIGNMENT_DEACTIVATED);
             }
 
             $assignment = CoachTeamAssignment::query()->firstOrNew([
                 'coach_user_id' => $coach->id,
                 'team_id' => $team->id,
             ]);
+            $auditAction = $assignment->exists ? SportAuditAction::COACH_ASSIGNMENT_UPDATED : SportAuditAction::COACH_ASSIGNMENT_CREATED;
 
             $assignment->forceFill([
                 'assigned_by_user_id' => $assignedBy->id,
@@ -106,7 +114,10 @@ class SportCoachAssignmentService
                 'coach_display_name' => trim($coach->first_name.' '.$coach->last_name),
             ])->save();
 
-            return $assignment->refresh()->loadMissing(['team', 'coach', 'assignedBy']);
+            $assignment = $assignment->refresh()->loadMissing(['team', 'coach', 'assignedBy']);
+            $this->activityRecorder->coachAssignmentChanged($assignment, $assignedBy, $auditAction);
+
+            return $assignment;
         });
     }
 
@@ -141,7 +152,12 @@ class SportCoachAssignmentService
                 ])->save();
             }
 
-            return $assignment->refresh()->loadMissing(['team', 'coach', 'assignedBy']);
+            $assignment = $assignment->refresh()->loadMissing(['team', 'coach', 'assignedBy']);
+            $this->activityRecorder->coachAssignmentChanged($assignment, $changedBy, $status === 'active'
+                ? SportAuditAction::COACH_ASSIGNMENT_UPDATED
+                : SportAuditAction::COACH_ASSIGNMENT_DEACTIVATED);
+
+            return $assignment;
         });
     }
 

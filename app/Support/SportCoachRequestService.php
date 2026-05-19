@@ -6,6 +6,7 @@ use App\Models\SportMatch;
 use App\Models\SportPlayer;
 use App\Models\SportTeam;
 use App\Models\User;
+use App\Services\SportActivityRecorder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -15,6 +16,7 @@ class SportCoachRequestService
     public function __construct(
         private readonly SportCoachAssignmentService $assignmentService,
         private readonly SportPlayerMembershipService $membershipService,
+        private readonly SportActivityRecorder $activityRecorder,
     ) {}
 
     public function createPendingPlayerRequest(User $coach, SportTeam $team, array $data, ?UploadedFile $photo = null): SportPlayer
@@ -23,7 +25,7 @@ class SportCoachRequestService
             throw new \RuntimeException('Coach cannot manage the selected team.');
         }
 
-        return DB::transaction(function () use ($coach, $team, $data, $photo): SportPlayer {
+        $player = DB::transaction(function () use ($coach, $team, $data, $photo): SportPlayer {
             $player = SportPlayer::query()->create([
                 'player_code' => $data['player_code'] ?? strtoupper('player-'.Str::random(8)),
                 'first_name' => $data['first_name'],
@@ -65,6 +67,10 @@ class SportCoachRequestService
 
             return $player->refresh()->loadMissing(['team']);
         });
+
+        $this->activityRecorder->playerRequestCreated($player, $coach);
+
+        return $player;
     }
 
     public function createPendingMatchRequest(User $coach, SportTeam $team, SportTeam $opponent, array $data): SportMatch
@@ -73,7 +79,7 @@ class SportCoachRequestService
             throw new \RuntimeException('Coach cannot manage the selected team.');
         }
 
-        return DB::transaction(function () use ($coach, $team, $opponent, $data): SportMatch {
+        $match = DB::transaction(function () use ($coach, $team, $opponent, $data): SportMatch {
             $match = SportMatch::query()->create([
                 'match_code' => $data['match_code'] ?? strtoupper('match-'.Str::random(8)),
                 'home_team_id' => $team->id,
@@ -98,5 +104,9 @@ class SportCoachRequestService
 
             return $match->refresh()->loadMissing(['homeTeam', 'awayTeam']);
         });
+
+        $this->activityRecorder->matchRequestCreated($match, $coach);
+
+        return $match;
     }
 }

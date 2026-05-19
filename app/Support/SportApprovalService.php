@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\SportMatch;
 use App\Models\SportPlayer;
 use App\Models\User;
+use App\Services\SportActivityRecorder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,7 @@ class SportApprovalService
 {
     public function __construct(
         private readonly SportPlayerMembershipService $membershipService,
+        private readonly SportActivityRecorder $activityRecorder,
     ) {}
 
     public function pendingPlayersQuery(): Builder
@@ -31,7 +33,7 @@ class SportApprovalService
 
     public function approvePlayer(SportPlayer $player, User $approver): SportPlayer
     {
-        return DB::transaction(function () use ($player, $approver): SportPlayer {
+        $player = DB::transaction(function () use ($player, $approver): SportPlayer {
             $team = $player->team;
 
             if (! $team) {
@@ -52,15 +54,22 @@ class SportApprovalService
                 'registration_status' => $player->registration_status === 'pending' ? 'registered' : $player->registration_status,
             ])->save();
 
-            $this->membershipService->activateMembership($player, $team, $approver, false);
+            $membership = $this->membershipService->activateMembership($player, $team, $approver, false);
+            $this->activityRecorder->rosterMembershipChanged($membership->loadMissing(['team', 'player']), $approver, SportAuditAction::ROSTER_MEMBERSHIP_ADDED);
 
             return $player->refresh()->loadMissing(['team', 'createdBy', 'approvedBy']);
         });
+
+        $this->activityRecorder->playerDecision($player, $approver, true);
+
+        return $player;
     }
 
     public function rejectPlayer(SportPlayer $player, User $approver, ?string $reason = null): SportPlayer
     {
-        return DB::transaction(function () use ($player, $approver, $reason): SportPlayer {
+        $existingMemberships = $player->memberships()->with(['team', 'player'])->get();
+
+        $player = DB::transaction(function () use ($player, $approver, $reason): SportPlayer {
             $this->membershipService->deactivateAllMembershipsForPlayer($player, $approver);
 
             $player->forceFill([
@@ -74,6 +83,14 @@ class SportApprovalService
 
             return $player->refresh()->loadMissing(['team', 'createdBy', 'approvedBy']);
         });
+
+        foreach ($existingMemberships as $membership) {
+            $this->activityRecorder->rosterMembershipChanged($membership, $approver, SportAuditAction::ROSTER_MEMBERSHIP_REMOVED);
+        }
+
+        $this->activityRecorder->playerDecision($player, $approver, false, $reason);
+
+        return $player;
     }
 
     public function approveMatch(SportMatch $match, User $approver): SportMatch
@@ -86,7 +103,10 @@ class SportApprovalService
             'rejection_reason' => null,
         ])->save();
 
-        return $match->refresh()->loadMissing(['homeTeam', 'awayTeam', 'creator', 'approvedBy']);
+        $match = $match->refresh()->loadMissing(['homeTeam', 'awayTeam', 'creator', 'approvedBy']);
+        $this->activityRecorder->matchDecision($match, $approver, true);
+
+        return $match;
     }
 
     public function rejectMatch(SportMatch $match, User $approver, ?string $reason = null): SportMatch
@@ -99,6 +119,9 @@ class SportApprovalService
             'rejection_reason' => $reason,
         ])->save();
 
-        return $match->refresh()->loadMissing(['homeTeam', 'awayTeam', 'creator', 'approvedBy']);
+        $match = $match->refresh()->loadMissing(['homeTeam', 'awayTeam', 'creator', 'approvedBy']);
+        $this->activityRecorder->matchDecision($match, $approver, false, $reason);
+
+        return $match;
     }
 }

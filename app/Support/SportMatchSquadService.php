@@ -8,6 +8,7 @@ use App\Models\SportMatchSquadPlayer;
 use App\Models\SportPlayer;
 use App\Models\SportTeam;
 use App\Models\User;
+use App\Services\SportActivityRecorder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ class SportMatchSquadService
         private readonly SportMatchEligibilityService $eligibilityService,
         private readonly SportMatchSquadSnapshotService $snapshotService,
         private readonly SportMatchSquadValidationService $validationService,
+        private readonly SportActivityRecorder $activityRecorder,
     ) {}
 
     public function squadsForMatch(SportMatch $match, ?User $actor = null): Collection
@@ -177,9 +179,13 @@ class SportMatchSquadService
             throw new \RuntimeException('Only draft squads can be submitted.');
         }
 
-        return $this->transitionSquad($squad, SportMatchSquadStatus::SUBMITTED, $actor, true, [SportMatchSquadStatus::DRAFT], [
+        $squad = $this->transitionSquad($squad, SportMatchSquadStatus::SUBMITTED, $actor, true, [SportMatchSquadStatus::DRAFT], [
             'submitted_at' => Carbon::now(),
         ]);
+
+        $this->activityRecorder->squadChanged($squad, $actor, SportAuditAction::MATCH_SQUAD_SUBMITTED);
+
+        return $squad;
     }
 
     public function approveSquad(SportMatchSquad $squad, User $actor): SportMatchSquad
@@ -188,10 +194,14 @@ class SportMatchSquadService
             throw new \RuntimeException('Only submitted squads can be approved.');
         }
 
-        return $this->transitionSquad($squad, SportMatchSquadStatus::APPROVED, $actor, true, [SportMatchSquadStatus::SUBMITTED], [
+        $squad = $this->transitionSquad($squad, SportMatchSquadStatus::APPROVED, $actor, true, [SportMatchSquadStatus::SUBMITTED], [
             'approved_by_user_id' => $actor->id,
             'approved_at' => Carbon::now(),
         ]);
+
+        $this->activityRecorder->squadChanged($squad, $actor, SportAuditAction::MATCH_SQUAD_APPROVED);
+
+        return $squad;
     }
 
     public function lockSquad(SportMatchSquad $squad, User $actor): SportMatchSquad
@@ -200,13 +210,17 @@ class SportMatchSquadService
             throw new \RuntimeException('Match squad is already locked.');
         }
 
-        return $this->transitionSquad($squad, SportMatchSquadStatus::LOCKED, $actor, false, [
+        $squad = $this->transitionSquad($squad, SportMatchSquadStatus::LOCKED, $actor, false, [
             SportMatchSquadStatus::DRAFT,
             SportMatchSquadStatus::SUBMITTED,
             SportMatchSquadStatus::APPROVED,
         ], [
             'locked_at' => Carbon::now(),
         ]);
+
+        $this->activityRecorder->squadChanged($squad, $actor, SportAuditAction::MATCH_SQUAD_LOCKED);
+
+        return $squad;
     }
 
     /**

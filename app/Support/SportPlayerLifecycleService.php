@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\SportPlayer;
 use App\Models\User;
+use App\Services\SportActivityRecorder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -12,6 +13,7 @@ class SportPlayerLifecycleService
     public function __construct(
         private readonly SportPlayerMembershipService $membershipService,
         private readonly SportPlayerStatusTransitionService $transitionService,
+        private readonly SportActivityRecorder $activityRecorder,
     ) {}
 
     public function history(SportPlayer $player): SportPlayer
@@ -21,7 +23,16 @@ class SportPlayerLifecycleService
 
     public function setRosterStatus(SportPlayer $player, string $status, ?User $changedBy = null, array $context = []): SportPlayer
     {
-        return DB::transaction(function () use ($player, $status, $changedBy, $context): SportPlayer {
+        $before = [
+            'roster_status' => $player->roster_status,
+            'status' => $player->status,
+            'team_id' => $player->team_id,
+            'disciplinary_status' => $player->disciplinary_status,
+            'injury_status' => $player->injury_status,
+            'archived_at' => $player->archived_at?->toISOString(),
+        ];
+
+        $player = DB::transaction(function () use ($player, $status, $changedBy, $context): SportPlayer {
             $player = $this->transitionService->transition($player, $status, $changedBy, $context);
 
             if (in_array($status, [SportPlayerRosterStatus::RELEASED, SportPlayerRosterStatus::GRADUATED, SportPlayerRosterStatus::ARCHIVED], true)) {
@@ -33,6 +44,20 @@ class SportPlayerLifecycleService
 
             return $player->refresh()->loadMissing(['team', 'createdBy', 'approvedBy', 'activeMembership.team', 'memberships.team']);
         });
+
+        $actor = $changedBy ?? request()->user();
+        if ($actor) {
+            $this->activityRecorder->playerLifecycleChanged($player, $actor, SportAuditAction::PLAYER_LIFECYCLE_CHANGED, $before, [
+                'roster_status' => $player->roster_status,
+                'status' => $player->status,
+                'team_id' => $player->team_id,
+                'disciplinary_status' => $player->disciplinary_status,
+                'injury_status' => $player->injury_status,
+                'archived_at' => $player->archived_at?->toISOString(),
+            ]);
+        }
+
+        return $player;
     }
 
     public function markInjured(SportPlayer $player, ?string $notes, ?User $changedBy = null): SportPlayer

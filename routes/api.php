@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AdminUserController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\English\EnglishClassController;
 use App\Http\Controllers\Api\English\EnglishDashboardController;
@@ -135,6 +136,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::delete('{id}/dismiss', [NotificationController::class, 'dismiss']);
         Route::patch('{id}/undismiss', [NotificationController::class, 'undismiss']);
     });
+
+    Route::get('audit-logs', [AuditLogController::class, 'index']);
 
     /*
     |----------------------------------------------------------------------

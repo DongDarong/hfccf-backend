@@ -6,6 +6,7 @@ use App\Models\SportPlayer;
 use App\Models\SportPlayerTeamMembership;
 use App\Models\SportTeam;
 use App\Models\User;
+use App\Services\SportActivityRecorder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,7 @@ class SportTeamRosterService
     public function __construct(
         private readonly SportPlayerMembershipService $membershipService,
         private readonly SportPlayerEligibilityService $eligibilityService,
+        private readonly SportActivityRecorder $activityRecorder,
     ) {}
 
     public function rosterForTeam(SportTeam $team): Collection
@@ -32,7 +34,7 @@ class SportTeamRosterService
             throw new \RuntimeException('Player cannot join the selected team.');
         }
 
-        return DB::transaction(function () use ($team, $player, $actor, $membershipStatus, $notes): SportPlayerTeamMembership {
+        $membership = DB::transaction(function () use ($team, $player, $actor, $membershipStatus, $notes): SportPlayerTeamMembership {
             $membership = $this->membershipService->activateMembership($player, $team, $actor, true);
 
             $membership->forceFill([
@@ -50,6 +52,10 @@ class SportTeamRosterService
 
             return $membership->refresh()->loadMissing(['team', 'player', 'createdBy', 'updatedBy']);
         });
+
+        $this->activityRecorder->rosterMembershipChanged($membership, $actor, SportAuditAction::ROSTER_MEMBERSHIP_ADDED);
+
+        return $membership;
     }
 
     public function transferPlayer(SportTeam $team, SportPlayer $player, User $actor, ?string $notes = null): SportPlayerTeamMembership
@@ -64,9 +70,9 @@ class SportTeamRosterService
         });
     }
 
-    public function updateMembership(SportPlayerTeamMembership $membership, array $data, User $actor): SportPlayerTeamMembership
+    public function updateMembership(SportPlayerTeamMembership $membership, array $data, User $actor, string $auditAction = SportAuditAction::ROSTER_MEMBERSHIP_UPDATED): SportPlayerTeamMembership
     {
-        return DB::transaction(function () use ($membership, $data, $actor): SportPlayerTeamMembership {
+        $membership = DB::transaction(function () use ($membership, $data, $actor): SportPlayerTeamMembership {
             $player = $membership->player()->first();
             $team = $membership->team()->first();
             $membership->forceFill([
@@ -101,14 +107,20 @@ class SportTeamRosterService
 
             return $membership->refresh()->loadMissing(['team', 'player', 'createdBy', 'updatedBy']);
         });
+
+        $this->activityRecorder->rosterMembershipChanged($membership, $actor, $auditAction);
+
+        return $membership;
     }
 
     public function deactivateMembership(SportPlayerTeamMembership $membership, User $actor): SportPlayerTeamMembership
     {
-        return $this->updateMembership($membership, [
+        $membership = $this->updateMembership($membership, [
             'status' => SportMembershipStatus::INACTIVE,
             'notes' => $membership->notes,
-        ], $actor);
+        ], $actor, SportAuditAction::ROSTER_MEMBERSHIP_REMOVED);
+
+        return $membership;
     }
 
     public function deactivateAllForPlayer(SportPlayer $player, ?User $actor = null): void
