@@ -31,7 +31,12 @@ class SportMatchEventTimelineTest extends TestCase
         $team = $this->createTeam('TEAM-EVT-1', 'Event Team One', $coach->id, 'Coach Event');
         $awayTeam = $this->createTeam('TEAM-EVT-2', 'Event Team Two');
         $match = $this->createMatch($team, $awayTeam, 'live');
-        $squadPlayer = $this->createSquadWithPlayer($match, $team);
+        $squad = SportMatchSquad::query()->create([
+            'match_id' => $match->id,
+            'team_id' => $team->id,
+            'status' => 'draft',
+        ]);
+        $squadPlayer = $this->createSquadPlayer($match, $team, $squad);
 
         $response = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
             'team_id' => $team->id,
@@ -96,8 +101,13 @@ class SportMatchEventTimelineTest extends TestCase
         $team = $this->createTeam('TEAM-EVT-7', 'Event Team Seven');
         $awayTeam = $this->createTeam('TEAM-EVT-8', 'Event Team Eight');
         $match = $this->createMatch($team, $awayTeam, 'live');
-        $squadPlayer = $this->createSquadWithPlayer($match, $team);
-        $otherSquadPlayer = $this->createSquadWithPlayer($match, $team, 'Event One Reserve');
+        $squad = SportMatchSquad::query()->create([
+            'match_id' => $match->id,
+            'team_id' => $team->id,
+            'status' => 'draft',
+        ]);
+        $squadPlayer = $this->createSquadPlayer($match, $team, $squad);
+        $otherSquadPlayer = $this->createSquadPlayer($match, $team, $squad, 'Event One Reserve');
 
         $first = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
             'team_id' => $team->id,
@@ -135,7 +145,12 @@ class SportMatchEventTimelineTest extends TestCase
         $team = $this->createTeam('TEAM-EVT-9', 'Event Team Nine');
         $awayTeam = $this->createTeam('TEAM-EVT-10', 'Event Team Ten');
         $match = $this->createMatch($team, $awayTeam, 'live');
-        $squadPlayer = $this->createSquadWithPlayer($match, $team, 'Event Snapshot Player');
+        $squad = SportMatchSquad::query()->create([
+            'match_id' => $match->id,
+            'team_id' => $team->id,
+            'status' => 'draft',
+        ]);
+        $squadPlayer = $this->createSquadPlayer($match, $team, $squad, 'Event Snapshot Player');
 
         $response = $this->postJson('/api/sport/matches/'.$match->id.'/events', [
             'team_id' => $team->id,
@@ -218,14 +233,8 @@ class SportMatchEventTimelineTest extends TestCase
         ]);
     }
 
-    private function createSquadWithPlayer(SportMatch $match, SportTeam $team, string $playerName = 'Event One Player'): SportMatchSquadPlayer
+    private function createSquadPlayer(SportMatch $match, SportTeam $team, SportMatchSquad $squad, string $playerName = 'Event One Player'): SportMatchSquadPlayer
     {
-        $squad = SportMatchSquad::query()->create([
-            'match_id' => $match->id,
-            'team_id' => $team->id,
-            'status' => 'draft',
-        ]);
-
         $player = $this->createPlayer($team, ...array_pad(explode(' ', $playerName, 2), 2, 'Player'));
 
         return SportMatchSquadPlayer::query()->create([

@@ -8,7 +8,6 @@ use App\Models\SportMatchSquadPlayer;
 use App\Models\SportPlayer;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class SportMatchEventService
@@ -75,6 +74,13 @@ class SportMatchEventService
                         ->first()
                         ?->players
                         ->firstWhere('player_id', $player->id);
+
+                    // Match events are snapshot-based, so a player can only be recorded if they exist in the
+                    // selected match squad. Current roster membership alone is not enough because it would break
+                    // historical accuracy when squads change later.
+                    if (! $squadPlayer) {
+                        throw new \RuntimeException('Event player must belong to the match squad.');
+                    }
                 }
             }
 
@@ -134,7 +140,7 @@ class SportMatchEventService
     {
         $match = $event->match()->firstOrFail();
 
-        return DB::transaction(function () use ($event, $match, $data, $actor): SportMatchEvent {
+        return DB::transaction(function () use ($event, $match, $data): SportMatchEvent {
             if ($response = $this->validationService->assertMatchReadyForTimeline($match)) {
                 throw new \RuntimeException($response->getData(true)['message'] ?? 'Match cannot be edited.');
             }
