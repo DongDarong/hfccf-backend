@@ -10,10 +10,13 @@ use App\Http\Controllers\Api\English\EnglishSubmissionController;
 use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
+use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherController;
 use App\Http\Controllers\Api\RoleController;
@@ -172,6 +175,16 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('attendance', [PreschoolAttendanceController::class, 'index']);
         Route::post('attendance', [PreschoolAttendanceController::class, 'store']);
         Route::put('attendance/{id}', [PreschoolAttendanceController::class, 'update']);
+
+        // Assessment routes stay alongside the rest of Preschool CRUD so staff
+        // can track progress without a separate module or report workflow.
+        Route::get('assessment-categories', [PreschoolAssessmentCategoryController::class, 'index']);
+        Route::get('students/{student}/assessments', [PreschoolStudentAssessmentController::class, 'index']);
+        Route::post('students/{student}/assessments', [PreschoolStudentAssessmentController::class, 'store']);
+        Route::put('assessments/{assessment}', [PreschoolStudentAssessmentController::class, 'update']);
+        Route::post('assessments/{assessment}/finalize', [PreschoolStudentAssessmentController::class, 'finalize']);
+        Route::post('assessments/{assessment}/archive', [PreschoolStudentAssessmentController::class, 'archive']);
+        Route::get('students/{student}/progress-summary', [PreschoolProgressSummaryController::class, 'index']);
 
         Route::get('payments', [PreschoolPaymentController::class, 'index']);
         Route::post('payments', [PreschoolPaymentController::class, 'store']);
