@@ -2,8 +2,8 @@
 
 namespace App\Http\Resources\Notification;
 
-use App\Models\NotificationRecipient;
 use App\Models\Notification as NotificationModel;
+use App\Models\NotificationRecipient;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 

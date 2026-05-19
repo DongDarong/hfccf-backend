@@ -7,6 +7,8 @@ use App\Http\Requests\Scholarship\StoreScholarshipStudentRequest;
 use App\Http\Requests\Scholarship\UpdateScholarshipStudentRequest;
 use App\Http\Resources\Scholarship\ScholarshipStudentResource;
 use App\Models\ScholarshipStudent;
+use App\Models\User;
+use App\Services\ScholarshipService;
 use App\Support\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -192,10 +194,10 @@ class ScholarshipStudentController extends Controller
 
     private function generateStudentCode(): string
     {
-        return app(\App\Services\ScholarshipService::class)->generateStudentCode();
+        return app(ScholarshipService::class)->generateStudentCode();
     }
 
-    private function authorizeScholarshipAdmin(?\App\Models\User $user): ?JsonResponse
+    private function authorizeScholarshipAdmin(?User $user): ?JsonResponse
     {
         if (! $user) {
             return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);
@@ -207,5 +209,4 @@ class ScholarshipStudentController extends Controller
 
         return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
     }
-
 }

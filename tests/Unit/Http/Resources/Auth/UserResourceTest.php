@@ -44,7 +44,7 @@ class UserResourceTest extends TestCase
             ]);
             $user->loadMissing(['department', 'role', 'permissions']);
 
-            $payload = UserResource::make($user)->resolve(new Request());
+            $payload = UserResource::make($user)->resolve(new Request);
 
             $this->assertSame(Storage::disk('r2')->url($avatarPath), $payload['avatar']);
         } finally {

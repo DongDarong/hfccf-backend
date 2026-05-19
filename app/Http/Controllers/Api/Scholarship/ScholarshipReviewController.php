@@ -20,8 +20,7 @@ class ScholarshipReviewController extends Controller
 {
     public function __construct(
         private readonly ScholarshipService $scholarshipService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -188,5 +187,4 @@ class ScholarshipReviewController extends Controller
 
         return $query->first();
     }
-
 }

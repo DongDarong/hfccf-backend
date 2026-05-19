@@ -232,6 +232,7 @@ class PreschoolClassController extends Controller
         if ($studentIds === null) {
             $class->students_count = $class->students()->count();
             $class->save();
+
             return;
         }
 

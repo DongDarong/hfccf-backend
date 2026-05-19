@@ -4,12 +4,11 @@ namespace Tests\Feature;
 
 use App\Mail\PasswordResetOtpMail;
 use App\Models\PasswordResetOtp;
-use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class PasswordResetTest extends TestCase

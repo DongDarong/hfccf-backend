@@ -11,7 +11,6 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class PreschoolStudentController extends Controller
@@ -217,6 +216,7 @@ class PreschoolStudentController extends Controller
     {
         if ($classIds === null) {
             $student->classes()->syncWithoutDetaching([]);
+
             return;
         }
 
