@@ -76,7 +76,9 @@ QUEUE_CONNECTION=database
 ### 3. Run Migrations and Seeders
 
 ```bash
-php artisan migrate:fresh --seed
+php artisan migrate
+# Seed only when you need sample or bootstrap data:
+php artisan db:seed
 ```
 
 ### 4. Start the Queue Worker
@@ -89,7 +91,23 @@ php artisan queue:work --tries=3 --timeout=60
 
 The existing `composer run dev` script already starts a queue listener for local development.
 
-### 5. Start the Backend
+### 5. Production Readiness Notes
+
+For production or staging deploys, use the safe cache commands after migrations and before opening traffic:
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+If you deploy queued notifications or image-processing jobs, keep a worker running:
+
+```bash
+php artisan queue:work --tries=3 --timeout=60
+```
+
+### 6. Start the Backend
 
 ```bash
 php artisan serve
