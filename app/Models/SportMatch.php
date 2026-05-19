@@ -111,4 +111,9 @@ class SportMatch extends Model
     {
         return $this->belongsTo(User::class, 'approved_by_user_id', 'id');
     }
+
+    public function squads(): HasMany
+    {
+        return $this->hasMany(SportMatchSquad::class, 'match_id');
+    }
 }

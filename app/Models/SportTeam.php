@@ -73,4 +73,9 @@ class SportTeam extends Model
     {
         return $this->hasMany(SportMatch::class, 'away_team_id');
     }
+
+    public function matchSquads(): HasMany
+    {
+        return $this->hasMany(SportMatchSquad::class, 'team_id');
+    }
 }

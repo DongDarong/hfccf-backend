@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\Sport\SportCoachTeamController;
 use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportMatchController;
 use App\Http\Controllers\Api\Sport\SportMatchEventController;
+use App\Http\Controllers\Api\Sport\SportMatchSquadController;
 use App\Http\Controllers\Api\Sport\SportPlayerController;
 use App\Http\Controllers\Api\Sport\SportPlayerLifecycleController;
 use App\Http\Controllers\Api\Sport\SportTeamController;
@@ -337,6 +338,15 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::put('matches/{id}', [SportMatchController::class, 'update']);
         Route::delete('matches/{id}', [SportMatchController::class, 'destroy']);
         Route::patch('matches/{id}/status', [SportMatchController::class, 'updateStatus']);
+
+        Route::get('matches/{match}/teams/{team}/eligibility', [SportMatchSquadController::class, 'eligibility']);
+        Route::get('matches/{match}/squads', [SportMatchSquadController::class, 'index']);
+        Route::get('matches/{match}/teams/{team}/squad', [SportMatchSquadController::class, 'show']);
+        Route::post('matches/{match}/teams/{team}/squad', [SportMatchSquadController::class, 'store']);
+        Route::patch('match-squads/{squad}', [SportMatchSquadController::class, 'update']);
+        Route::post('match-squads/{squad}/submit', [SportMatchSquadController::class, 'submit']);
+        Route::post('match-squads/{squad}/approve', [SportMatchSquadController::class, 'approve']);
+        Route::post('match-squads/{squad}/lock', [SportMatchSquadController::class, 'lock']);
 
         Route::get('matches/{id}/events', [SportMatchEventController::class, 'index']);
         Route::post('matches/{id}/events', [SportMatchEventController::class, 'store']);
