@@ -15,12 +15,14 @@ use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
+use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
 use App\Http\Controllers\Api\Preschool\PreschoolScheduleController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentGuardianController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherScheduleController;
@@ -176,6 +178,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('students/{id}', [PreschoolStudentController::class, 'show']);
         Route::put('students/{id}', [PreschoolStudentController::class, 'update']);
         Route::delete('students/{id}', [PreschoolStudentController::class, 'destroy']);
+
+        // Guardian records stay normalized and admin-managed while teachers
+        // only read student-specific guardian/contact views.
+        Route::get('guardians', [PreschoolGuardianController::class, 'index']);
+        Route::post('guardians', [PreschoolGuardianController::class, 'store']);
+        Route::get('guardians/{guardian}', [PreschoolGuardianController::class, 'show']);
+        Route::patch('guardians/{guardian}', [PreschoolGuardianController::class, 'update']);
+        Route::delete('guardians/{guardian}', [PreschoolGuardianController::class, 'destroy']);
+
+        Route::get('students/{student}/guardians', [PreschoolStudentGuardianController::class, 'index']);
+        Route::post('students/{student}/guardians', [PreschoolStudentGuardianController::class, 'store']);
+        Route::patch('student-guardians/{relationship}', [PreschoolStudentGuardianController::class, 'update']);
+        Route::delete('student-guardians/{relationship}', [PreschoolStudentGuardianController::class, 'destroy']);
+        Route::get('students/{student}/emergency-contacts', [PreschoolStudentGuardianController::class, 'emergencyContacts']);
 
         Route::get('attendance', [PreschoolAttendanceController::class, 'index']);
         Route::post('attendance', [PreschoolAttendanceController::class, 'store']);
