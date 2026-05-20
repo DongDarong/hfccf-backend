@@ -13,10 +13,13 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
+use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
+use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherController;
 use App\Http\Controllers\Api\RoleController;
@@ -185,6 +188,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('assessments/{assessment}/finalize', [PreschoolStudentAssessmentController::class, 'finalize']);
         Route::post('assessments/{assessment}/archive', [PreschoolStudentAssessmentController::class, 'archive']);
         Route::get('students/{student}/progress-summary', [PreschoolProgressSummaryController::class, 'index']);
+        // Reports stay on finalized assessment data so the frontend can render
+        // stable summary screens without inventing a separate reporting store.
+        Route::get('report-periods', [PreschoolReportPeriodController::class, 'index']);
+        Route::get('students/{student}/reports', [PreschoolStudentReportController::class, 'index']);
+        Route::get('students/{student}/reports/{period}', [PreschoolStudentReportController::class, 'show']);
+        Route::get('classes/{class}/reports', [PreschoolClassroomReportController::class, 'index']);
+        Route::get('classes/{class}/reports/{period}', [PreschoolClassroomReportController::class, 'show']);
 
         Route::get('payments', [PreschoolPaymentController::class, 'index']);
         Route::post('payments', [PreschoolPaymentController::class, 'store']);
