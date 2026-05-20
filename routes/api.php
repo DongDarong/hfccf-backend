@@ -18,10 +18,12 @@ use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
+use App\Http\Controllers\Api\Preschool\PreschoolScheduleController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
-use App\Http\Controllers\Api\Preschool\PreschoolStudentReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherController;
+use App\Http\Controllers\Api\Preschool\PreschoolTeacherScheduleController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipApplicationController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipDashboardController;
@@ -195,6 +197,17 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('students/{student}/reports/{period}', [PreschoolStudentReportController::class, 'show']);
         Route::get('classes/{class}/reports', [PreschoolClassroomReportController::class, 'index']);
         Route::get('classes/{class}/reports/{period}', [PreschoolClassroomReportController::class, 'show']);
+
+        // Weekly schedules stay isolated from attendance and reporting because
+        // timetable conflicts need their own validation and read-only views.
+        Route::get('schedules', [PreschoolScheduleController::class, 'index']);
+        Route::post('schedules', [PreschoolScheduleController::class, 'store']);
+        Route::get('schedules/{schedule}', [PreschoolScheduleController::class, 'show']);
+        Route::patch('schedules/{schedule}', [PreschoolScheduleController::class, 'update']);
+        Route::delete('schedules/{schedule}', [PreschoolScheduleController::class, 'destroy']);
+        Route::get('classes/{class}/schedule', [PreschoolTeacherScheduleController::class, 'classSchedule']);
+        Route::get('teachers/{teacher}/schedule', [PreschoolTeacherScheduleController::class, 'teacherSchedule']);
+        Route::get('me/schedule', [PreschoolTeacherScheduleController::class, 'meSchedule']);
 
         Route::get('payments', [PreschoolPaymentController::class, 'index']);
         Route::post('payments', [PreschoolPaymentController::class, 'store']);

@@ -104,6 +104,15 @@ class User extends Authenticatable
         return $this->hasMany(CoachTeamAssignment::class, 'coach_user_id', 'id')->where('status', 'active');
     }
 
+    /**
+     * Preschool timetable lookups stay teacher-scoped through the shared User
+     * model because teacher-preschool accounts are real system users.
+     */
+    public function preschoolScheduleEntries(): HasMany
+    {
+        return $this->hasMany(PreschoolScheduleEntry::class, 'teacher_user_id', 'id');
+    }
+
     private function resolveAvatarUrl(mixed $value): ?string
     {
         return ImageStorage::url($value);

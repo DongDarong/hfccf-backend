@@ -56,4 +56,13 @@ class PreschoolClass extends Model
     {
         return $this->hasMany(PreschoolPayment::class, 'class_id');
     }
+
+    /**
+     * Keep schedule rows attached to the class model so timetable pages can
+     * reuse the same Preschool class context without duplicating fields.
+     */
+    public function scheduleEntries(): HasMany
+    {
+        return $this->hasMany(PreschoolScheduleEntry::class, 'class_id');
+    }
 }
