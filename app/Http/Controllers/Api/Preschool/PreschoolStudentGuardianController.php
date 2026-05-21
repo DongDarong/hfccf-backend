@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Preschool\StorePreschoolStudentGuardianRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolStudentGuardianRequest;
 use App\Http\Resources\Preschool\PreschoolStudentGuardianResource;
+use App\Models\PreschoolGuardian;
 use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentGuardian;
 use App\Models\User;
@@ -58,6 +59,74 @@ class PreschoolStudentGuardianController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Preschool student guardian updated successfully.',
+            'data' => [
+                'relationship' => PreschoolStudentGuardianResource::make($updated)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    /**
+     * Pair-based actions keep the student and guardian anchors visible in the
+     * URL so staff can confirm exactly which relationship they are editing.
+     */
+    public function updateByGuardian(UpdatePreschoolStudentGuardianRequest $request, PreschoolStudent $student, PreschoolGuardian $guardian, PreschoolStudentGuardianService $service): JsonResponse
+    {
+        $updated = $service->updateRelationshipForGuardian($request->user(), $student, $guardian, $request->validated());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool student guardian updated successfully.',
+            'data' => [
+                'relationship' => PreschoolStudentGuardianResource::make($updated)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function setPrimary(Request $request, PreschoolStudent $student, PreschoolGuardian $guardian, PreschoolStudentGuardianService $service): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $updated = $service->setPrimaryRelationship($request->user(), $student, $guardian);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool student guardian marked as primary successfully.',
+            'data' => [
+                'relationship' => PreschoolStudentGuardianResource::make($updated)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function archiveByGuardian(Request $request, PreschoolStudent $student, PreschoolGuardian $guardian, PreschoolStudentGuardianService $service): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $updated = $service->archiveRelationshipForGuardian($request->user(), $student, $guardian);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool student guardian archived successfully.',
+            'data' => [
+                'relationship' => PreschoolStudentGuardianResource::make($updated)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function restoreByGuardian(Request $request, PreschoolStudent $student, PreschoolGuardian $guardian, PreschoolStudentGuardianService $service): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $updated = $service->restoreRelationshipForGuardian($request->user(), $student, $guardian);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool student guardian restored successfully.',
             'data' => [
                 'relationship' => PreschoolStudentGuardianResource::make($updated)->resolve($request),
             ],

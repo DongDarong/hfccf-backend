@@ -215,6 +215,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
         Route::get('students/{student}/guardians', [PreschoolStudentGuardianController::class, 'index']);
         Route::post('students/{student}/guardians', [PreschoolStudentGuardianController::class, 'store']);
+        // Pair-based routes keep the student and guardian identifiers visible so
+        // staff can manage the exact relationship without relying on a hidden id.
+        Route::put('students/{student}/guardians/{guardian}', [PreschoolStudentGuardianController::class, 'updateByGuardian']);
+        Route::post('students/{student}/guardians/{guardian}/set-primary', [PreschoolStudentGuardianController::class, 'setPrimary']);
+        Route::post('students/{student}/guardians/{guardian}/archive', [PreschoolStudentGuardianController::class, 'archiveByGuardian']);
+        Route::post('students/{student}/guardians/{guardian}/restore', [PreschoolStudentGuardianController::class, 'restoreByGuardian']);
         Route::patch('student-guardians/{relationship}', [PreschoolStudentGuardianController::class, 'update']);
         Route::delete('student-guardians/{relationship}', [PreschoolStudentGuardianController::class, 'destroy']);
         Route::get('students/{student}/emergency-contacts', [PreschoolStudentGuardianController::class, 'emergencyContacts']);

@@ -77,6 +77,56 @@ final class PreschoolStudentGuardianService
         });
     }
 
+    public function updateRelationshipForGuardian(User $user, PreschoolStudent $student, PreschoolGuardian $guardian, array $data): PreschoolStudentGuardian
+    {
+        $relationship = $this->findRelationship($student, $guardian);
+
+        return $this->updateRelationship($user, $relationship, $data);
+    }
+
+    /**
+     * Pair-based actions keep the student and guardian anchors visible in the
+     * API, which reduces accidental updates to the wrong historical link.
+     */
+    public function setPrimaryRelationship(User $user, PreschoolStudent $student, PreschoolGuardian $guardian): PreschoolStudentGuardian
+    {
+        $relationship = $this->findRelationship($student, $guardian);
+        $this->ensureGuardianLinkable($relationship->guardian()->firstOrFail());
+
+        return DB::transaction(function () use ($user, $relationship): PreschoolStudentGuardian {
+            $relationship->status = PreschoolGuardianStatus::ACTIVE;
+            $relationship->is_primary = true;
+            $relationship->updated_by_user_id = $user->id;
+            $relationship->save();
+
+            $this->syncPrimaryContact($user, $relationship);
+
+            return $relationship->fresh(['guardian', 'student']);
+        });
+    }
+
+    public function archiveRelationshipForGuardian(User $user, PreschoolStudent $student, PreschoolGuardian $guardian): PreschoolStudentGuardian
+    {
+        $relationship = $this->findRelationship($student, $guardian);
+
+        return $this->archiveRelationship($user, $relationship);
+    }
+
+    public function restoreRelationshipForGuardian(User $user, PreschoolStudent $student, PreschoolGuardian $guardian): PreschoolStudentGuardian
+    {
+        $relationship = $this->findRelationship($student, $guardian);
+        $this->ensureGuardianLinkable($relationship->guardian()->firstOrFail());
+
+        return DB::transaction(function () use ($user, $relationship): PreschoolStudentGuardian {
+            $relationship->status = PreschoolGuardianStatus::ACTIVE;
+            $relationship->ends_at = null;
+            $relationship->updated_by_user_id = $user->id;
+            $relationship->save();
+
+            return $relationship->fresh(['guardian', 'student']);
+        });
+    }
+
     public function updateRelationship(User $user, PreschoolStudentGuardian $relationship, array $data): PreschoolStudentGuardian
     {
         $this->ensureAdminAccess($user);
@@ -160,6 +210,15 @@ final class PreschoolStudentGuardianService
                 'guardian_id' => 'Archived guardians cannot be linked to active student relationships.',
             ]);
         }
+    }
+
+    private function findRelationship(PreschoolStudent $student, PreschoolGuardian $guardian): PreschoolStudentGuardian
+    {
+        return PreschoolStudentGuardian::query()
+            ->with(['guardian', 'student'])
+            ->where('student_id', $student->id)
+            ->where('guardian_id', $guardian->id)
+            ->firstOrFail();
     }
 
     private function ensureAdminAccess(?User $user): void

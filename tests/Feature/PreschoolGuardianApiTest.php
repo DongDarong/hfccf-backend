@@ -34,6 +34,7 @@ class PreschoolGuardianApiTest extends TestCase
         $guardian = $this->postJson('/api/preschool/guardians', $this->guardianPayload())
             ->assertCreated()
             ->assertJsonPath('success', true)
+            ->assertJsonStructure(['success', 'message', 'data' => ['guardian']])
             ->json('data.guardian');
 
         $this->postJson("/api/preschool/students/{$student->id}/guardians", [
@@ -117,6 +118,66 @@ class PreschoolGuardianApiTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
+    public function test_admin_can_set_primary_archive_and_restore_student_guardian_relationship(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'psc-g-125', 'preschool.guardian125@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $student = $this->createStudent('PS-GUARD-125', 'Sok', 'Rina');
+        $guardian = PreschoolGuardian::query()->create($this->guardianData('Guardian', '+855 12 999 999'));
+        $this->linkRelationship($student, $guardian, 2, false, $admin->id);
+
+        $this->postJson("/api/preschool/students/{$student->id}/guardians/{$guardian->id}/set-primary")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['success', 'message', 'data' => ['relationship']])
+            ->assertJsonPath('data.relationship.isPrimary', true);
+
+        $this->putJson("/api/preschool/students/{$student->id}/guardians/{$guardian->id}", [
+            'relationship_type' => 'guardian',
+            'can_pickup' => true,
+            'emergency_priority' => 1,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.relationship.relationshipType', 'guardian')
+            ->assertJsonPath('data.relationship.canPickup', true);
+
+        $this->postJson("/api/preschool/students/{$student->id}/guardians/{$guardian->id}/archive")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.relationship.status', 'archived')
+            ->assertJsonPath('data.relationship.canPickup', false);
+
+        $this->postJson("/api/preschool/students/{$student->id}/guardians/{$guardian->id}/restore")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.relationship.status', 'active')
+            ->assertJsonPath('data.relationship.endsAt', null);
+    }
+
+    public function test_inactive_relationship_does_not_count_as_active(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'psc-g-126', 'preschool.guardian126@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $student = $this->createStudent('PS-GUARD-126', 'Rith', 'Sophea');
+        $guardian = PreschoolGuardian::query()->create($this->guardianData('Guardian', '+855 12 888 888'));
+
+        $this->postJson("/api/preschool/students/{$student->id}/guardians", [
+            'guardian_id' => $guardian->id,
+            'relationship_type' => 'guardian',
+            'is_primary' => true,
+            'can_pickup' => true,
+            'emergency_priority' => 1,
+            'status' => 'inactive',
+        ])->assertCreated();
+
+        $this->getJson("/api/preschool/students/{$student->id}/emergency-contacts")
+            ->assertOk()
+            ->assertJsonCount(0, 'data.items');
+    }
+
     public function test_emergency_contacts_are_ordered_by_priority(): void
     {
         $admin = $this->makeUserWithRole('adminpreschool', 'psc-g-130', 'preschool.guardian130@hfccf.org');
@@ -169,6 +230,23 @@ class PreschoolGuardianApiTest extends TestCase
         Sanctum::actingAs($coach);
 
         $this->getJson('/api/preschool/guardians')
+            ->assertForbidden();
+    }
+
+    public function test_teacher_cannot_modify_guardian_relationships(): void
+    {
+        $teacher = $this->makeUserWithRole('teacher-preschool', 'psc-g-170', 'preschool.guardian170@hfccf.org');
+        Sanctum::actingAs($teacher);
+
+        $student = $this->createStudent('PS-GUARD-170', 'Kosal', 'Mey');
+        $guardian = PreschoolGuardian::query()->create($this->guardianData('Guardian', '+855 12 777 000'));
+        $this->linkRelationship($student, $guardian, 1, true, $teacher->id);
+
+        $this->putJson("/api/preschool/students/{$student->id}/guardians/{$guardian->id}", [
+            'relationship_type' => 'guardian',
+        ])->assertForbidden();
+
+        $this->postJson("/api/preschool/students/{$student->id}/guardians/{$guardian->id}/set-primary")
             ->assertForbidden();
     }
 
