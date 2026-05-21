@@ -113,6 +113,15 @@ class User extends Authenticatable
         return $this->hasMany(PreschoolScheduleEntry::class, 'teacher_user_id', 'id');
     }
 
+    /**
+     * Guardian accounts stay linked to the shared User model so portal access
+     * can be revoked without turning every guardian record into a login.
+     */
+    public function guardianPortalAccount(): HasMany
+    {
+        return $this->hasMany(PreschoolGuardianPortalAccount::class, 'user_id', 'id');
+    }
+
     private function resolveAvatarUrl(mixed $value): ?string
     {
         return ImageStorage::url($value);

@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\English\EnglishStudentController;
 use App\Http\Controllers\Api\English\EnglishSubmissionController;
 use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
+use App\Http\Controllers\Api\GuardianPortal\GuardianPortalAuthController;
+use App\Http\Controllers\Api\GuardianPortal\GuardianPortalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
@@ -16,6 +18,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
+use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
@@ -91,6 +94,23 @@ Route::prefix('auth')->group(function (): void {
         Route::patch('change-password', [AuthController::class, 'changePassword']);
 
         Route::post('logout', [AuthController::class, 'logout']);
+    });
+
+});
+
+Route::prefix('guardian-portal')->group(function (): void {
+    // The invitation activation endpoint is public so a guardian can claim
+    // the portal account before the login-only routes become available.
+    Route::post('activate', [GuardianPortalAuthController::class, 'activate']);
+
+    Route::middleware(['auth:sanctum', 'throttle:api', 'guardian.portal'])->group(function (): void {
+        Route::get('me', [GuardianPortalController::class, 'me']);
+        Route::get('students', [GuardianPortalController::class, 'students']);
+        Route::get('students/{student}', [GuardianPortalController::class, 'show']);
+        Route::get('students/{student}/attendance-summary', [GuardianPortalController::class, 'attendanceSummary']);
+        Route::get('students/{student}/schedule-summary', [GuardianPortalController::class, 'scheduleSummary']);
+        Route::get('students/{student}/progress-summary', [GuardianPortalController::class, 'progressSummary']);
+        Route::get('students/{student}/reports', [GuardianPortalController::class, 'reports']);
     });
 });
 
@@ -186,6 +206,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('guardians/{guardian}', [PreschoolGuardianController::class, 'show']);
         Route::patch('guardians/{guardian}', [PreschoolGuardianController::class, 'update']);
         Route::delete('guardians/{guardian}', [PreschoolGuardianController::class, 'destroy']);
+
+        // Guardian portal accounts are managed separately from guardian records
+        // so activation and revocation do not disturb the contact history.
+        Route::get('guardian-portal/accounts', [PreschoolGuardianPortalController::class, 'index']);
+        Route::post('guardians/{guardian}/portal/invite', [PreschoolGuardianPortalController::class, 'invite']);
+        Route::post('guardian-portal/{account}/revoke', [PreschoolGuardianPortalController::class, 'revoke']);
 
         Route::get('students/{student}/guardians', [PreschoolStudentGuardianController::class, 'index']);
         Route::post('students/{student}/guardians', [PreschoolStudentGuardianController::class, 'store']);

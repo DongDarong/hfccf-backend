@@ -42,6 +42,9 @@ class HfccfAuthSeeder extends Seeder
             ['code' => 'teacher-preschool', 'name' => 'Preschool Teacher', 'scope' => 'staff', 'domain_code' => 'preschool', 'department_code' => 'education', 'sort_order' => 7],
             ['code' => 'teacher-scholarship', 'name' => 'Scholarship Teacher', 'scope' => 'staff', 'domain_code' => 'scholarship', 'department_code' => 'education', 'sort_order' => 8],
             ['code' => 'coach', 'name' => 'Coach', 'scope' => 'staff', 'domain_code' => 'sport', 'department_code' => 'sports', 'sort_order' => 9],
+            // Portal users are kept separate from admin/staff users so guardian
+            // portal access can be revoked without changing Preschool contact data.
+            ['code' => 'guardian', 'name' => 'Guardian', 'scope' => 'portal', 'domain_code' => 'preschool', 'department_code' => 'education', 'sort_order' => 10],
         ]);
 
         DB::table('permissions')->insert([

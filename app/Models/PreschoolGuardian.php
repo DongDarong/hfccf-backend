@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PreschoolGuardian extends Model
@@ -60,5 +61,14 @@ class PreschoolGuardian extends Model
             'ends_at',
             'notes',
         ])->withTimestamps();
+    }
+
+    /**
+     * Portal account state lives alongside guardian data so revocation and
+     * invitation flows can reuse the same normalized record without duplication.
+     */
+    public function portalAccount(): HasOne
+    {
+        return $this->hasOne(PreschoolGuardianPortalAccount::class, 'guardian_id');
     }
 }
