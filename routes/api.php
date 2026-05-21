@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
+use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
@@ -208,6 +209,17 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         // staff-only diagnostics never get mistaken for a guardian id.
         Route::get('guardians/duplicates', [PreschoolGuardianIntegrityController::class, 'duplicates']);
         Route::get('guardians/consistency-report', [PreschoolGuardianIntegrityController::class, 'consistencyReport']);
+
+        // Remediation routes are static and must sit before {guardian} so the
+        // segment "remediation" is never resolved as a guardian model binding.
+        Route::get('guardians/remediation/logs', [PreschoolGuardianRemediationController::class, 'logs']);
+        Route::post('guardians/remediation/mark-reviewed', [PreschoolGuardianRemediationController::class, 'markReviewed']);
+        Route::post('guardians/remediation/set-primary', [PreschoolGuardianRemediationController::class, 'setPrimary']);
+        Route::post('guardians/remediation/clear-invalid-primary', [PreschoolGuardianRemediationController::class, 'clearInvalidPrimary']);
+        Route::post('guardians/remediation/clear-invalid-emergency-contact', [PreschoolGuardianRemediationController::class, 'clearInvalidEmergencyContact']);
+        Route::post('guardians/remediation/reconcile-legacy-fields', [PreschoolGuardianRemediationController::class, 'reconcileLegacyFields']);
+        Route::post('guardians/remediation/archive-duplicate-candidate', [PreschoolGuardianRemediationController::class, 'archiveDuplicateCandidate']);
+        Route::post('guardians/remediation/archive-orphan-guardian', [PreschoolGuardianRemediationController::class, 'archiveOrphanGuardian']);
         Route::get('guardians/{guardian}', [PreschoolGuardianController::class, 'show']);
         Route::patch('guardians/{guardian}', [PreschoolGuardianController::class, 'update']);
         Route::delete('guardians/{guardian}', [PreschoolGuardianController::class, 'destroy']);
