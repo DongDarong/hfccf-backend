@@ -169,6 +169,8 @@ final class PreschoolReportService
 
     private function studentSnapshot(PreschoolStudent $student): array
     {
+        $guardianSnapshot = app(PreschoolGuardianSnapshotService::class)->preferredGuardianSnapshot($student);
+
         return [
             'id' => $student->id,
             'studentCode' => $student->student_code,
@@ -177,8 +179,9 @@ final class PreschoolReportService
             'lastName' => $student->last_name,
             'gender' => $student->gender,
             'dateOfBirth' => $student->date_of_birth?->toDateString(),
-            'guardianName' => $student->guardian_name,
-            'guardianPhone' => $student->guardian_phone,
+            'guardianName' => $guardianSnapshot['guardianName'] ?? $student->guardian_name,
+            'guardianPhone' => $guardianSnapshot['guardianPhone'] ?? $student->guardian_phone,
+            'guardianSource' => $guardianSnapshot['source'] ?? 'legacy',
             'status' => $student->status,
         ];
     }

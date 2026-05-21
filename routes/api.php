@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
+use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
@@ -203,6 +204,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         // only read student-specific guardian/contact views.
         Route::get('guardians', [PreschoolGuardianController::class, 'index']);
         Route::post('guardians', [PreschoolGuardianController::class, 'store']);
+        // Integrity checks stay ahead of the dynamic guardian route so these
+        // staff-only diagnostics never get mistaken for a guardian id.
+        Route::get('guardians/duplicates', [PreschoolGuardianIntegrityController::class, 'duplicates']);
+        Route::get('guardians/consistency-report', [PreschoolGuardianIntegrityController::class, 'consistencyReport']);
         Route::get('guardians/{guardian}', [PreschoolGuardianController::class, 'show']);
         Route::patch('guardians/{guardian}', [PreschoolGuardianController::class, 'update']);
         Route::delete('guardians/{guardian}', [PreschoolGuardianController::class, 'destroy']);
