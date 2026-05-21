@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
+use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
@@ -220,6 +221,19 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('guardians/remediation/reconcile-legacy-fields', [PreschoolGuardianRemediationController::class, 'reconcileLegacyFields']);
         Route::post('guardians/remediation/archive-duplicate-candidate', [PreschoolGuardianRemediationController::class, 'archiveDuplicateCandidate']);
         Route::post('guardians/remediation/archive-orphan-guardian', [PreschoolGuardianRemediationController::class, 'archiveOrphanGuardian']);
+
+        // Governance routes sit under a dedicated segment so they never collide
+        // with {guardian} model binding and form a self-contained workflow area.
+        Route::post('guardians/governance/sync', [PreschoolGuardianGovernanceController::class, 'sync']);
+        Route::get('guardians/governance/dashboard-summary', [PreschoolGuardianGovernanceController::class, 'dashboardSummary']);
+        Route::get('guardians/governance/stale-issues', [PreschoolGuardianGovernanceController::class, 'staleIssues']);
+        Route::get('guardians/governance/recurring-issues', [PreschoolGuardianGovernanceController::class, 'recurringIssues']);
+        Route::get('guardians/governance/issues', [PreschoolGuardianGovernanceController::class, 'index']);
+        Route::get('guardians/governance/issues/{issue}', [PreschoolGuardianGovernanceController::class, 'show']);
+        Route::post('guardians/governance/issues/{issue}/acknowledge', [PreschoolGuardianGovernanceController::class, 'acknowledge']);
+        Route::post('guardians/governance/issues/{issue}/assign', [PreschoolGuardianGovernanceController::class, 'assign']);
+        Route::post('guardians/governance/issues/{issue}/resolve', [PreschoolGuardianGovernanceController::class, 'resolve']);
+        Route::post('guardians/governance/issues/{issue}/dismiss', [PreschoolGuardianGovernanceController::class, 'dismiss']);
         Route::get('guardians/{guardian}', [PreschoolGuardianController::class, 'show']);
         Route::patch('guardians/{guardian}', [PreschoolGuardianController::class, 'update']);
         Route::delete('guardians/{guardian}', [PreschoolGuardianController::class, 'destroy']);
