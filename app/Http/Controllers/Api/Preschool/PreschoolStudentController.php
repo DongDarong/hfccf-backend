@@ -8,6 +8,7 @@ use App\Http\Requests\Preschool\UpdatePreschoolStudentRequest;
 use App\Http\Resources\Preschool\PreschoolStudentResource;
 use App\Models\PreschoolStudent;
 use App\Models\User;
+use App\Support\ImageStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -112,6 +113,7 @@ class PreschoolStudentController extends Controller
             'guardian_phone' => $data['guardian_phone'] ?? null,
             'address' => $data['address'] ?? null,
             'status' => $data['status'],
+            'avatar' => ImageStorage::store($request->file('avatar'), 'preschool/students'),
         ]);
 
         $this->syncStudentClasses($student, $data['class_ids'] ?? []);
@@ -172,6 +174,17 @@ class PreschoolStudentController extends Controller
             if (array_key_exists($field, $data)) {
                 $student->{$field} = $data[$field];
             }
+        }
+
+        $replaceAvatar = $request->hasFile('avatar');
+        $removeAvatar = (bool) ($data['remove_avatar'] ?? false);
+
+        if ($replaceAvatar) {
+            ImageStorage::delete($student->avatar);
+            $student->avatar = ImageStorage::store($request->file('avatar'), 'preschool/students');
+        } elseif ($removeAvatar) {
+            ImageStorage::delete($student->avatar);
+            $student->avatar = null;
         }
 
         $student->save();

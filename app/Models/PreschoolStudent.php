@@ -21,6 +21,7 @@ class PreschoolStudent extends Model
         'guardian_phone',
         'address',
         'status',
+        'avatar',
     ];
 
     protected function casts(): array

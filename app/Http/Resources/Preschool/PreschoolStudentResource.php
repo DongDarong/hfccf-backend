@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Preschool;
 
 use App\Models\PreschoolStudent;
+use App\Support\ImageStorage;
 use App\Support\PreschoolGuardianSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -33,6 +34,7 @@ class PreschoolStudentResource extends JsonResource
             'guardianSource' => $guardianSnapshot['source'] ?? 'legacy',
             'address' => $this->address,
             'status' => $this->status,
+            'avatarUrl' => ImageStorage::url($this->avatar),
             'classesCount' => $this->whenLoaded('classes', fn () => $this->classes->count(), 0),
             'createdAt' => $this->created_at?->toISOString(),
             'updatedAt' => $this->updated_at?->toISOString(),

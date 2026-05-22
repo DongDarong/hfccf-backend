@@ -48,6 +48,8 @@ class UpdatePreschoolStudentRequest extends FormRequest
             'status' => ['sometimes', 'required', Rule::in(['active', 'pending', 'inactive', 'graduated'])],
             'class_ids' => ['sometimes', 'array'],
             'class_ids.*' => ['integer', 'exists:preschool_classes,id'],
+            'avatar' => ['sometimes', 'nullable', 'image', 'max:4096'],
+            'remove_avatar' => ['sometimes', 'nullable', 'boolean'],
         ];
     }
 }
