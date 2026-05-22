@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
+use App\Http\Controllers\Api\Preschool\PreschoolClassroomResourceController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
@@ -293,6 +294,14 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('payments/{id}', [PreschoolPaymentController::class, 'show']);
         Route::put('payments/{id}', [PreschoolPaymentController::class, 'update']);
         Route::delete('payments/{id}', [PreschoolPaymentController::class, 'destroy']);
+
+        // Classroom resources are readable by all preschool staff and writable
+        // by admins only — the controller enforces both access tiers.
+        Route::get('classroom-resources', [PreschoolClassroomResourceController::class, 'index']);
+        Route::post('classroom-resources', [PreschoolClassroomResourceController::class, 'store']);
+        Route::get('classroom-resources/{id}', [PreschoolClassroomResourceController::class, 'show']);
+        Route::put('classroom-resources/{id}', [PreschoolClassroomResourceController::class, 'update']);
+        Route::delete('classroom-resources/{id}', [PreschoolClassroomResourceController::class, 'destroy']);
     });
 
     /*
