@@ -57,6 +57,15 @@ use App\Http\Controllers\Api\Sport\SportTournamentKnockoutController;
 use App\Http\Controllers\Api\Sport\SportTournamentResultController;
 use App\Http\Controllers\Api\Sport\SportTournamentStatisticsController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\Assessment\AssessmentFormTemplateController;
+use App\Http\Controllers\Api\Assessment\AssessmentFormSectionController;
+use App\Http\Controllers\Api\Assessment\AssessmentQuestionController;
+use App\Http\Controllers\Api\Assessment\AssessmentScoringController;
+use App\Http\Controllers\Api\Assessment\AssessmentSubmissionController;
+use App\Http\Controllers\Api\Assessment\AssessmentPrintTemplateController;
+use App\Http\Controllers\Api\Assessment\AssessmentQuestionTypeController;
+use App\Http\Controllers\Api\Assessment\AssessmentReportController;
+use App\Http\Controllers\Api\Assessment\AssessmentAuditLogController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -481,5 +490,70 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::delete('match-events/{id}', [SportMatchEventController::class, 'destroy']);
         Route::put('events/{id}', [SportMatchEventController::class, 'update']);
         Route::delete('events/{id}', [SportMatchEventController::class, 'destroy']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Assessment Routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('assessment')->group(function (): void {
+        // Question types (read-only reference data)
+        Route::get('question-types', [AssessmentQuestionTypeController::class, 'index']);
+
+        // Form templates
+        Route::get('forms', [AssessmentFormTemplateController::class, 'index']);
+        Route::post('forms', [AssessmentFormTemplateController::class, 'store']);
+        Route::get('forms/{form}', [AssessmentFormTemplateController::class, 'show']);
+        Route::put('forms/{form}', [AssessmentFormTemplateController::class, 'update']);
+        Route::delete('forms/{form}', [AssessmentFormTemplateController::class, 'destroy']);
+        Route::post('forms/{form}/publish', [AssessmentFormTemplateController::class, 'publish']);
+        Route::post('forms/{form}/duplicate', [AssessmentFormTemplateController::class, 'duplicate']);
+        Route::post('forms/{form}/archive', [AssessmentFormTemplateController::class, 'archive']);
+
+        // Form sections
+        Route::get('forms/{form}/sections', [AssessmentFormSectionController::class, 'index']);
+        Route::post('forms/{form}/sections', [AssessmentFormSectionController::class, 'store']);
+        Route::put('forms/{form}/sections/{section}', [AssessmentFormSectionController::class, 'update']);
+        Route::delete('forms/{form}/sections/{section}', [AssessmentFormSectionController::class, 'destroy']);
+        Route::post('forms/{form}/sections/reorder', [AssessmentFormSectionController::class, 'reorder']);
+
+        // Questions
+        Route::get('forms/{form}/questions', [AssessmentQuestionController::class, 'index']);
+        Route::post('forms/{form}/questions', [AssessmentQuestionController::class, 'store']);
+        Route::get('forms/{form}/questions/{question}', [AssessmentQuestionController::class, 'show']);
+        Route::put('forms/{form}/questions/{question}', [AssessmentQuestionController::class, 'update']);
+        Route::delete('forms/{form}/questions/{question}', [AssessmentQuestionController::class, 'destroy']);
+        Route::post('forms/{form}/questions/{question}/duplicate', [AssessmentQuestionController::class, 'duplicate']);
+        Route::post('forms/{form}/questions/reorder', [AssessmentQuestionController::class, 'reorder']);
+
+        // Scoring
+        Route::get('forms/{form}/scoring', [AssessmentScoringController::class, 'show']);
+        Route::put('forms/{form}/scoring', [AssessmentScoringController::class, 'update']);
+
+        // Print templates
+        Route::get('print-templates', [AssessmentPrintTemplateController::class, 'index']);
+        Route::post('print-templates', [AssessmentPrintTemplateController::class, 'store']);
+        Route::get('print-templates/{printTemplate}', [AssessmentPrintTemplateController::class, 'show']);
+        Route::put('print-templates/{printTemplate}', [AssessmentPrintTemplateController::class, 'update']);
+        Route::delete('print-templates/{printTemplate}', [AssessmentPrintTemplateController::class, 'destroy']);
+
+        // Submissions
+        Route::get('submissions', [AssessmentSubmissionController::class, 'index']);
+        Route::post('submissions', [AssessmentSubmissionController::class, 'store']);
+        Route::get('submissions/{submission}', [AssessmentSubmissionController::class, 'show']);
+        Route::put('submissions/{submission}', [AssessmentSubmissionController::class, 'update']);
+        Route::post('submissions/{submission}/submit', [AssessmentSubmissionController::class, 'submit']);
+        Route::post('submissions/{submission}/review', [AssessmentSubmissionController::class, 'review']);
+        Route::delete('submissions/{submission}', [AssessmentSubmissionController::class, 'destroy']);
+
+        // Reports
+        Route::get('reports/dashboard', [AssessmentReportController::class, 'dashboard']);
+        Route::get('reports/risk-distribution', [AssessmentReportController::class, 'riskDistribution']);
+        Route::get('reports/submission-trend', [AssessmentReportController::class, 'submissionTrend']);
+
+        // Audit logs
+        Route::get('audit-logs', [AssessmentAuditLogController::class, 'index']);
     });
 });
