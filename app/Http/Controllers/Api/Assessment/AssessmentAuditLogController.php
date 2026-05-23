@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Assessment;
 use App\Http\Controllers\Controller;
 use App\Models\AssessmentAuditLog;
 use App\Models\User;
+use App\Http\Resources\Assessment\AssessmentAuditLogResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,22 +21,22 @@ class AssessmentAuditLogController extends Controller
         $validated = $request->validate([
             'page'     => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'event'    => ['sometimes', 'nullable', 'string', 'max:64'],
+            'action'   => ['sometimes', 'nullable', 'string', 'max:64'],
         ]);
 
         $perPage = (int) ($validated['per_page'] ?? 20);
 
-        $query = AssessmentAuditLog::with('actor')->latest();
+        $query = AssessmentAuditLog::with('user')->latest();
 
-        if (! empty($validated['event'])) {
-            $query->where('event', $validated['event']);
+        if (! empty($validated['action'])) {
+            $query->where('action', $validated['action']);
         }
 
         $paginator = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data'    => $paginator->items(),
+            'data'    => AssessmentAuditLogResource::collection($paginator->items()),
             'meta'    => [
                 'page'       => $paginator->currentPage(),
                 'perPage'    => $paginator->perPage(),

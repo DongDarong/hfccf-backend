@@ -84,4 +84,34 @@ class AssessmentQuestion extends Model
     {
         return $this->hasMany(AssessmentMatrixRow::class, 'question_id')->orderBy('sort_order');
     }
+
+    public function getQuestionTextAttribute(): ?string
+    {
+        return $this->label;
+    }
+
+    public function setQuestionTextAttribute(?string $value): void
+    {
+        $this->attributes['label'] = $value;
+    }
+
+    public function getOrderAttribute(): int
+    {
+        return (int) $this->sort_order;
+    }
+
+    public function setOrderAttribute(mixed $value): void
+    {
+        $this->attributes['sort_order'] = is_numeric($value) ? (int) $value : 0;
+    }
+
+    public function getConfigAttribute(): array
+    {
+        return $this->settings ?? [];
+    }
+
+    public function setConfigAttribute(mixed $value): void
+    {
+        $this->attributes['settings'] = is_array($value) ? json_encode($value) : $value;
+    }
 }

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AssessmentFormVersion extends Model
 {
+    const UPDATED_AT = null;
+
     protected $fillable = [
         'template_id',
         'version_number',

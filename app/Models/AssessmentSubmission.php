@@ -59,6 +59,11 @@ class AssessmentSubmission extends Model
         return $this->belongsTo(AssessmentFormTemplate::class, 'template_id');
     }
 
+    public function formTemplate(): BelongsTo
+    {
+        return $this->template();
+    }
+
     public function version(): BelongsTo
     {
         return $this->belongsTo(AssessmentFormVersion::class, 'version_id');
@@ -107,5 +112,45 @@ class AssessmentSubmission extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(AssessmentAttachment::class, 'submission_id');
+    }
+
+    public function getFormTemplateIdAttribute(): int
+    {
+        return (int) $this->template_id;
+    }
+
+    public function setFormTemplateIdAttribute(mixed $value): void
+    {
+        $this->attributes['template_id'] = $value;
+    }
+
+    public function getModuleAttribute(): ?string
+    {
+        return $this->template?->module;
+    }
+
+    public function getReviewNoteAttribute(): ?string
+    {
+        return $this->risk_note;
+    }
+
+    public function setReviewNoteAttribute(?string $value): void
+    {
+        $this->attributes['risk_note'] = $value;
+    }
+
+    public function getRejectionReasonAttribute(): ?string
+    {
+        return $this->rejection_note;
+    }
+
+    public function setRejectionReasonAttribute(?string $value): void
+    {
+        $this->attributes['rejection_note'] = $value;
+    }
+
+    public function getCompletedAtAttribute()
+    {
+        return $this->approved_at ?? $this->rejected_at ?? $this->reviewed_at;
     }
 }

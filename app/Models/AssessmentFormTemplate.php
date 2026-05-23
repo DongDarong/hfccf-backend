@@ -32,7 +32,7 @@ class AssessmentFormTemplate extends Model
     {
         return [
             'is_locked' => 'boolean',
-            'settings'  => 'array',
+            'settings' => 'array',
         ];
     }
 
@@ -81,5 +81,18 @@ class AssessmentFormTemplate extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+
+    public function getCurrentVersionAttribute(): ?int
+    {
+        $currentVersion = $this->relationLoaded('currentVersion')
+            ? $this->getRelation('currentVersion')
+            : $this->currentVersion()->first();
+
+        if ($currentVersion) {
+            return (int) $currentVersion->version_number;
+        }
+
+        return $this->versions()->max('version_number') ? (int) $this->versions()->max('version_number') : null;
     }
 }

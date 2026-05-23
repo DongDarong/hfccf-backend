@@ -10,14 +10,18 @@ class AssessmentSubmissionListResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'           => $this->id,
-            'status'       => $this->status,
-            'submitted_at' => $this->submitted_at?->toIso8601String(),
-            'form_template' => $this->whenLoaded('formTemplate', fn () => [
-                'id'   => $this->formTemplate->id,
-                'name' => $this->formTemplate->name,
+            'id'            => $this->id,
+            'status'        => $this->status,
+            'submitted_at'  => $this->submitted_at?->toIso8601String(),
+            'template'      => $this->whenLoaded('template', fn () => [
+                'id'   => $this->template->id,
+                'name' => $this->template->name,
             ]),
-            'student' => $this->whenLoaded('student', fn () => [
+            'form_template' => $this->whenLoaded('template', fn () => [
+                'id'   => $this->template->id,
+                'name' => $this->template->name,
+            ]),
+            'student'       => $this->whenLoaded('student', fn () => [
                 'id'        => $this->student->id,
                 'full_name' => $this->student->full_name,
             ]),

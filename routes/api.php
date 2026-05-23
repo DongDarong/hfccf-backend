@@ -535,6 +535,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         // Print templates
         Route::get('print-templates', [AssessmentPrintTemplateController::class, 'index']);
         Route::post('print-templates', [AssessmentPrintTemplateController::class, 'store']);
+        Route::post('print-templates/preview', [AssessmentPrintTemplateController::class, 'preview']);
         Route::get('print-templates/{printTemplate}', [AssessmentPrintTemplateController::class, 'show']);
         Route::put('print-templates/{printTemplate}', [AssessmentPrintTemplateController::class, 'update']);
         Route::delete('print-templates/{printTemplate}', [AssessmentPrintTemplateController::class, 'destroy']);
@@ -546,12 +547,16 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::put('submissions/{submission}', [AssessmentSubmissionController::class, 'update']);
         Route::post('submissions/{submission}/submit', [AssessmentSubmissionController::class, 'submit']);
         Route::post('submissions/{submission}/review', [AssessmentSubmissionController::class, 'review']);
+        Route::post('submissions/{submission}/print', [AssessmentSubmissionController::class, 'print']);
         Route::delete('submissions/{submission}', [AssessmentSubmissionController::class, 'destroy']);
 
         // Reports
         Route::get('reports/dashboard', [AssessmentReportController::class, 'dashboard']);
         Route::get('reports/risk-distribution', [AssessmentReportController::class, 'riskDistribution']);
         Route::get('reports/submission-trend', [AssessmentReportController::class, 'submissionTrend']);
+        Route::get('reports/export', [AssessmentReportController::class, 'export'])->name('assessment.reports.export');
+        Route::get('reports/exports/{exportLog}', [AssessmentReportController::class, 'exportStatus'])->name('assessment.exports.status');
+        Route::get('reports/exports/{exportLog}/download', [AssessmentReportController::class, 'downloadExport'])->name('assessment.exports.download');
 
         // Audit logs
         Route::get('audit-logs', [AssessmentAuditLogController::class, 'index']);

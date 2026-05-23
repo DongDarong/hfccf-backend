@@ -10,6 +10,7 @@ use App\Services\AssessmentFormService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class AssessmentFormTemplateController extends Controller
@@ -72,13 +73,19 @@ class AssessmentFormTemplateController extends Controller
             'name'        => ['required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
             'module'      => ['required', 'string', 'max:32'],
+            'settings'    => ['sometimes', 'nullable', 'array'],
             'config'      => ['sometimes', 'nullable', 'array'],
         ]);
 
         $template = AssessmentFormTemplate::create([
-            ...$validated,
+            'uuid'       => (string) Str::uuid(),
+            'code'       => strtoupper($validated['module']).'-'.Str::upper(Str::random(6)),
+            'name'       => $validated['name'],
+            'description'=> $validated['description'] ?? null,
+            'module'     => $validated['module'],
             'status'     => 'draft',
             'created_by' => $request->user()->id,
+            'settings'   => $validated['settings'] ?? $validated['config'] ?? null,
         ]);
 
         return response()->json([
@@ -116,10 +123,16 @@ class AssessmentFormTemplateController extends Controller
         $validated = $request->validate([
             'name'        => ['sometimes', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
+            'settings'    => ['sometimes', 'nullable', 'array'],
             'config'      => ['sometimes', 'nullable', 'array'],
         ]);
 
-        $form->update($validated);
+        $form->update([
+            'name'        => $validated['name'] ?? $form->name,
+            'description' => $validated['description'] ?? $form->description,
+            'settings'    => $validated['settings'] ?? $validated['config'] ?? $form->settings,
+            'updated_by'  => $request->user()->id,
+        ]);
 
         return response()->json([
             'success' => true,

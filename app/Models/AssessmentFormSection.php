@@ -42,6 +42,11 @@ class AssessmentFormSection extends Model
         return $this->belongsTo(AssessmentFormTemplate::class, 'template_id');
     }
 
+    public function formTemplate(): BelongsTo
+    {
+        return $this->template();
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(AssessmentFormSection::class, 'parent_id');
@@ -55,5 +60,20 @@ class AssessmentFormSection extends Model
     public function questions(): HasMany
     {
         return $this->hasMany(AssessmentQuestion::class, 'section_id')->orderBy('sort_order');
+    }
+
+    public function getFormTemplateIdAttribute(): int
+    {
+        return (int) $this->template_id;
+    }
+
+    public function getOrderAttribute(): int
+    {
+        return (int) $this->sort_order;
+    }
+
+    public function setOrderAttribute(mixed $value): void
+    {
+        $this->attributes['sort_order'] = is_numeric($value) ? (int) $value : 0;
     }
 }

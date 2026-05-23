@@ -46,4 +46,14 @@ class AssessmentSubmissionScore extends Model
     {
         return $this->belongsTo(User::class, 'override_by', 'id');
     }
+
+    public function getTotalScoreAttribute(): mixed
+    {
+        return $this->raw_score;
+    }
+
+    public function getScorePercentAttribute(): mixed
+    {
+        return $this->percentage;
+    }
 }

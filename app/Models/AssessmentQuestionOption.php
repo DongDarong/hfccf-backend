@@ -37,4 +37,24 @@ class AssessmentQuestionOption extends Model
     {
         return $this->belongsTo(AssessmentQuestion::class, 'question_id');
     }
+
+    public function getOptionTextAttribute(): ?string
+    {
+        return $this->label;
+    }
+
+    public function setOptionTextAttribute(?string $value): void
+    {
+        $this->attributes['label'] = $value;
+    }
+
+    public function getOrderAttribute(): int
+    {
+        return (int) $this->sort_order;
+    }
+
+    public function setOrderAttribute(mixed $value): void
+    {
+        $this->attributes['sort_order'] = is_numeric($value) ? (int) $value : 0;
+    }
 }

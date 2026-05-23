@@ -22,7 +22,7 @@ class AssessmentFormSectionController extends Controller
             return $response;
         }
 
-        $sections = $form->sections()->orderBy('order')->get();
+        $sections = $form->sections()->orderBy('sort_order')->get();
 
         return response()->json([
             'success' => true,
@@ -39,13 +39,16 @@ class AssessmentFormSectionController extends Controller
         $validated = $request->validate([
             'title'       => ['required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
+            'sort_order'  => ['sometimes', 'integer', 'min:1'],
             'order'       => ['sometimes', 'integer', 'min:1'],
             'parent_id'   => ['sometimes', 'nullable', 'integer'],
         ]);
 
         $section = $form->sections()->create([
-            ...$validated,
-            'order' => $validated['order'] ?? ($form->sections()->max('order') + 1),
+            'title'       => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'parent_id'   => $validated['parent_id'] ?? null,
+            'sort_order'  => $validated['sort_order'] ?? $validated['order'] ?? ((int) ($form->sections()->max('sort_order') ?? 0) + 1),
         ]);
 
         return response()->json([
@@ -64,10 +67,15 @@ class AssessmentFormSectionController extends Controller
         $validated = $request->validate([
             'title'       => ['sometimes', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
+            'sort_order'  => ['sometimes', 'integer', 'min:1'],
             'order'       => ['sometimes', 'integer', 'min:1'],
         ]);
 
-        $section->update($validated);
+        $section->update([
+            'title'       => $validated['title'] ?? $section->title,
+            'description' => $validated['description'] ?? $section->description,
+            'sort_order'  => $validated['sort_order'] ?? $validated['order'] ?? $section->sort_order,
+        ]);
 
         return response()->json([
             'success' => true,
