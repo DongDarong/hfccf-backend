@@ -20,10 +20,13 @@ class EnsureUserHasPermission
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        // The request user may or may not have `permissions` eager-loaded; keep a safe fallback query.
-        $permissionCodes = $user->relationLoaded('permissions')
-            ? $user->permissions->pluck('code')->all()
-            : $user->permissions()->pluck('permissions.code')->all();
+        // Resolve both direct and role-derived permissions so role-based accounts
+        // keep working even when the user_permissions pivot is empty.
+        $permissionCodes = method_exists($user, 'resolvedPermissionCodes')
+            ? $user->resolvedPermissionCodes()
+            : ($user->relationLoaded('permissions')
+                ? $user->permissions->pluck('code')->all()
+                : $user->permissions()->pluck('permissions.code')->all());
 
         if (in_array('all:*', $permissionCodes, true) || in_array($permissionCode, $permissionCodes, true)) {
             return $next($request);

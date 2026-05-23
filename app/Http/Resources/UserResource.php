@@ -15,9 +15,6 @@ class UserResource extends JsonResource
     public function toArray(Request $request): array
     {
         $fullName = trim($this->first_name.' '.$this->last_name);
-        $permissionCodes = $this->relationLoaded('permissions')
-            ? $this->permissions->pluck('code')->unique()->values()->all()
-            : $this->permissions()->orderBy('permissions.code')->pluck('permissions.code')->all();
 
         return [
             'id' => $this->id,
@@ -39,7 +36,7 @@ class UserResource extends JsonResource
             'createdAt' => $this->created_at?->format('Y-m-d H:i:s'),
             'updatedAt' => $this->updated_at?->format('Y-m-d H:i:s'),
             'lastLoginAt' => $this->last_login_at?->format('Y-m-d H:i:s'),
-            'permissions' => $permissionCodes,
+            'permissions' => $this->resolvedPermissionCodes(),
         ];
     }
 }

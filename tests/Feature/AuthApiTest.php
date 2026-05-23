@@ -55,6 +55,31 @@ class AuthApiTest extends TestCase
         $this->assertNotEmpty($response->json('data.token'));
     }
 
+    public function test_superadmin_login_uses_role_permissions_when_direct_permissions_are_missing(): void
+    {
+        $user = $this->createUserWithoutDirectPermissions();
+
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret-pass',
+            'remember' => false,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.role', 'superadmin')
+            ->assertJsonPath('data.user.permissions.0', 'all:*');
+
+        $token = $response->json('data.token');
+
+        $this->getJson('/api/auth/me', [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.user.permissions.0', 'all:*');
+    }
+
     public function test_login_rejects_invalid_credentials(): void
     {
         $user = $this->createUser();
@@ -818,6 +843,25 @@ class AuthApiTest extends TestCase
         ]);
 
         return $user;
+    }
+
+    private function createUserWithoutDirectPermissions(array $overrides = []): User
+    {
+        $role = Role::query()->findOrFail('superadmin');
+
+        return User::query()->create(array_merge([
+            'id' => 'usr-role-only',
+            'first_name' => 'Role',
+            'last_name' => 'Only',
+            'username' => 'Role Only',
+            'email' => 'role.only@hfccf.org',
+            'phone' => '+855 12 777 777',
+            'role_code' => $role->code,
+            'department_code' => $role->department_code,
+            'status' => 'active',
+            'avatar' => null,
+            'password' => 'secret-pass',
+        ], $overrides));
     }
 
     protected function loginAndGetToken(User $user, string $password = 'secret-pass'): string

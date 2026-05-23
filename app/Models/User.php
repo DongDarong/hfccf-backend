@@ -89,6 +89,35 @@ class User extends Authenticatable
         );
     }
 
+    /**
+     * Resolve the effective permission codes for the user.
+     *
+     * Direct user permissions take priority, but role permissions are merged in
+     * so role-based accounts (including seeded Super Admin users) always expose
+     * the expected permission set even when the user_permissions pivot is empty.
+     *
+     * @return array<int, string>
+     */
+    public function resolvedPermissionCodes(): array
+    {
+        $directPermissionCodes = $this->relationLoaded('permissions')
+            ? $this->permissions->pluck('code')->all()
+            : $this->permissions()->pluck('permissions.code')->all();
+
+        $rolePermissionCodes = $this->relationLoaded('role') && $this->role
+            ? $this->role->permissions()->pluck('permissions.code')->all()
+            : ($this->role_code
+                ? $this->role()->first()?->permissions()->pluck('permissions.code')->all() ?? []
+                : []);
+
+        return collect(array_merge($directPermissionCodes, $rolePermissionCodes))
+            ->filter(fn ($permissionCode) => is_string($permissionCode) && trim($permissionCode) !== '')
+            ->map(fn ($permissionCode) => trim($permissionCode))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function coachedSportTeams(): HasMany
     {
         return $this->hasMany(SportTeam::class, 'coach_user_id', 'id');

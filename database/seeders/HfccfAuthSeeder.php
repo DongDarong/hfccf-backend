@@ -134,8 +134,8 @@ class HfccfAuthSeeder extends Seeder
             [
                 'id' => 'usr_002',
                 'first_name' => 'Darong',
-                'last_name' => 'Dong',
-                'username' => 'Darong Dong',
+                'last_name' => 'Admin',
+                'username' => 'dngdarong',
                 'email' => 'dngdarong@gmail.com',
                 'phone' => null,
                 'role_code' => 'superadmin',
