@@ -73,8 +73,16 @@ class ImageStorage
         foreach (self::deleteDisks() as $disk) {
             $storage = Storage::disk($disk);
 
-            if (method_exists($storage, 'exists') && $storage->exists($path)) {
-                return $storage->url($path);
+            try {
+                if (method_exists($storage, 'exists') && $storage->exists($path)) {
+                    return $storage->url($path);
+                }
+            } catch (Throwable $e) {
+                Log::warning('ImageStorage: disk exists() check failed, falling back to URL generation.', [
+                    'disk' => $disk,
+                    'path' => $path,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 
