@@ -21,8 +21,9 @@ class PreschoolGuardianPortalAccount extends Model
     ];
 
     /**
-     * Portal access must stay separate from the guardian record so invited
-     * users can be activated or revoked without losing relationship history.
+     * Legacy compatibility account state stays separate from the guardian
+     * record so admin staff can audit invite/revoke metadata without turning
+     * the guardian record itself into a first-class login identity.
      */
     protected function casts(): array
     {

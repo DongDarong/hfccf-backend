@@ -143,8 +143,9 @@ class User extends Authenticatable
     }
 
     /**
-     * Guardian accounts stay linked to the shared User model so portal access
-     * can be revoked without turning every guardian record into a login.
+     * Guardian portal rows are legacy compatibility records only. They remain
+     * linked to User so staff can revoke an activated account, but the parent
+     * record itself is not supposed to become a general-purpose auth identity.
      */
     public function guardianPortalAccount(): HasMany
     {

@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * The guardian portal gets its own normalized account table so portal
-     * access can be revoked independently from guardian relationship data.
+     * Legacy compatibility table only: keep invite/revoke metadata separate
+     * from guardian relationship data so the architecture can phase this out
+     * later without rewriting the core Preschool guardian tables.
      */
     public function up(): void
     {

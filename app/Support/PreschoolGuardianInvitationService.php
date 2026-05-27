@@ -14,8 +14,9 @@ use Illuminate\Validation\ValidationException;
 final class PreschoolGuardianInvitationService
 {
     /**
-     * Invitation state is the only place where guardian data becomes login
-     * access, so revocation and activation stay auditable and reversible.
+     * Invitation state remains legacy compatibility logic for now. It allows
+     * admin staff to audit invite/revoke history without treating guardians as
+     * a primary Preschool auth population.
      */
     public function invite(User $actor, PreschoolGuardian $guardian, array $data = []): array
     {

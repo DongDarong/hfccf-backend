@@ -12,9 +12,9 @@ use Symfony\Component\HttpFoundation\Response;
 final class PreschoolGuardianPortalService
 {
     /**
-     * Keep portal account listing isolated from guardian/contact data so invite
-     * state and revocation can evolve without changing the core Preschool
-     * guardian relationship tables.
+     * Keep portal account listing isolated from guardian/contact data. This is
+     * a legacy compatibility surface for admin oversight, not a supported
+     * parent-facing login workflow.
      */
     public function listAccounts(User $actor, array $filters = []): LengthAwarePaginator
     {

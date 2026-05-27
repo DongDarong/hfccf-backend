@@ -112,8 +112,9 @@ Route::prefix('auth')->group(function (): void {
 });
 
 Route::prefix('guardian-portal')->group(function (): void {
-    // The invitation activation endpoint is public so a guardian can claim
-    // the portal account before the login-only routes become available.
+    // Legacy compatibility surface: this manages portal account state for
+    // staff oversight only and must not be expanded into a first-class parent
+    // portal workflow in the Preschool UI.
     Route::post('activate', [GuardianPortalAuthController::class, 'activate']);
 
     Route::middleware(['auth:sanctum', 'throttle:api', 'guardian.portal'])->group(function (): void {
