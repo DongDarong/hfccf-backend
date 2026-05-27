@@ -10,6 +10,7 @@ use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolClassTeacherAssignment;
 use App\Models\PreschoolClass;
 use App\Models\User;
+use App\Support\PreschoolSettingsBackboneService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -231,8 +232,15 @@ class PreschoolClassController extends Controller
         ], Response::HTTP_OK);
     }
 
+    private function academicContext(): array
+    {
+        return app(PreschoolSettingsBackboneService::class)->currentAcademicContext();
+    }
+
     private function syncClassStudents(PreschoolClass $class, ?array $studentIds): void
     {
+        $academicContext = $this->academicContext();
+
         if ($studentIds === null) {
             // Assignment state is preserved on the pivot table, so we only
             // recalculate the active count when the caller is not changing the
@@ -266,6 +274,8 @@ class PreschoolClassController extends Controller
                 $assignment->enrolled_at = now();
             }
 
+            $assignment->academic_year = $academicContext['academic_year'];
+            $assignment->term_label = $academicContext['term_label'];
             $assignment->status = 'active';
             $assignment->save();
         }
@@ -329,6 +339,8 @@ class PreschoolClassController extends Controller
             'teacher_display_name' => $teacherDisplayName,
             'status' => 'active',
             'assigned_at' => now(),
+            'academic_year' => $this->academicContext()['academic_year'],
+            'term_label' => $this->academicContext()['term_label'],
             'ended_at' => null,
         ]);
     }

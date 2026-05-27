@@ -14,6 +14,8 @@ class PreschoolClassStudent extends Pivot
         'class_id',
         'student_id',
         'enrolled_at',
+        'academic_year',
+        'term_label',
         'status',
     ];
 }

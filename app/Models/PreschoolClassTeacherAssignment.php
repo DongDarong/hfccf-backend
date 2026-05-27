@@ -13,6 +13,8 @@ class PreschoolClassTeacherAssignment extends Model
         'teacher_display_name',
         'status',
         'assigned_at',
+        'academic_year',
+        'term_label',
         'ended_at',
         'notes',
     ];

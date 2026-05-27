@@ -10,6 +10,7 @@ use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolStudent;
 use App\Models\User;
 use App\Support\ImageStorage;
+use App\Support\PreschoolSettingsBackboneService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -226,8 +227,15 @@ class PreschoolStudentController extends Controller
         ], Response::HTTP_OK);
     }
 
+    private function academicContext(): array
+    {
+        return app(PreschoolSettingsBackboneService::class)->currentAcademicContext();
+    }
+
     private function syncStudentClasses(PreschoolStudent $student, ?array $classIds): void
     {
+        $academicContext = $this->academicContext();
+
         if ($classIds === null) {
             // Keep history rows intact when the caller is not changing class
             // membership. The inactive pivots remain available for assignment
@@ -253,6 +261,8 @@ class PreschoolStudentController extends Controller
                 $assignment->enrolled_at = now();
             }
 
+            $assignment->academic_year = $academicContext['academic_year'];
+            $assignment->term_label = $academicContext['term_label'];
             $assignment->status = 'active';
             $assignment->save();
         }

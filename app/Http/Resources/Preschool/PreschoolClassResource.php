@@ -22,6 +22,8 @@ class PreschoolClassResource extends JsonResource
                         'fullName' => trim($student->first_name.' '.$student->last_name),
                         'status' => $student->pivot->status ?? 'active',
                         'enrolledAt' => $student->pivot->enrolled_at?->toISOString(),
+                        'academicYear' => $student->pivot->academic_year,
+                        'termLabel' => $student->pivot->term_label,
                         'updatedAt' => $student->pivot->updated_at?->toISOString(),
                     ];
                 })
@@ -38,6 +40,8 @@ class PreschoolClassResource extends JsonResource
                         'fullName' => trim($student->first_name.' '.$student->last_name),
                         'status' => $student->pivot->status ?? 'active',
                         'enrolledAt' => $student->pivot->enrolled_at?->toISOString(),
+                        'academicYear' => $student->pivot->academic_year,
+                        'termLabel' => $student->pivot->term_label,
                         'updatedAt' => $student->pivot->updated_at?->toISOString(),
                     ];
                 })
@@ -55,6 +59,8 @@ class PreschoolClassResource extends JsonResource
                         'teacherDisplayName' => $assignment->teacher_display_name,
                         'status' => $assignment->status ?? 'active',
                         'assignedAt' => $assignment->assigned_at?->toISOString(),
+                        'academicYear' => $assignment->academic_year,
+                        'termLabel' => $assignment->term_label,
                         'endedAt' => $assignment->ended_at?->toISOString(),
                         'notes' => $assignment->notes,
                         'updatedAt' => $assignment->updated_at?->toISOString(),

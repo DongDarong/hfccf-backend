@@ -32,6 +32,8 @@ class PreschoolStudentResource extends JsonResource
                         'teacherDisplayName' => $class->teacher_display_name ?: ($class->relationLoaded('teacher') ? $class->teacher?->name : null),
                         'status' => $class->pivot->status ?? 'active',
                         'enrolledAt' => $class->pivot->enrolled_at?->toISOString(),
+                        'academicYear' => $class->pivot->academic_year,
+                        'termLabel' => $class->pivot->term_label,
                         'updatedAt' => $class->pivot->updated_at?->toISOString(),
                     ];
                 })
@@ -50,6 +52,8 @@ class PreschoolStudentResource extends JsonResource
                         'teacherDisplayName' => $class->teacher_display_name ?: ($class->relationLoaded('teacher') ? $class->teacher?->name : null),
                         'status' => $class->pivot->status ?? 'active',
                         'enrolledAt' => $class->pivot->enrolled_at?->toISOString(),
+                        'academicYear' => $class->pivot->academic_year,
+                        'termLabel' => $class->pivot->term_label,
                         'updatedAt' => $class->pivot->updated_at?->toISOString(),
                     ];
                 })
