@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Preschool\StorePreschoolClassRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolClassRequest;
 use App\Http\Resources\Preschool\PreschoolClassResource;
+use App\Models\PreschoolClassStudent;
+use App\Models\PreschoolClassTeacherAssignment;
 use App\Models\PreschoolClass;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,7 +45,7 @@ class PreschoolClassController extends Controller
             ? 'asc'
             : 'desc';
 
-        $query = PreschoolClass::query()->with(['teacher', 'students']);
+        $query = PreschoolClass::query()->with(['teacher', 'students', 'teacherAssignments']);
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -113,8 +115,9 @@ class PreschoolClassController extends Controller
             'notes' => $data['notes'] ?? null,
         ]);
 
+        $this->syncTeacherAssignmentHistory($class, $class->teacher_user_id, $class->teacher_display_name);
         $this->syncClassStudents($class, $data['student_ids'] ?? []);
-        $class->load(['teacher', 'students']);
+        $class->load(['teacher', 'students', 'teacherAssignments']);
 
         return response()->json([
             'success' => true,
@@ -131,7 +134,7 @@ class PreschoolClassController extends Controller
             return $response;
         }
 
-        $class = PreschoolClass::query()->with(['teacher', 'students'])->find($id);
+        $class = PreschoolClass::query()->with(['teacher', 'students', 'teacherAssignments'])->find($id);
 
         if (! $class) {
             return response()->json([
@@ -190,8 +193,9 @@ class PreschoolClassController extends Controller
         }
 
         $class->save();
+        $this->syncTeacherAssignmentHistory($class, $class->teacher_user_id, $class->teacher_display_name);
         $this->syncClassStudents($class, $data['student_ids'] ?? null);
-        $class->load(['teacher', 'students']);
+        $class->load(['teacher', 'students', 'teacherAssignments']);
 
         return response()->json([
             'success' => true,
@@ -230,22 +234,103 @@ class PreschoolClassController extends Controller
     private function syncClassStudents(PreschoolClass $class, ?array $studentIds): void
     {
         if ($studentIds === null) {
-            $class->students_count = $class->students()->count();
+            // Assignment state is preserved on the pivot table, so we only
+            // recalculate the active count when the caller is not changing the
+            // student roster. This keeps inactive assignments available for
+            // history views without changing current enrollment behavior.
+            $class->students_count = PreschoolClassStudent::query()
+                ->where('class_id', $class->id)
+                ->where('status', 'active')
+                ->count();
             $class->save();
+
             return;
         }
 
-        $class->students()->sync(
-            collect($studentIds)->mapWithKeys(static fn ($studentId) => [
-                $studentId => [
-                    'enrolled_at' => now(),
-                    'status' => 'active',
-                ],
-            ])->all(),
-        );
+        $targetStudentIds = collect($studentIds)
+            ->filter()
+            ->map(static fn ($studentId) => trim((string) $studentId))
+            ->filter()
+            ->unique()
+            ->values();
 
-        $class->students_count = $class->students()->count();
+        foreach ($targetStudentIds as $studentId) {
+            $assignment = PreschoolClassStudent::query()->firstOrNew([
+                'class_id' => $class->id,
+                'student_id' => $studentId,
+            ]);
+
+            // Re-activating an existing assignment should keep a clean audit
+            // trail in the pivot row instead of deleting and recreating links.
+            if (! $assignment->exists || ($assignment->status ?? null) !== 'active') {
+                $assignment->enrolled_at = now();
+            }
+
+            $assignment->status = 'active';
+            $assignment->save();
+        }
+
+        PreschoolClassStudent::query()
+            ->where('class_id', $class->id)
+            ->whereNotIn('student_id', $targetStudentIds->all())
+            ->update(['status' => 'inactive']);
+
+        $class->students_count = PreschoolClassStudent::query()
+            ->where('class_id', $class->id)
+            ->where('status', 'active')
+            ->count();
         $class->save();
+    }
+
+    /**
+     * Teacher assignment history is intentionally stored separately from the
+     * current teacher_user_id field so Preschool admins can review ownership
+     * changes without turning teachers into portal users or mutating history.
+     */
+    private function syncTeacherAssignmentHistory(PreschoolClass $class, ?string $teacherUserId, ?string $teacherDisplayName = null): void
+    {
+        $teacherUserId = trim((string) $teacherUserId);
+        $teacherDisplayName = $this->resolveTeacherDisplayName($teacherUserId, $teacherDisplayName);
+
+        $activeAssignment = PreschoolClassTeacherAssignment::query()
+            ->where('class_id', $class->id)
+            ->where('status', 'active')
+            ->latest('assigned_at')
+            ->first();
+
+        if ($teacherUserId === '') {
+            if ($activeAssignment) {
+                $activeAssignment->status = 'inactive';
+                $activeAssignment->ended_at = now();
+                $activeAssignment->save();
+            }
+
+            return;
+        }
+
+        if ($activeAssignment && (string) $activeAssignment->teacher_user_id === $teacherUserId) {
+            if ($teacherDisplayName !== null && trim((string) $teacherDisplayName) !== trim((string) $activeAssignment->teacher_display_name)) {
+                $activeAssignment->teacher_display_name = $teacherDisplayName;
+                $activeAssignment->save();
+            }
+
+            return;
+        }
+
+        if ($activeAssignment) {
+            $activeAssignment->status = 'inactive';
+            $activeAssignment->ended_at = now();
+            $activeAssignment->save();
+        }
+
+        PreschoolClassTeacherAssignment::query()->create([
+            'class_id' => $class->id,
+            'teacher_user_id' => $teacherUserId,
+            'teacher_display_name' => $teacherDisplayName,
+            'status' => 'active',
+            'assigned_at' => now(),
+            'ended_at' => null,
+        ]);
     }
 
     private function resolveTeacherDisplayName($teacherUserId, $teacherDisplayName): ?string

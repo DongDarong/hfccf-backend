@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Api\Scholarship;
 
 use App\Http\Controllers\Controller;
-use App\Support\ApiResponse;
+use App\Models\User;
 use App\Services\ScholarshipService;
+use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,8 +14,7 @@ class ScholarshipDashboardController extends Controller
 {
     public function __construct(
         private readonly ScholarshipService $scholarshipService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -32,7 +32,7 @@ class ScholarshipDashboardController extends Controller
         return $this->index($request);
     }
 
-    private function authorizeScholarshipViewer(?\App\Models\User $user): ?JsonResponse
+    private function authorizeScholarshipViewer(?User $user): ?JsonResponse
     {
         if (! $user) {
             return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);

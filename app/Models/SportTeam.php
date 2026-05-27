@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SportTeam extends Model
@@ -48,6 +49,16 @@ class SportTeam extends Model
         return $this->belongsTo(User::class, 'coach_user_id', 'id');
     }
 
+    public function coachAssignments(): HasMany
+    {
+        return $this->hasMany(CoachTeamAssignment::class, 'team_id');
+    }
+
+    public function activeCoachAssignment(): HasOne
+    {
+        return $this->hasOne(CoachTeamAssignment::class, 'team_id')->where('status', 'active');
+    }
+
     public function players(): HasMany
     {
         return $this->hasMany(SportPlayer::class, 'team_id');
@@ -62,5 +73,9 @@ class SportTeam extends Model
     {
         return $this->hasMany(SportMatch::class, 'away_team_id');
     }
-}
 
+    public function matchSquads(): HasMany
+    {
+        return $this->hasMany(SportMatchSquad::class, 'team_id');
+    }
+}

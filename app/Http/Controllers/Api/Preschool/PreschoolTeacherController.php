@@ -5,17 +5,19 @@ namespace App\Http\Controllers\Api\Preschool;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Preschool\StorePreschoolTeacherRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolTeacherRequest;
+use App\Http\Resources\Preschool\PreschoolAttendanceResource;
+use App\Http\Resources\Preschool\PreschoolClassResource;
 use App\Http\Resources\Preschool\PreschoolStudentResource;
 use App\Http\Resources\UserResource;
 use App\Models\PreschoolAttendanceRecord;
 use App\Models\PreschoolClass;
+use App\Models\PreschoolStudent;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\ImageStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class PreschoolTeacherController extends Controller
@@ -299,7 +301,7 @@ class PreschoolTeacherController extends Controller
             'success' => true,
             'message' => 'Preschool classes retrieved successfully.',
             'data' => [
-                'items' => \App\Http\Resources\Preschool\PreschoolClassResource::collection($paginator->getCollection())->resolve($request),
+                'items' => PreschoolClassResource::collection($paginator->getCollection())->resolve($request),
                 'pagination' => $this->paginationShape($paginator),
             ],
         ], Response::HTTP_OK);
@@ -334,7 +336,7 @@ class PreschoolTeacherController extends Controller
             'success' => true,
             'message' => 'Preschool attendance retrieved successfully.',
             'data' => [
-                'items' => \App\Http\Resources\Preschool\PreschoolAttendanceResource::collection($paginator->getCollection())->resolve($request),
+                'items' => PreschoolAttendanceResource::collection($paginator->getCollection())->resolve($request),
                 'pagination' => $this->paginationShape($paginator),
             ],
         ], Response::HTTP_OK);
@@ -351,7 +353,7 @@ class PreschoolTeacherController extends Controller
 
     private function studentQueryForUser(User $user): Builder
     {
-        $query = \App\Models\PreschoolStudent::query()->whereNull('deleted_at');
+        $query = PreschoolStudent::query()->whereNull('deleted_at');
 
         if ($user->role_code === 'teacher-preschool') {
             $query->whereHas('classes', static function (Builder $builder) use ($user): void {
@@ -437,41 +439,12 @@ class PreschoolTeacherController extends Controller
 
     private function storeAvatarIfUploaded(Request $request): ?string
     {
-        if (! $request->hasFile('avatar')) {
-            return null;
-        }
-
-        $path = $request->file('avatar')->store('avatars', 'public');
-
-        return asset('storage/'.$path);
+        return ImageStorage::store($request->file('avatar'), 'avatars');
     }
 
     private function deleteStoredAvatarIfNeeded(?string $avatarUrl): void
     {
-        $path = $this->resolvePublicStoragePath($avatarUrl);
-
-        if (! $path) {
-            return;
-        }
-
-        Storage::disk('public')->delete($path);
-    }
-
-    private function resolvePublicStoragePath(?string $avatarUrl): ?string
-    {
-        $value = trim((string) $avatarUrl);
-        if ($value === '') {
-            return null;
-        }
-
-        $path = (string) parse_url($value, PHP_URL_PATH);
-        $storagePrefix = '/storage/';
-
-        if ($path === '' || ! str_contains($path, $storagePrefix)) {
-            return null;
-        }
-
-        return substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix));
+        ImageStorage::delete($avatarUrl);
     }
 
     private function syncPermissionsFromRole(User $user, string $roleCode): void

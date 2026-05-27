@@ -22,6 +22,7 @@ Laravel 13 API backend for the HFCCF admin system. The current backend supports 
 - English module APIs for classes, students, teachers, tasks, and submissions
 - Sport foundation APIs for teams, players, coaches, matches, events, tournaments, and standings
 - API rate limiting for general API traffic, login, OTP, and password reset endpoints
+- Queue-based asynchronous image optimization after upload
 - Automatic user archiving to `deleted_users` table upon deletion
 - Standardized sequential user ID indexing (`usr_001`, `usr_002`, etc.)
 - Consistent JSON error responses for missing API routes and rate-limit failures
@@ -69,16 +70,44 @@ DB_PASSWORD=
 
 SESSION_DRIVER=file
 CACHE_STORE=file
-QUEUE_CONNECTION=sync
+QUEUE_CONNECTION=database
 ```
 
 ### 3. Run Migrations and Seeders
 
 ```bash
-php artisan migrate:fresh --seed
+php artisan migrate
+# Seed only when you need sample or bootstrap data:
+php artisan db:seed
 ```
 
-### 4. Start the Backend
+### 4. Start the Queue Worker
+
+Image uploads dispatch an asynchronous optimization job after the original file is stored. Keep a worker running in any environment that uses the database queue:
+
+```bash
+php artisan queue:work --tries=3 --timeout=60
+```
+
+The existing `composer run dev` script already starts a queue listener for local development.
+
+### 5. Production Readiness Notes
+
+For production or staging deploys, use the safe cache commands after migrations and before opening traffic:
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+If you deploy queued notifications or image-processing jobs, keep a worker running:
+
+```bash
+php artisan queue:work --tries=3 --timeout=60
+```
+
+### 6. Start the Backend
 
 ```bash
 php artisan serve
@@ -148,4 +177,5 @@ Configured in `app/Providers/AppServiceProvider.php` and applied in `bootstrap/a
 - The role code `adminscholarship` is the canonical scholarship admin role used by the frontend and backend.
 - Players and preschool students are data records, not system users.
 - Sport matches derive score snapshots from match events; standings are derived from completed tournament matches.
+- Uploaded images are stored on the configured filesystem disk and optimized asynchronously by queued post-upload jobs.
 - Frontend module integration uses standardized JSON response envelopes with `success`, `message`, and `data`.

@@ -66,4 +66,3 @@ class UpdateSportCoachRequest extends FormRequest
         ];
     }
 }
-

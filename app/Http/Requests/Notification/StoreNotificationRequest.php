@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Notification;
 
+use App\Models\Department;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -78,15 +81,15 @@ class StoreNotificationRequest extends FormRequest
                 $validator->errors()->add('target_value', 'The target value must be a valid module.');
             }
 
-            if ($targetType === 'role' && ! \App\Models\Role::query()->where('code', $targetValue)->exists()) {
+            if ($targetType === 'role' && ! Role::query()->where('code', $targetValue)->exists()) {
                 $validator->errors()->add('target_value', 'The selected role does not exist.');
             }
 
-            if ($targetType === 'department' && ! \App\Models\Department::query()->where('code', $targetValue)->exists()) {
+            if ($targetType === 'department' && ! Department::query()->where('code', $targetValue)->exists()) {
                 $validator->errors()->add('target_value', 'The selected department does not exist.');
             }
 
-            if ($targetType === 'user' && ! \App\Models\User::query()->where('id', $targetValue)->exists()) {
+            if ($targetType === 'user' && ! User::query()->where('id', $targetValue)->exists()) {
                 $validator->errors()->add('target_value', 'The selected user does not exist.');
             }
         });

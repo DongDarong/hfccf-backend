@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\ImageStorage;
 use App\Traits\HasAuditFields;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -88,30 +89,72 @@ class User extends Authenticatable
         );
     }
 
+    /**
+     * Resolve the effective permission codes for the user.
+     *
+     * Direct user permissions take priority, but role permissions are merged in
+     * so role-based accounts (including seeded Super Admin users) always expose
+     * the expected permission set even when the user_permissions pivot is empty.
+     *
+     * @return array<int, string>
+     */
+    public function resolvedPermissionCodes(): array
+    {
+        $directPermissionCodes = $this->relationLoaded('permissions')
+            ? $this->permissions->pluck('code')->all()
+            : $this->permissions()->pluck('permissions.code')->all();
+
+        $rolePermissionCodes = $this->relationLoaded('role') && $this->role
+            ? $this->role->permissions()->pluck('permissions.code')->all()
+            : ($this->role_code
+                ? $this->role()->first()?->permissions()->pluck('permissions.code')->all() ?? []
+                : []);
+
+        return collect(array_merge($directPermissionCodes, $rolePermissionCodes))
+            ->filter(fn ($permissionCode) => is_string($permissionCode) && trim($permissionCode) !== '')
+            ->map(fn ($permissionCode) => trim($permissionCode))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function coachedSportTeams(): HasMany
     {
         return $this->hasMany(SportTeam::class, 'coach_user_id', 'id');
     }
 
+    public function coachTeamAssignments(): HasMany
+    {
+        return $this->hasMany(CoachTeamAssignment::class, 'coach_user_id', 'id');
+    }
+
+    public function activeCoachTeamAssignments(): HasMany
+    {
+        return $this->hasMany(CoachTeamAssignment::class, 'coach_user_id', 'id')->where('status', 'active');
+    }
+
+    /**
+     * Preschool timetable lookups stay teacher-scoped through the shared User
+     * model because teacher-preschool accounts are real system users.
+     */
+    public function preschoolScheduleEntries(): HasMany
+    {
+        return $this->hasMany(PreschoolScheduleEntry::class, 'teacher_user_id', 'id');
+    }
+
+    /**
+     * Guardian portal rows are legacy compatibility records only. They remain
+     * linked to User so staff can revoke an activated account, but the parent
+     * record itself is not supposed to become a general-purpose auth identity.
+     */
+    public function guardianPortalAccount(): HasMany
+    {
+        return $this->hasMany(PreschoolGuardianPortalAccount::class, 'user_id', 'id');
+    }
+
     private function resolveAvatarUrl(mixed $value): ?string
     {
-        $avatar = trim((string) $value);
-
-        if ($avatar === '' || str_starts_with($avatar, 'blob:')) {
-            return null;
-        }
-
-        if (preg_match('/^https?:\/\//i', $avatar) === 1) {
-            return $avatar;
-        }
-
-        $path = ltrim($avatar, '/');
-
-        if (str_starts_with($path, 'storage/')) {
-            return asset($path);
-        }
-
-        return asset('storage/'.$path);
+        return ImageStorage::url($value);
     }
 
     protected static function booted(): void

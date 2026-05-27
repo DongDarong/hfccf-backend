@@ -6,6 +6,9 @@ use App\Http\Requests\Sport\StoreSportTeamRequest;
 use App\Http\Requests\Sport\UpdateSportTeamRequest;
 use App\Http\Resources\Sport\SportTeamResource;
 use App\Models\SportTeam;
+use App\Models\User;
+use App\Support\ApiResponse;
+use App\Support\SportCoachAssignmentService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +16,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SportTeamController extends SportController
 {
+    public function __construct(
+        private readonly SportCoachAssignmentService $assignmentService,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         if ($response = $this->authorizeSportAdmin($request->user())) {
@@ -81,7 +88,7 @@ class SportTeamController extends SportController
             ->orderBy('id', 'desc')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        return \App\Support\ApiResponse::paginatedResponse(
+        return ApiResponse::paginatedResponse(
             'Sport teams retrieved successfully.',
             $paginator,
             $request,
@@ -113,9 +120,16 @@ class SportTeamController extends SportController
             'description' => $data['description'] ?? null,
         ]);
 
+        if (! empty($data['coach_user_id'])) {
+            $coach = $this->resolveUserReference($data['coach_user_id'], 'coach');
+            if ($coach) {
+                $this->assignmentService->assignTeamToCoach($team, $coach, $request->user());
+            }
+        }
+
         $team->loadMissing(['coach']);
 
-        return \App\Support\ApiResponse::successResponse(
+        return ApiResponse::successResponse(
             'Sport team created successfully.',
             [
                 'team' => SportTeamResource::make($team)->resolve($request),
@@ -133,10 +147,10 @@ class SportTeamController extends SportController
         $team = SportTeam::query()->with(['coach'])->find($id);
 
         if (! $team) {
-            return \App\Support\ApiResponse::errorResponse('Team not found.', null, Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_NOT_FOUND);
         }
 
-        return \App\Support\ApiResponse::successResponse(
+        return ApiResponse::successResponse(
             'Sport team retrieved successfully.',
             [
                 'team' => SportTeamResource::make($team)->resolve($request),
@@ -149,7 +163,7 @@ class SportTeamController extends SportController
         $team = SportTeam::query()->find($id);
 
         if (! $team) {
-            return \App\Support\ApiResponse::errorResponse('Team not found.', null, Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validated();
@@ -205,9 +219,22 @@ class SportTeamController extends SportController
         }
 
         $team->save();
+
+        if (array_key_exists('coach_user_id', $data) || array_key_exists('coach', $data)) {
+            $coach = $this->resolveUserReference($data['coach_user_id'] ?? $data['coach'] ?? null, 'coach');
+            if ($coach) {
+                $this->assignmentService->assignTeamToCoach($team, $coach, $request->user());
+            } else {
+                $activeAssignment = $this->assignmentService->activeAssignmentForTeam($team);
+                if ($activeAssignment) {
+                    $this->assignmentService->deactivateAssignment($activeAssignment, $request->user());
+                }
+            }
+        }
+
         $team->loadMissing(['coach']);
 
-        return \App\Support\ApiResponse::successResponse(
+        return ApiResponse::successResponse(
             'Sport team updated successfully.',
             [
                 'team' => SportTeamResource::make($team)->resolve($request),
@@ -224,16 +251,16 @@ class SportTeamController extends SportController
         $team = SportTeam::query()->find($id);
 
         if (! $team) {
-            return \App\Support\ApiResponse::errorResponse('Team not found.', null, Response::HTTP_NOT_FOUND);
+            return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_NOT_FOUND);
         }
 
         $this->deleteSportFile($team->logo);
         $team->delete();
 
-        return \App\Support\ApiResponse::successResponse('Sport team deleted successfully.');
+        return ApiResponse::successResponse('Sport team deleted successfully.');
     }
 
-    private function resolveCoachDisplayName(array $data, ?string $fallback = null, ?\App\Models\User $coach = null): ?string
+    private function resolveCoachDisplayName(array $data, ?string $fallback = null, ?User $coach = null): ?string
     {
         $coachDisplayName = trim((string) ($data['coach_display_name'] ?? $data['coach'] ?? $fallback ?? ''));
 

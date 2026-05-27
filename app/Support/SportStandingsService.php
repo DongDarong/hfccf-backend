@@ -8,7 +8,6 @@ use App\Models\SportTeam;
 use App\Models\SportTournament;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class SportStandingsService
@@ -27,7 +26,7 @@ class SportStandingsService
         if ($teamIds === []) {
             SportStanding::query()->where('tournament_id', $resolvedTournament->id)->delete();
 
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         $completedMatches = SportMatch::query()
@@ -136,6 +135,7 @@ class SportStandingsService
         return collect($standings)
             ->map(function (array $row): array {
                 $row['goal_difference'] = $row['goals_for'] - $row['goals_against'];
+
                 return $row;
             })
             ->sort(function (array $left, array $right) use ($teamNames): int {

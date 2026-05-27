@@ -3,15 +3,14 @@
 namespace App\Http\Controllers\Api\Sport;
 
 use App\Http\Controllers\Controller;
-use App\Models\SportMatch;
 use App\Models\SportPlayer;
-use App\Models\SportTournament;
 use App\Models\SportTeam;
+use App\Models\SportTournament;
 use App\Models\User;
 use App\Support\ApiResponse;
-use Illuminate\Http\UploadedFile;
+use App\Support\ImageStorage;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -165,32 +164,12 @@ abstract class SportController extends Controller
 
     protected function storeSportFile(?UploadedFile $file, string $directory): ?string
     {
-        if (! $file) {
-            return null;
-        }
-
-        return $file->store($directory, 'public');
+        return ImageStorage::store($file, $directory);
     }
 
     protected function deleteSportFile(?string $path): void
     {
-        $storedPath = trim((string) $path);
-
-        if ($storedPath === '') {
-            return;
-        }
-
-        if (preg_match('/^https?:\/\//i', $storedPath) === 1) {
-            return;
-        }
-
-        if (str_starts_with($storedPath, asset('storage/'))) {
-            $storedPath = str_replace(asset('storage/'), '', $storedPath);
-        }
-
-        $storedPath = ltrim($storedPath, '/');
-
-        Storage::disk('public')->delete($storedPath);
+        ImageStorage::delete($path);
     }
 
     protected function makeSportCode(string $prefix): string

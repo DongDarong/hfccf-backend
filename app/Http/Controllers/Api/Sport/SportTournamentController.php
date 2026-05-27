@@ -7,9 +7,14 @@ use App\Http\Requests\Sport\StoreSportTournamentRequest;
 use App\Http\Requests\Sport\UpdateSportTournamentRequest;
 use App\Http\Resources\Sport\SportStandingResource;
 use App\Http\Resources\Sport\SportTournamentResource;
+use App\Models\SportMatch;
+use App\Models\SportMatchEvent;
 use App\Models\SportStanding;
 use App\Models\SportTeam;
 use App\Models\SportTournament;
+use App\Models\SportTournamentGroup;
+use App\Models\SportTournamentGroupTeam;
+use App\Models\SportTournamentKnockoutRound;
 use App\Support\ApiResponse;
 use App\Support\SportStandingsService;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,9 +25,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SportTournamentController extends SportController
 {
-    public function __construct(private readonly SportStandingsService $standingsService)
-    {
-    }
+    public function __construct(private readonly SportStandingsService $standingsService) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -48,7 +51,7 @@ class SportTournamentController extends SportController
         $sortBy = (string) ($validated['sort_by'] ?? 'created_at');
         $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $query = SportTournament::query()->withCount(['teams', 'matches', 'standings']);
+        $query = SportTournament::query()->withCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents']);
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -98,16 +101,27 @@ class SportTournamentController extends SportController
 
         $tournament = SportTournament::query()->create([
             'tournament_code' => $data['tournament_code'] ?? $this->makeSportCode('tournament'),
+            'slug' => $data['slug'] ?? null,
             'name' => $data['name'],
             'season' => $data['season'] ?? null,
             'tournament_type' => $data['tournament_type'] ?? 'league',
             'status' => $data['status'],
+            'visibility' => $data['visibility'] ?? 'private',
+            'registration_open_at' => $data['registration_open_at'] ?? null,
+            'registration_close_at' => $data['registration_close_at'] ?? null,
             'starts_at' => $data['starts_at'] ?? null,
             'ends_at' => $data['ends_at'] ?? null,
             'description' => $data['description'] ?? null,
+            'logo_path' => $data['logo_path'] ?? null,
+            'banner_path' => $data['banner_path'] ?? null,
+            'location' => $data['location'] ?? null,
+            'organizer' => $data['organizer'] ?? null,
+            'rules' => $data['rules'] ?? null,
+            'settings' => $data['settings'] ?? null,
+            'created_by_user_id' => $request->user()?->id,
         ]);
 
-        $tournament->loadCount(['teams', 'matches', 'standings']);
+        $tournament->loadCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents']);
 
         return ApiResponse::successResponse(
             'Sport tournament created successfully.',
@@ -124,7 +138,7 @@ class SportTournamentController extends SportController
             return $response;
         }
 
-        $tournament = SportTournament::query()->withCount(['teams', 'matches', 'standings'])->find($id);
+        $tournament = SportTournament::query()->withCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents'])->find($id);
 
         if (! $tournament) {
             return ApiResponse::errorResponse('Tournament not found.', null, Response::HTTP_NOT_FOUND);
@@ -152,7 +166,7 @@ class SportTournamentController extends SportController
 
         $data = $request->validated();
 
-        foreach (['name', 'season', 'status', 'starts_at', 'ends_at', 'description'] as $field) {
+        foreach (['name', 'season', 'status', 'visibility', 'registration_open_at', 'registration_close_at', 'starts_at', 'ends_at', 'description', 'logo_path', 'banner_path', 'location', 'organizer', 'rules', 'settings', 'slug'] as $field) {
             if (array_key_exists($field, $data)) {
                 $tournament->{$field} = $data[$field];
             }
@@ -167,7 +181,7 @@ class SportTournamentController extends SportController
         }
 
         $tournament->save();
-        $tournament->loadCount(['teams', 'matches', 'standings']);
+        $tournament->loadCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents']);
 
         return ApiResponse::successResponse(
             'Sport tournament updated successfully.',
@@ -190,6 +204,11 @@ class SportTournamentController extends SportController
         }
 
         SportStanding::query()->where('tournament_id', $tournament->id)->delete();
+        SportMatchEvent::query()->where('tournament_id', $tournament->id)->delete();
+        SportMatch::query()->where('tournament_id', $tournament->id)->delete();
+        SportTournamentGroupTeam::query()->where('tournament_id', $tournament->id)->delete();
+        SportTournamentGroup::query()->where('tournament_id', $tournament->id)->delete();
+        SportTournamentKnockoutRound::query()->where('tournament_id', $tournament->id)->delete();
         $tournament->teams()->detach();
         $tournament->delete();
 
@@ -219,7 +238,7 @@ class SportTournamentController extends SportController
         ]);
 
         $standings = $this->standingsService->rebuildTournament($tournament);
-        $tournament->loadCount(['teams', 'matches', 'standings']);
+        $tournament->loadCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents']);
 
         return ApiResponse::successResponse('Team added to tournament successfully.', [
             'tournament' => SportTournamentResource::make($tournament)->resolve($request),
@@ -246,7 +265,7 @@ class SportTournamentController extends SportController
             ->delete();
 
         $standings = $this->standingsService->rebuildTournament($tournament);
-        $tournament->loadCount(['teams', 'matches', 'standings']);
+        $tournament->loadCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents']);
 
         return ApiResponse::successResponse('Team removed from tournament successfully.', [
             'tournament' => SportTournamentResource::make($tournament)->resolve($request),

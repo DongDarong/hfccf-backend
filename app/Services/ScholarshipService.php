@@ -4,18 +4,18 @@ namespace App\Services;
 
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipStatusHistory;
+use App\Models\ScholarshipStudent;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class ScholarshipService
 {
     public function dashboardSummary(User $user): array
     {
         $teacherScope = $this->teacherApplicationScope($user);
-        $studentQuery = \App\Models\ScholarshipStudent::query();
-        $applicationQuery = \App\Models\ScholarshipApplication::query();
+        $studentQuery = ScholarshipStudent::query();
+        $applicationQuery = ScholarshipApplication::query();
 
         if ($user->role_code === 'teacher-scholarship') {
             $applicationQuery = $teacherScope($applicationQuery);
@@ -58,7 +58,7 @@ class ScholarshipService
 
     public function generateStudentCode(): string
     {
-        $maxNumeric = (int) \App\Models\ScholarshipStudent::withTrashed()
+        $maxNumeric = (int) ScholarshipStudent::withTrashed()
             ->pluck('student_code')
             ->map(static function (?string $code): int {
                 if (! is_string($code)) {
@@ -74,7 +74,7 @@ class ScholarshipService
 
     public function generateApplicationCode(): string
     {
-        $maxNumeric = (int) \App\Models\ScholarshipApplication::withTrashed()
+        $maxNumeric = (int) ScholarshipApplication::withTrashed()
             ->pluck('application_code')
             ->map(static function (?string $code): int {
                 if (! is_string($code)) {

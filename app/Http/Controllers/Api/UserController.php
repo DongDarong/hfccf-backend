@@ -8,9 +8,9 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\ImageStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
@@ -281,41 +281,12 @@ class UserController extends Controller
 
     private function storeAvatarIfUploaded(Request $request): ?string
     {
-        if (! $request->hasFile('avatar')) {
-            return null;
-        }
-
-        $path = $request->file('avatar')->store('avatars', 'public');
-
-        return asset('storage/'.$path);
+        return ImageStorage::store($request->file('avatar'), 'avatars');
     }
 
     private function deleteStoredAvatarIfNeeded(?string $avatarUrl): void
     {
-        $path = $this->resolvePublicStoragePath($avatarUrl);
-
-        if (! $path) {
-            return;
-        }
-
-        Storage::disk('public')->delete($path);
-    }
-
-    private function resolvePublicStoragePath(?string $avatarUrl): ?string
-    {
-        $value = trim((string) $avatarUrl);
-        if ($value === '') {
-            return null;
-        }
-
-        $path = (string) parse_url($value, PHP_URL_PATH);
-        $storagePrefix = '/storage/';
-
-        if ($path === '' || ! str_contains($path, $storagePrefix)) {
-            return null;
-        }
-
-        return substr($path, strpos($path, $storagePrefix) + strlen($storagePrefix));
+        ImageStorage::delete($avatarUrl);
     }
 
     private function syncPermissionsFromRole(User $user, string $roleCode): void

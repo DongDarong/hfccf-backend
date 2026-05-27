@@ -27,9 +27,19 @@ class SportTeamResource extends JsonResource
                 'email' => $this->coach?->email,
                 'avatar' => $this->coach?->avatar,
             ]),
+            'activeCoachAssignment' => $this->whenLoaded('activeCoachAssignment', fn (): array => [
+                'id' => $this->activeCoachAssignment?->id,
+                'coachUserId' => $this->activeCoachAssignment?->coach_user_id,
+                'status' => $this->activeCoachAssignment?->status,
+                'assignedAt' => $this->activeCoachAssignment?->assigned_at?->toISOString(),
+                'endedAt' => $this->activeCoachAssignment?->ended_at?->toISOString(),
+            ]),
+            'coachAssignments' => $this->whenLoaded('coachAssignments', fn (): array => SportCoachTeamAssignmentResource::collection($this->coachAssignments)->resolve($request)),
+            'players' => $this->whenLoaded('players', fn (): array => SportPlayerResource::collection($this->players)->resolve($request)),
             'division' => $this->division,
             'captainName' => $this->captain_name,
             'playersCount' => $this->players_count ?? $this->whenCounted('players'),
+            'activePlayersCount' => $this->whenLoaded('players', fn (): int => $this->players->where('roster_status', 'active')->count()),
             'matchesCount' => (int) ($this->matches_count ?? (($this->home_matches_count ?? 0) + ($this->away_matches_count ?? 0))),
             'wins' => (int) $this->wins,
             'draws' => (int) $this->draws,
@@ -45,4 +55,3 @@ class SportTeamResource extends JsonResource
         ];
     }
 }
-

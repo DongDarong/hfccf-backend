@@ -4,20 +4,28 @@ namespace App\Http\Controllers\Api\Sport;
 
 use App\Http\Requests\Sport\StoreSportCoachRequest;
 use App\Http\Requests\Sport\UpdateSportCoachRequest;
+use App\Http\Resources\Sport\SportMatchResource;
+use App\Http\Resources\Sport\SportTeamResource;
 use App\Http\Resources\UserResource;
+use App\Models\CoachTeamAssignment;
+use App\Models\SportMatch;
 use App\Models\SportTeam;
 use App\Models\User;
 use App\Support\ApiResponse;
+use App\Support\SportCoachAssignmentService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class SportCoachController extends SportController
 {
+    public function __construct(
+        private readonly SportCoachAssignmentService $assignmentService,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         if ($response = $this->authorizeSportAdmin($request->user())) {
@@ -203,6 +211,14 @@ class SportCoachController extends SportController
                 'coach_user_id' => null,
             ]);
 
+        CoachTeamAssignment::query()
+            ->where('coach_user_id', $coach->id)
+            ->where('status', 'active')
+            ->update([
+                'status' => 'inactive',
+                'ended_at' => now(),
+            ]);
+
         $coach->delete();
 
         return ApiResponse::successResponse('Sport coach deleted successfully.');
@@ -216,9 +232,9 @@ class SportCoachController extends SportController
             return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
         }
 
-        $teams = SportTeam::query()->where('coach_user_id', $coach->id)->get();
+        $teams = $this->assignmentService->assignedTeamsForCoach($coach)->loadMissing(['coach', 'activeCoachAssignment.coach', 'activeCoachAssignment.assignedBy', 'coachAssignments.coach', 'coachAssignments.assignedBy']);
 
-        $recentMatches = \App\Models\SportMatch::query()
+        $recentMatches = SportMatch::query()
             ->with(['homeTeam', 'awayTeam', 'events'])
             ->where(function ($query) use ($coach): void {
                 $query->whereHas('homeTeam', fn ($builder) => $builder->where('coach_user_id', $coach->id))
@@ -239,8 +255,8 @@ class SportCoachController extends SportController
                 'liveMatches' => $liveMatches,
                 'upcomingMatches' => $upcomingMatches,
             ],
-            'teams' => \App\Http\Resources\Sport\SportTeamResource::collection($teams)->resolve($request),
-            'matches' => \App\Http\Resources\Sport\SportMatchResource::collection($recentMatches)->resolve($request),
+            'teams' => SportTeamResource::collection($teams)->resolve($request),
+            'matches' => SportMatchResource::collection($recentMatches)->resolve($request),
         ]);
     }
 
@@ -252,14 +268,10 @@ class SportCoachController extends SportController
             return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
         }
 
-        $teams = SportTeam::query()
-            ->with(['coach'])
-            ->where('coach_user_id', $coach->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $teams = $this->assignmentService->assignedTeamsForCoach($coach)->loadMissing(['coach', 'activeCoachAssignment.coach', 'activeCoachAssignment.assignedBy', 'coachAssignments.coach', 'coachAssignments.assignedBy']);
 
         return ApiResponse::successResponse('Coach teams retrieved successfully.', [
-            'items' => \App\Http\Resources\Sport\SportTeamResource::collection($teams)->resolve($request),
+            'items' => SportTeamResource::collection($teams)->resolve($request),
             'pagination' => [
                 'page' => 1,
                 'perPage' => $teams->count() ?: 10,
@@ -277,18 +289,20 @@ class SportCoachController extends SportController
             return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
         }
 
-        $matches = \App\Models\SportMatch::query()
+        $teamIds = $this->assignmentService->assignedTeamsForCoach($coach)->pluck('id')->all();
+
+        $matches = SportMatch::query()
             ->with(['homeTeam', 'awayTeam', 'events'])
-            ->where(function ($query) use ($coach): void {
-                $query->whereHas('homeTeam', fn ($builder) => $builder->where('coach_user_id', $coach->id))
-                    ->orWhereHas('awayTeam', fn ($builder) => $builder->where('coach_user_id', $coach->id));
+            ->where(function ($query) use ($teamIds): void {
+                $query->whereIn('home_team_id', $teamIds)
+                    ->orWhereIn('away_team_id', $teamIds);
             })
             ->orderByDesc('scheduled_at')
             ->orderByDesc('id')
             ->get();
 
         return ApiResponse::successResponse('Coach matches retrieved successfully.', [
-            'items' => \App\Http\Resources\Sport\SportMatchResource::collection($matches)->resolve($request),
+            'items' => SportMatchResource::collection($matches)->resolve($request),
             'pagination' => [
                 'page' => 1,
                 'perPage' => $matches->count() ?: 10,

@@ -60,7 +60,36 @@ return [
             'report' => false,
         ],
 
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('R2_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('R2_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('R2_REGION', env('AWS_DEFAULT_REGION', 'auto')),
+            'bucket' => env('R2_BUCKET', env('AWS_BUCKET')),
+            'url' => env('R2_PUBLIC_URL', env('AWS_URL')),
+            'endpoint' => env('R2_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('R2_USE_PATH_STYLE_ENDPOINT', true),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Media Storage Defaults
+    |--------------------------------------------------------------------------
+    |
+    | Keep image uploads on the public disk locally and switch to R2 in
+    | production by setting FILESYSTEM_IMAGE_DISK=r2.
+    |
+    */
+
+    'image_disk' => env('FILESYSTEM_IMAGE_DISK', 'public'),
+    'image_legacy_disks' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', env('FILESYSTEM_IMAGE_LEGACY_DISKS', 'public')),
+    ))),
 
     /*
     |--------------------------------------------------------------------------

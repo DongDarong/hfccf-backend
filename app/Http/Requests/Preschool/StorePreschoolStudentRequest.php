@@ -46,6 +46,7 @@ class StorePreschoolStudentRequest extends FormRequest
             'status' => ['required', Rule::in(['active', 'pending', 'inactive', 'graduated'])],
             'class_ids' => ['sometimes', 'array'],
             'class_ids.*' => ['integer', 'exists:preschool_classes,id'],
+            'avatar' => ['sometimes', 'nullable', 'image', 'max:4096'],
         ];
     }
 }

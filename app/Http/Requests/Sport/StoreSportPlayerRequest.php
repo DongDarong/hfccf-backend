@@ -72,6 +72,7 @@ class StoreSportPlayerRequest extends FormRequest
             'matches_played' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'goals_scored' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'status' => ['required', 'in:active,pending,inactive,suspended'],
+            'approval_status' => ['sometimes', 'nullable', 'in:pending,approved,rejected'],
             'notes' => ['sometimes', 'nullable', 'string'],
             'division' => ['sometimes', 'nullable', 'string', 'max:100'],
         ];
@@ -96,4 +97,3 @@ class StoreSportPlayerRequest extends FormRequest
         ];
     }
 }
-

@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PreschoolClass extends Model
 {
@@ -55,5 +55,25 @@ class PreschoolClass extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(PreschoolPayment::class, 'class_id');
+    }
+
+    /**
+     * Teacher ownership history stays separate from the current teacher_user_id
+     * column so Preschool admins can review reassignment changes without
+     * treating teacher records as login accounts or overwriting the current
+     * classroom owner.
+     */
+    public function teacherAssignments(): HasMany
+    {
+        return $this->hasMany(PreschoolClassTeacherAssignment::class, 'class_id');
+    }
+
+    /**
+     * Keep schedule rows attached to the class model so timetable pages can
+     * reuse the same Preschool class context without duplicating fields.
+     */
+    public function scheduleEntries(): HasMany
+    {
+        return $this->hasMany(PreschoolScheduleEntry::class, 'class_id');
     }
 }

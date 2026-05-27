@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureGuardianPortalAccess;
 use App\Http\Middleware\EnsureUserHasPermission;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(ThrottleRequests::class.':global');
 
         $middleware->alias([
+            'guardian.portal' => EnsureGuardianPortalAccess::class,
             'permission' => EnsureUserHasPermission::class,
             'throttle' => ThrottleRequests::class,
         ]);

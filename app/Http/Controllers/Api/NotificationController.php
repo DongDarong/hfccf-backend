@@ -17,8 +17,7 @@ class NotificationController extends Controller
 {
     public function __construct(
         private readonly NotificationService $notificationService,
-    ) {
-    }
+    ) {}
 
     public function index(ListNotificationRequest $request): JsonResponse
     {

@@ -13,26 +13,14 @@ class HfccfAuthSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('notification_recipients')->delete();
-        DB::table('notification_targets')->delete();
-        DB::table('notifications')->delete();
-        DB::table('personal_access_tokens')->delete();
-        DB::table('password_reset_otps')->delete();
-        DB::table('user_permissions')->delete();
-        DB::table('users')->delete();
-        DB::table('role_permissions')->delete();
-        DB::table('permissions')->delete();
-        DB::table('roles')->delete();
-        DB::table('departments')->delete();
-
-        DB::table('departments')->insert([
+        DB::table('departments')->upsert([
             ['code' => 'operations', 'name' => 'Operations', 'display_order' => 1, 'is_active' => true],
             ['code' => 'education', 'name' => 'Education', 'display_order' => 2, 'is_active' => true],
             ['code' => 'sports', 'name' => 'Sports', 'display_order' => 3, 'is_active' => true],
             ['code' => 'administration', 'name' => 'Administration', 'display_order' => 4, 'is_active' => true],
-        ]);
+        ], ['code'], ['name', 'display_order', 'is_active']);
 
-        DB::table('roles')->insert([
+        DB::table('roles')->upsert([
             ['code' => 'superadmin', 'name' => 'Super Admin', 'scope' => 'super_admin', 'domain_code' => 'global', 'department_code' => 'operations', 'sort_order' => 1],
             ['code' => 'adminenglish', 'name' => 'English Admin', 'scope' => 'admin', 'domain_code' => 'english', 'department_code' => 'education', 'sort_order' => 2],
             ['code' => 'adminpreschool', 'name' => 'Preschool Admin', 'scope' => 'admin', 'domain_code' => 'preschool', 'department_code' => 'education', 'sort_order' => 3],
@@ -42,9 +30,13 @@ class HfccfAuthSeeder extends Seeder
             ['code' => 'teacher-preschool', 'name' => 'Preschool Teacher', 'scope' => 'staff', 'domain_code' => 'preschool', 'department_code' => 'education', 'sort_order' => 7],
             ['code' => 'teacher-scholarship', 'name' => 'Scholarship Teacher', 'scope' => 'staff', 'domain_code' => 'scholarship', 'department_code' => 'education', 'sort_order' => 8],
             ['code' => 'coach', 'name' => 'Coach', 'scope' => 'staff', 'domain_code' => 'sport', 'department_code' => 'sports', 'sort_order' => 9],
-        ]);
+            // Legacy compatibility only: guardian remains a portal-scoped role
+            // for historical data, but Preschool architecture should treat the
+            // guardian record itself as data-only rather than a normal user.
+            ['code' => 'guardian', 'name' => 'Guardian', 'scope' => 'portal', 'domain_code' => 'preschool', 'department_code' => 'education', 'sort_order' => 10],
+        ], ['code'], ['name', 'scope', 'domain_code', 'department_code', 'sort_order']);
 
-        DB::table('permissions')->insert([
+        DB::table('permissions')->upsert([
             ['code' => 'all:*', 'module' => 'all', 'name' => 'Full system access'],
             ['code' => 'athletes:read', 'module' => 'athletes', 'name' => 'Read athletes'],
             ['code' => 'attendance:write', 'module' => 'attendance', 'name' => 'Manage attendance'],
@@ -60,9 +52,9 @@ class HfccfAuthSeeder extends Seeder
             ['code' => 'training:write', 'module' => 'training', 'name' => 'Manage training'],
             ['code' => 'users:read', 'module' => 'users', 'name' => 'Read users'],
             ['code' => 'users:write', 'module' => 'users', 'name' => 'Manage users'],
-        ]);
+        ], ['code'], ['module', 'name']);
 
-        DB::table('role_permissions')->insert([
+        DB::table('role_permissions')->insertOrIgnore([
             ['role_code' => 'superadmin', 'permission_code' => 'all:*'],
 
             ['role_code' => 'adminenglish', 'permission_code' => 'dashboard:read'],
@@ -111,7 +103,7 @@ class HfccfAuthSeeder extends Seeder
             ['role_code' => 'teacher-scholarship', 'permission_code' => 'tasks:write'],
         ]);
 
-        DB::table('users')->insert([
+        DB::table('users')->upsert([
             [
                 'id' => 'usr_001',
                 'first_name' => 'Vanna',
@@ -131,8 +123,8 @@ class HfccfAuthSeeder extends Seeder
             [
                 'id' => 'usr_002',
                 'first_name' => 'Darong',
-                'last_name' => 'Dong',
-                'username' => 'Darong Dong',
+                'last_name' => 'Admin',
+                'username' => 'dngdarong',
                 'email' => 'dngdarong@gmail.com',
                 'phone' => null,
                 'role_code' => 'superadmin',
@@ -272,10 +264,10 @@ class HfccfAuthSeeder extends Seeder
                 'created_at' => '2026-02-13 08:00:00',
                 'updated_at' => '2026-02-13 08:00:00',
             ],
-        ]);
+        ], ['id'], ['first_name', 'last_name', 'username', 'email', 'phone', 'role_code', 'department_code', 'status', 'avatar', 'password', 'last_login_at', 'created_at', 'updated_at']);
 
         DB::statement('
-            INSERT INTO `user_permissions` (`user_id`, `permission_code`)
+            INSERT IGNORE INTO `user_permissions` (`user_id`, `permission_code`)
             SELECT `u`.`id`, `rp`.`permission_code`
             FROM `users` AS `u`
             INNER JOIN `role_permissions` AS `rp`
@@ -283,3 +275,4 @@ class HfccfAuthSeeder extends Seeder
         ');
     }
 }
+

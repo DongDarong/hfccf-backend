@@ -20,8 +20,7 @@ class ScholarshipApplicationController extends Controller
 {
     public function __construct(
         private readonly ScholarshipService $scholarshipService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -392,6 +391,6 @@ class ScholarshipApplicationController extends Controller
 
     private function generateApplicationCode(): string
     {
-        return app(\App\Services\ScholarshipService::class)->generateApplicationCode();
+        return app(ScholarshipService::class)->generateApplicationCode();
     }
 }
