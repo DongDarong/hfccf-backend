@@ -7,6 +7,7 @@ use App\Models\AssessmentFormVersion;
 use App\Models\AssessmentFormSection;
 use App\Models\AssessmentQuestion;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AssessmentFormService
 {
@@ -35,7 +36,7 @@ class AssessmentFormService
     {
         return DB::transaction(function () use ($template) {
             $newTemplate = $template->replicate(['deleted_at']);
-            $newTemplate->uuid = (string) \Illuminate\Support\Str::uuid();
+            $newTemplate->uuid = (string) Str::uuid();
             $newTemplate->code = $this->generateCopyCode($template->code ?? 'FORM');
             $newTemplate->name = $template->name . ' (Copy)';
             $newTemplate->status = 'draft';
@@ -105,7 +106,7 @@ class AssessmentFormService
     private function generateCopyCode(string $baseCode): string
     {
         $base = strtoupper(preg_replace('/[^A-Z0-9]+/i', '-', $baseCode) ?: 'FORM');
-        $suffix = strtoupper(\Illuminate\Support\Str::random(4));
+        $suffix = strtoupper(Str::random(4));
 
         return trim($base, '-') . '-COPY-' . $suffix;
     }

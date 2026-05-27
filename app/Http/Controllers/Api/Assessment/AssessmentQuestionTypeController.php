@@ -17,7 +17,20 @@ class AssessmentQuestionTypeController extends Controller
             return $response;
         }
 
-        $types = AssessmentQuestionType::orderBy('label')->get(['id', 'key', 'label', 'category', 'has_options', 'config_schema']);
+        $types = AssessmentQuestionType::orderBy('label')->get([
+            'id',
+            'key',
+            'label',
+            'label_kh',
+            'renderer',
+            'has_options',
+            'has_scoring',
+            'has_matrix',
+            'is_file',
+            'settings_schema',
+            'is_active',
+            'sort_order',
+        ]);
 
         return response()->json([
             'success' => true,
