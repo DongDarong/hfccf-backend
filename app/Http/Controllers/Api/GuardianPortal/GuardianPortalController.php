@@ -12,71 +12,70 @@ use Symfony\Component\HttpFoundation\Response;
 class GuardianPortalController extends Controller
 {
     /**
-     * Portal views are read-only and are always scoped to active guardian
-     * relationships so unrelated student data never leaks into the portal.
+     * Legacy compatibility only: the public guardian portal is disabled, so
+     * these endpoints now fail closed instead of exposing student summaries to
+     * an authenticated parent account.
      */
     public function me(Request $request, PreschoolGuardianPortalSummaryService $service): JsonResponse
     {
         return response()->json([
-            'success' => true,
-            'message' => 'Guardian portal profile retrieved successfully.',
-            'data' => $service->me($request->user()),
-        ], Response::HTTP_OK);
+            'success' => false,
+            'message' => 'Guardian portal access is disabled.',
+            'data' => null,
+        ], Response::HTTP_GONE);
     }
 
     public function students(Request $request, PreschoolGuardianPortalSummaryService $service): JsonResponse
     {
         return response()->json([
-            'success' => true,
-            'message' => 'Guardian portal students retrieved successfully.',
-            'data' => [
-                'items' => $service->visibleStudents($request->user())->all(),
-            ],
-        ], Response::HTTP_OK);
+            'success' => false,
+            'message' => 'Guardian portal access is disabled.',
+            'data' => null,
+        ], Response::HTTP_GONE);
     }
 
     public function show(Request $request, PreschoolStudent $student, PreschoolGuardianPortalSummaryService $service): JsonResponse
     {
         return response()->json([
-            'success' => true,
-            'message' => 'Guardian portal student summary retrieved successfully.',
-            'data' => $service->studentBundle($request->user(), $student),
-        ], Response::HTTP_OK);
+            'success' => false,
+            'message' => 'Guardian portal access is disabled.',
+            'data' => null,
+        ], Response::HTTP_GONE);
     }
 
     public function attendanceSummary(Request $request, PreschoolStudent $student, PreschoolGuardianPortalSummaryService $service): JsonResponse
     {
         return response()->json([
-            'success' => true,
-            'message' => 'Guardian portal attendance summary retrieved successfully.',
-            'data' => $service->attendanceSummary($request->user(), $student),
-        ], Response::HTTP_OK);
+            'success' => false,
+            'message' => 'Guardian portal access is disabled.',
+            'data' => null,
+        ], Response::HTTP_GONE);
     }
 
     public function scheduleSummary(Request $request, PreschoolStudent $student, PreschoolGuardianPortalSummaryService $service): JsonResponse
     {
         return response()->json([
-            'success' => true,
-            'message' => 'Guardian portal schedule summary retrieved successfully.',
-            'data' => $service->scheduleSummary($request->user(), $student),
-        ], Response::HTTP_OK);
+            'success' => false,
+            'message' => 'Guardian portal access is disabled.',
+            'data' => null,
+        ], Response::HTTP_GONE);
     }
 
     public function progressSummary(Request $request, PreschoolStudent $student, PreschoolGuardianPortalSummaryService $service): JsonResponse
     {
         return response()->json([
-            'success' => true,
-            'message' => 'Guardian portal progress summary retrieved successfully.',
-            'data' => $service->progressSummary($request->user(), $student),
-        ], Response::HTTP_OK);
+            'success' => false,
+            'message' => 'Guardian portal access is disabled.',
+            'data' => null,
+        ], Response::HTTP_GONE);
     }
 
     public function reports(Request $request, PreschoolStudent $student, PreschoolGuardianPortalSummaryService $service): JsonResponse
     {
         return response()->json([
-            'success' => true,
-            'message' => 'Guardian portal reports retrieved successfully.',
-            'data' => $service->reportsSummary($request->user(), $student),
-        ], Response::HTTP_OK);
+            'success' => false,
+            'message' => 'Guardian portal access is disabled.',
+            'data' => null,
+        ], Response::HTTP_GONE);
     }
 }

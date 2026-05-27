@@ -12,22 +12,12 @@ use Symfony\Component\HttpFoundation\Response;
 final class PreschoolGuardianAccessService
 {
     /**
-     * Portal access is resolved through the portal account, not through the
-     * guardian master record, so revocation can safely cut login access.
+     * Legacy compatibility only: guardian portal access is disabled, so any
+     * attempt to resolve a portal account fails closed.
      */
     public function resolveActiveAccount(User $user): PreschoolGuardianPortalAccount
     {
-        abort_unless($user, Response::HTTP_UNAUTHORIZED, 'Unauthenticated.');
-        abort_unless($user->role_code === 'guardian', Response::HTTP_FORBIDDEN, 'Forbidden.');
-
-        $account = PreschoolGuardianPortalAccount::query()
-            ->with('guardian')
-            ->where('user_id', $user->id)
-            ->first();
-
-        abort_unless($account && $account->status === PreschoolGuardianPortalStatus::ACTIVE, Response::HTTP_FORBIDDEN, 'Forbidden.');
-
-        return $account;
+        abort(Response::HTTP_GONE, 'Guardian portal access is disabled.');
     }
 
     public function visibleStudents(User $user): Collection

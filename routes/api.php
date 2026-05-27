@@ -9,8 +9,6 @@ use App\Http\Controllers\Api\English\EnglishStudentController;
 use App\Http\Controllers\Api\English\EnglishSubmissionController;
 use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
-use App\Http\Controllers\Api\GuardianPortal\GuardianPortalAuthController;
-use App\Http\Controllers\Api\GuardianPortal\GuardianPortalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
@@ -109,23 +107,6 @@ Route::prefix('auth')->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout']);
     });
 
-});
-
-Route::prefix('guardian-portal')->group(function (): void {
-    // Legacy compatibility surface: this manages portal account state for
-    // staff oversight only and must not be expanded into a first-class parent
-    // portal workflow in the Preschool UI.
-    Route::post('activate', [GuardianPortalAuthController::class, 'activate']);
-
-    Route::middleware(['auth:sanctum', 'throttle:api', 'guardian.portal'])->group(function (): void {
-        Route::get('me', [GuardianPortalController::class, 'me']);
-        Route::get('students', [GuardianPortalController::class, 'students']);
-        Route::get('students/{student}', [GuardianPortalController::class, 'show']);
-        Route::get('students/{student}/attendance-summary', [GuardianPortalController::class, 'attendanceSummary']);
-        Route::get('students/{student}/schedule-summary', [GuardianPortalController::class, 'scheduleSummary']);
-        Route::get('students/{student}/progress-summary', [GuardianPortalController::class, 'progressSummary']);
-        Route::get('students/{student}/reports', [GuardianPortalController::class, 'reports']);
-    });
 });
 
 /*

@@ -9,10 +9,8 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Resources\Auth\UserResource;
 use App\Mail\PasswordResetOtpMail;
 use App\Models\PasswordResetOtp;
-use App\Models\PreschoolGuardianPortalAccount;
 use App\Models\User;
 use App\Support\ImageStorage;
-use App\Support\PreschoolGuardianPortalStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -61,21 +59,11 @@ class AuthController extends Controller
         }
 
         if ($user->role_code === 'guardian') {
-            $portalAccount = PreschoolGuardianPortalAccount::query()
-                ->where('user_id', $user->id)
-                ->first();
-
-            if (! $portalAccount || $portalAccount->status !== PreschoolGuardianPortalStatus::ACTIVE) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'This guardian portal account is not active.',
-                    'data' => null,
-                ], Response::HTTP_FORBIDDEN);
-            }
-
-            $portalAccount->forceFill([
-                'last_login_at' => now(),
-            ])->save();
+            return response()->json([
+                'success' => false,
+                'message' => 'Guardian portal access is disabled.',
+                'data' => null,
+            ], Response::HTTP_FORBIDDEN);
         }
 
         $user->forceFill([

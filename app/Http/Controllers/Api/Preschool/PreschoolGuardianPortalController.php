@@ -16,8 +16,8 @@ use Symfony\Component\HttpFoundation\Response;
 class PreschoolGuardianPortalController extends Controller
 {
     /**
-     * Admin portal management stays here so Preschool staff can invite and
-     * revoke guardian access without touching the guardian data records.
+     * Legacy admin oversight only: portal accounts are kept as audit records,
+     * but they no longer bootstrap guardian login or public portal access.
      */
     public function index(Request $request, PreschoolGuardianPortalService $service): JsonResponse
     {
@@ -46,11 +46,10 @@ class PreschoolGuardianPortalController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Guardian portal invitation created successfully.',
+            'message' => 'Guardian portal invitation recorded successfully.',
             'data' => [
                 'account' => PreschoolGuardianPortalAccountResource::make($payload['account'])->resolve($request),
-                'activationToken' => $payload['activationToken'],
-                'activationUrl' => $payload['activationUrl'],
+                'activationDisabled' => (bool) ($payload['activationDisabled'] ?? false),
             ],
         ], Response::HTTP_CREATED);
     }
