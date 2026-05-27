@@ -71,9 +71,10 @@ class PreschoolAcademicLifecycleService
         $year = $this->currentAcademicYear();
         $term = $this->currentTerm($year?->id);
         $fallback = app(PreschoolSettingsBackboneService::class)->currentAcademicContext();
+        $reportPeriod = app(PreschoolReportPeriodService::class)->currentContext();
 
         if (! $year) {
-            return $fallback;
+            return array_merge($fallback, $reportPeriod);
         }
 
         return [
@@ -83,7 +84,7 @@ class PreschoolAcademicLifecycleService
             'term_id' => $term?->id,
             'term_label' => $term ? trim((string) ($term->name ?: $term->code)) : ($fallback['term_label'] ?? ''),
             'term_status' => $term?->status,
-        ];
+        ] + $reportPeriod;
     }
 
     public function resolveForDate(mixed $date): array
@@ -125,6 +126,8 @@ class PreschoolAcademicLifecycleService
             $term = $this->currentTerm($year?->id);
         }
 
+        $reportPeriod = app(PreschoolReportPeriodService::class)->resolveForDate($date);
+
         return [
             'academic_year_id' => $year?->id,
             'academic_year' => $year ? trim((string) ($year->label ?: $year->code)) : $this->currentContext()['academic_year'],
@@ -132,7 +135,7 @@ class PreschoolAcademicLifecycleService
             'term_id' => $term?->id,
             'term_label' => $term ? trim((string) ($term->name ?: $term->code)) : ($this->currentContext()['term_label'] ?? ''),
             'term_status' => $term?->status,
-        ];
+        ] + $reportPeriod;
     }
 
     public function createAcademicYear(array $data): PreschoolAcademicYear

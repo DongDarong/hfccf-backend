@@ -9,6 +9,7 @@ use App\Http\Resources\Preschool\PreschoolStudentAssessmentResource;
 use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentAssessment;
 use App\Models\User;
+use App\Support\PreschoolLifecycleAuditService;
 use App\Support\PreschoolAssessmentService;
 use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -96,7 +97,15 @@ class PreschoolStudentAssessmentController extends Controller
             return $response;
         }
 
+        $previous = $this->assessmentState($assessment);
         $updated = $service->finalizeAssessment($request->user(), $assessment);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'assessment.finalized',
+            assessment: $updated,
+            previousState: $previous,
+            newState: $this->assessmentState($updated),
+        );
 
         return response()->json([
             'success' => true,
@@ -117,7 +126,15 @@ class PreschoolStudentAssessmentController extends Controller
             return $response;
         }
 
+        $previous = $this->assessmentState($assessment);
         $updated = $service->archiveAssessment($request->user(), $assessment);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'assessment.archived',
+            assessment: $updated,
+            previousState: $previous,
+            newState: $this->assessmentState($updated),
+        );
 
         return response()->json([
             'success' => true,
@@ -170,5 +187,41 @@ class PreschoolStudentAssessmentController extends Controller
             'total' => $paginator->total(),
             'totalPages' => $paginator->lastPage(),
         ];
+    }
+
+    private function assessmentState(PreschoolStudentAssessment $assessment): array
+    {
+        return [
+            'id' => $assessment->id,
+            'student_id' => $assessment->student_id,
+            'class_id' => $assessment->class_id,
+            'period_label' => $assessment->period_label,
+            'assessment_date' => $assessment->assessment_date?->toDateString(),
+            'status' => $assessment->status,
+            'score' => $assessment->score,
+            'rating' => $assessment->rating,
+        ];
+    }
+
+    private function recordAudit(Request $request, string $actionType, PreschoolStudentAssessment $assessment, ?array $previousState, ?array $newState): void
+    {
+        app(PreschoolLifecycleAuditService::class)->recordSafely([
+            'actor_user_id' => $request->user()?->id,
+            'actor_role' => $request->user()?->role_code,
+            'action_type' => $actionType,
+            'entity_type' => 'assessment',
+            'entity_id' => (string) $assessment->id,
+            'academic_year_id' => $assessment->academic_year_id,
+            'term_id' => $assessment->term_id,
+            'report_period_id' => app(\App\Support\PreschoolReportPeriodService::class)->resolveForAssessment([
+                'period_label' => $assessment->period_label,
+                'assessment_date' => $assessment->assessment_date?->toDateString(),
+            ], $assessment->assessment_date?->toDateString())?->id,
+            'previous_state' => $previousState,
+            'new_state' => $newState,
+            'request_context' => app(PreschoolLifecycleAuditService::class)->requestContext($request, [
+                'route' => $request->route()?->getName(),
+            ]),
+        ]);
     }
 }

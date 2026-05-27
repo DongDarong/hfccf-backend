@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PreschoolAcademicTerm;
 use App\Models\PreschoolAcademicYear;
 use App\Models\User;
+use App\Support\PreschoolLifecycleAuditService;
 use App\Support\PreschoolAcademicLifecycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,6 +45,14 @@ class PreschoolAcademicLifecycleController extends Controller
 
         $validated = $request->validate($this->academicYearRules());
         $academicYear = $service->createAcademicYear($validated);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_year.created',
+            entityType: 'academic_year',
+            entityId: (string) $academicYear->id,
+            previousState: null,
+            newState: $service->academicYearSnapshot($academicYear->loadMissing('terms')),
+        );
 
         return response()->json([
             'success' => true,
@@ -62,7 +71,16 @@ class PreschoolAcademicLifecycleController extends Controller
         }
 
         $validated = $request->validate($this->academicYearRules(true, $academicYear));
+        $previous = $service->academicYearSnapshot($academicYear->replicate()->loadMissing('terms'));
         $updated = $service->updateAcademicYear($academicYear, $validated);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_year.updated',
+            entityType: 'academic_year',
+            entityId: (string) $updated->id,
+            previousState: $previous,
+            newState: $service->academicYearSnapshot($updated->loadMissing('terms')),
+        );
 
         return response()->json([
             'success' => true,
@@ -80,7 +98,16 @@ class PreschoolAcademicLifecycleController extends Controller
             return $response;
         }
 
+        $previous = $service->academicYearSnapshot($academicYear->replicate()->loadMissing('terms'));
         $updated = $service->activateAcademicYear($academicYear);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_year.activated',
+            entityType: 'academic_year',
+            entityId: (string) $updated->id,
+            previousState: $previous,
+            newState: $service->academicYearSnapshot($updated->loadMissing('terms')),
+        );
 
         return response()->json([
             'success' => true,
@@ -98,7 +125,16 @@ class PreschoolAcademicLifecycleController extends Controller
             return $response;
         }
 
+        $previous = $service->academicYearSnapshot($academicYear->replicate()->loadMissing('terms'));
         $updated = $service->closeAcademicYear($academicYear);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_year.closed',
+            entityType: 'academic_year',
+            entityId: (string) $updated->id,
+            previousState: $previous,
+            newState: $service->academicYearSnapshot($updated->loadMissing('terms')),
+        );
 
         return response()->json([
             'success' => true,
@@ -118,6 +154,14 @@ class PreschoolAcademicLifecycleController extends Controller
 
         $validated = $request->validate($this->termRules());
         $term = $service->createTerm($validated);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_term.created',
+            entityType: 'academic_term',
+            entityId: (string) $term->id,
+            previousState: null,
+            newState: $service->termSnapshot($term),
+        );
 
         return response()->json([
             'success' => true,
@@ -136,7 +180,16 @@ class PreschoolAcademicLifecycleController extends Controller
         }
 
         $validated = $request->validate($this->termRules(true, $term));
+        $previous = $service->termSnapshot($term->replicate()->loadMissing('academicYear'));
         $updated = $service->updateTerm($term, $validated);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_term.updated',
+            entityType: 'academic_term',
+            entityId: (string) $updated->id,
+            previousState: $previous,
+            newState: $service->termSnapshot($updated),
+        );
 
         return response()->json([
             'success' => true,
@@ -154,7 +207,16 @@ class PreschoolAcademicLifecycleController extends Controller
             return $response;
         }
 
+        $previous = $service->termSnapshot($term->replicate()->loadMissing('academicYear'));
         $updated = $service->activateTerm($term);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_term.activated',
+            entityType: 'academic_term',
+            entityId: (string) $updated->id,
+            previousState: $previous,
+            newState: $service->termSnapshot($updated),
+        );
 
         return response()->json([
             'success' => true,
@@ -172,7 +234,16 @@ class PreschoolAcademicLifecycleController extends Controller
             return $response;
         }
 
+        $previous = $service->termSnapshot($term->replicate()->loadMissing('academicYear'));
         $updated = $service->closeTerm($term);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_term.closed',
+            entityType: 'academic_term',
+            entityId: (string) $updated->id,
+            previousState: $previous,
+            newState: $service->termSnapshot($updated),
+        );
 
         return response()->json([
             'success' => true,
@@ -241,5 +312,51 @@ class PreschoolAcademicLifecycleController extends Controller
             'message' => 'Forbidden.',
             'data' => null,
         ], Response::HTTP_FORBIDDEN);
+    }
+
+    /**
+     * Academic lifecycle events are audited separately from CRUD so override
+     * history and term closures remain easy to review without mutating data.
+     */
+    private function recordAudit(
+        Request $request,
+        string $actionType,
+        string $entityType,
+        string $entityId,
+        ?array $previousState,
+        ?array $newState,
+    ): void {
+        $academicYearId = null;
+        if (is_array($newState)) {
+            $academicYearId = $newState['academicYearId'] ?? $newState['id'] ?? null;
+        }
+        if ($academicYearId === null && is_array($previousState)) {
+            $academicYearId = $previousState['academicYearId'] ?? $previousState['id'] ?? null;
+        }
+
+        $termId = null;
+        if ($entityType === 'academic_term') {
+            if (is_array($newState)) {
+                $termId = $newState['id'] ?? null;
+            }
+            if ($termId === null && is_array($previousState)) {
+                $termId = $previousState['id'] ?? null;
+            }
+        }
+
+        app(PreschoolLifecycleAuditService::class)->recordSafely([
+            'actor_user_id' => $request->user()?->id,
+            'actor_role' => $request->user()?->role_code,
+            'action_type' => $actionType,
+            'entity_type' => $entityType,
+            'entity_id' => $entityId,
+            'academic_year_id' => $academicYearId,
+            'term_id' => $termId,
+            'previous_state' => $previousState,
+            'new_state' => $newState,
+            'request_context' => app(PreschoolLifecycleAuditService::class)->requestContext($request, [
+                'route' => $request->route()?->getName(),
+            ]),
+        ]);
     }
 }

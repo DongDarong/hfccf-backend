@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
+use App\Http\Controllers\Api\Preschool\PreschoolLifecycleAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
@@ -269,6 +270,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         // Reports stay on finalized assessment data so the frontend can render
         // stable summary screens without inventing a separate reporting store.
         Route::get('report-periods', [PreschoolReportPeriodController::class, 'index']);
+        Route::post('report-periods', [PreschoolReportPeriodController::class, 'store']);
+        Route::patch('report-periods/{reportPeriod}', [PreschoolReportPeriodController::class, 'update']);
+        Route::patch('report-periods/{reportPeriod}/activate', [PreschoolReportPeriodController::class, 'activate']);
+        Route::patch('report-periods/{reportPeriod}/finalize', [PreschoolReportPeriodController::class, 'finalize']);
+        Route::patch('report-periods/{reportPeriod}/lock', [PreschoolReportPeriodController::class, 'lock']);
+        Route::patch('report-periods/{reportPeriod}/archive', [PreschoolReportPeriodController::class, 'archive']);
+        Route::get('lifecycle-audit-logs', [PreschoolLifecycleAuditController::class, 'index']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
         // Academic lifecycle records stay admin-only so the year/term backbone

@@ -20,7 +20,7 @@ final class PreschoolReportService
      */
     public function bundle(User $user, PreschoolStudent $student, ?string $periodLabel = null): array
     {
-        $periods = $this->aggregation->reportPeriods($user, $student);
+        $periods = app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
         $selectedPeriod = $this->resolveSelectedPeriod($periods, $periodLabel);
 
         return [
@@ -33,12 +33,12 @@ final class PreschoolReportService
 
     public function reportPeriods(User $user, ?PreschoolStudent $student = null): Collection
     {
-        return $this->aggregation->reportPeriods($user, $student);
+        return app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
     }
 
     public function studentReportForPeriod(User $user, PreschoolStudent $student, string $periodLabel): array
     {
-        $periods = $this->aggregation->reportPeriods($user, $student);
+        $periods = app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
         $selectedPeriod = $this->normalizeLabel($periodLabel);
 
         if ($periods->doesntContain('label', $selectedPeriod)) {
