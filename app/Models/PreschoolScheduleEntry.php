@@ -19,6 +19,8 @@ class PreschoolScheduleEntry extends Model
         'status',
         'effective_from',
         'effective_until',
+        'academic_year_id',
+        'term_id',
         'created_by_user_id',
         'updated_by_user_id',
     ];
@@ -54,5 +56,15 @@ class PreschoolScheduleEntry extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by_user_id', 'id');
+    }
+
+    public function academicYear(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolAcademicYear::class, 'academic_year_id');
+    }
+
+    public function term(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolAcademicTerm::class, 'term_id');
     }
 }

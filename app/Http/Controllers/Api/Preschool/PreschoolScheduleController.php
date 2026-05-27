@@ -67,7 +67,7 @@ class PreschoolScheduleController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $schedule = $service->createSchedule($request->user(), $payload)->load(['preschoolClass.teacher', 'teacher']);
+        $schedule = $service->createSchedule($request->user(), $payload)->load(['preschoolClass.teacher', 'teacher', 'academicYear', 'term']);
 
         return response()->json([
             'success' => true,
@@ -84,7 +84,7 @@ class PreschoolScheduleController extends Controller
             return $response;
         }
 
-        $schedule->load(['preschoolClass.teacher', 'teacher']);
+        $schedule->load(['preschoolClass.teacher', 'teacher', 'academicYear', 'term']);
 
         return response()->json([
             'success' => true,

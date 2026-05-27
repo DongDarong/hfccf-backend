@@ -15,6 +15,8 @@ class PreschoolClassTeacherAssignment extends Model
         'assigned_at',
         'academic_year',
         'term_label',
+        'academic_year_id',
+        'term_id',
         'ended_at',
         'notes',
     ];

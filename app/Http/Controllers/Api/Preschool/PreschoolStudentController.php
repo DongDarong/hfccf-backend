@@ -10,7 +10,7 @@ use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolStudent;
 use App\Models\User;
 use App\Support\ImageStorage;
-use App\Support\PreschoolSettingsBackboneService;
+use App\Support\PreschoolAcademicLifecycleService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -229,7 +229,7 @@ class PreschoolStudentController extends Controller
 
     private function academicContext(): array
     {
-        return app(PreschoolSettingsBackboneService::class)->currentAcademicContext();
+        return app(PreschoolAcademicLifecycleService::class)->currentContext();
     }
 
     private function syncStudentClasses(PreschoolStudent $student, ?array $classIds): void
@@ -263,6 +263,11 @@ class PreschoolStudentController extends Controller
 
             $assignment->academic_year = $academicContext['academic_year'];
             $assignment->term_label = $academicContext['term_label'];
+            $assignment->academic_year_id = $academicContext['academic_year_id'] ?? null;
+            $assignment->term_id = $academicContext['term_id'] ?? null;
+            $assignment->enrollment_status = 'active';
+            $assignment->enrollment_started_at = $assignment->enrollment_started_at ?: now();
+            $assignment->enrollment_ended_at = null;
             $assignment->status = 'active';
             $assignment->save();
         }
@@ -270,7 +275,11 @@ class PreschoolStudentController extends Controller
         PreschoolClassStudent::query()
             ->where('student_id', $student->id)
             ->whereNotIn('class_id', $targetClassIds->all())
-            ->update(['status' => 'inactive']);
+            ->update([
+                'status' => 'inactive',
+                'enrollment_status' => 'inactive',
+                'enrollment_ended_at' => now(),
+            ]);
 
         $student->load('classes');
         foreach ($student->classes as $class) {

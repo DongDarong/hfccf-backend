@@ -24,6 +24,11 @@ class PreschoolClassResource extends JsonResource
                         'enrolledAt' => $student->pivot->enrolled_at?->toISOString(),
                         'academicYear' => $student->pivot->academic_year,
                         'termLabel' => $student->pivot->term_label,
+                        'academicYearId' => $student->pivot->academic_year_id,
+                        'termId' => $student->pivot->term_id,
+                        'enrollmentStatus' => $student->pivot->enrollment_status ?? $student->pivot->status ?? 'active',
+                        'enrollmentStartedAt' => $student->pivot->enrollment_started_at?->toISOString(),
+                        'enrollmentEndedAt' => $student->pivot->enrollment_ended_at?->toISOString(),
                         'updatedAt' => $student->pivot->updated_at?->toISOString(),
                     ];
                 })
@@ -42,6 +47,11 @@ class PreschoolClassResource extends JsonResource
                         'enrolledAt' => $student->pivot->enrolled_at?->toISOString(),
                         'academicYear' => $student->pivot->academic_year,
                         'termLabel' => $student->pivot->term_label,
+                        'academicYearId' => $student->pivot->academic_year_id,
+                        'termId' => $student->pivot->term_id,
+                        'enrollmentStatus' => $student->pivot->enrollment_status ?? $student->pivot->status ?? 'active',
+                        'enrollmentStartedAt' => $student->pivot->enrollment_started_at?->toISOString(),
+                        'enrollmentEndedAt' => $student->pivot->enrollment_ended_at?->toISOString(),
                         'updatedAt' => $student->pivot->updated_at?->toISOString(),
                     ];
                 })
@@ -61,6 +71,8 @@ class PreschoolClassResource extends JsonResource
                         'assignedAt' => $assignment->assigned_at?->toISOString(),
                         'academicYear' => $assignment->academic_year,
                         'termLabel' => $assignment->term_label,
+                        'academicYearId' => $assignment->academic_year_id,
+                        'termId' => $assignment->term_id,
                         'endedAt' => $assignment->ended_at?->toISOString(),
                         'notes' => $assignment->notes,
                         'updatedAt' => $assignment->updated_at?->toISOString(),

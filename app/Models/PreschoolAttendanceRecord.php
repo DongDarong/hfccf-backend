@@ -14,6 +14,8 @@ class PreschoolAttendanceRecord extends Model
         'attendance_date',
         'status',
         'note',
+        'academic_year_id',
+        'term_id',
     ];
 
     protected function casts(): array
@@ -36,5 +38,15 @@ class PreschoolAttendanceRecord extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by_user_id', 'id');
+    }
+
+    public function academicYear(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolAcademicYear::class, 'academic_year_id');
+    }
+
+    public function term(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolAcademicTerm::class, 'term_id');
     }
 }

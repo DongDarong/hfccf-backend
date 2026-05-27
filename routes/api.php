@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
+use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
@@ -270,6 +271,18 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('report-periods', [PreschoolReportPeriodController::class, 'index']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
+        // Academic lifecycle records stay admin-only so the year/term backbone
+        // can drive attendance, schedules, assignments, and reports without
+        // turning settings into a monolithic write path.
+        Route::get('academic-lifecycle', [PreschoolAcademicLifecycleController::class, 'index']);
+        Route::post('academic-years', [PreschoolAcademicLifecycleController::class, 'storeAcademicYear']);
+        Route::patch('academic-years/{academicYear}', [PreschoolAcademicLifecycleController::class, 'updateAcademicYear']);
+        Route::patch('academic-years/{academicYear}/activate', [PreschoolAcademicLifecycleController::class, 'activateAcademicYear']);
+        Route::patch('academic-years/{academicYear}/close', [PreschoolAcademicLifecycleController::class, 'closeAcademicYear']);
+        Route::post('terms', [PreschoolAcademicLifecycleController::class, 'storeTerm']);
+        Route::patch('terms/{term}', [PreschoolAcademicLifecycleController::class, 'updateTerm']);
+        Route::patch('terms/{term}/activate', [PreschoolAcademicLifecycleController::class, 'activateTerm']);
+        Route::patch('terms/{term}/close', [PreschoolAcademicLifecycleController::class, 'closeTerm']);
         Route::get('students/{student}/reports', [PreschoolStudentReportController::class, 'index']);
         Route::get('students/{student}/reports/{period}', [PreschoolStudentReportController::class, 'show']);
         Route::get('classes/{class}/reports', [PreschoolClassroomReportController::class, 'index']);

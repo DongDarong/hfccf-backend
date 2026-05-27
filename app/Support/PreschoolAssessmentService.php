@@ -45,7 +45,7 @@ final class PreschoolAssessmentService
         $sortDirection = strtolower((string) ($filters['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $query = PreschoolStudentAssessment::query()
-            ->with(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy'])
+            ->with(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy', 'academicYear', 'term'])
             ->where('student_id', $student->id);
 
         if ($status !== '' && in_array($status, PreschoolAssessmentStatus::values(), true)) {
@@ -90,6 +90,7 @@ final class PreschoolAssessmentService
     public function createAssessment(User $user, PreschoolStudent $student, array $data): PreschoolStudentAssessment
     {
         $classId = $this->resolveClassIdForUser($user, $student, $this->nullableInt($data['class_id'] ?? null));
+        $academicContext = app(PreschoolAcademicLifecycleService::class)->currentContext();
 
         $assessment = new PreschoolStudentAssessment([
             'student_id' => $student->id,
@@ -97,6 +98,8 @@ final class PreschoolAssessmentService
             'category_id' => (int) $data['category_id'],
             'assessed_by_user_id' => $user->id,
             'period_label' => trim((string) $data['period_label']),
+            'academic_year_id' => $academicContext['academic_year_id'] ?? null,
+            'term_id' => $academicContext['term_id'] ?? null,
             'assessment_date' => $data['assessment_date'],
             'score' => $data['score'] ?? null,
             'rating' => $data['rating'] ?? null,
@@ -106,7 +109,7 @@ final class PreschoolAssessmentService
         ]);
 
         $assessment->save();
-        $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy']);
+        $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy', 'academicYear', 'term']);
 
         return $assessment;
     }
@@ -114,6 +117,7 @@ final class PreschoolAssessmentService
     public function updateAssessment(User $user, PreschoolStudentAssessment $assessment, array $data): PreschoolStudentAssessment
     {
         $this->ensureUserCanManageAssessment($user, $assessment);
+        $academicContext = app(PreschoolAcademicLifecycleService::class)->currentContext();
 
         if ($assessment->status !== PreschoolAssessmentStatus::DRAFT) {
             throw ValidationException::withMessages([
@@ -135,8 +139,16 @@ final class PreschoolAssessmentService
             }
         }
 
+        if (! $assessment->academic_year_id) {
+            $assessment->academic_year_id = $academicContext['academic_year_id'] ?? null;
+        }
+
+        if (! $assessment->term_id) {
+            $assessment->term_id = $academicContext['term_id'] ?? null;
+        }
+
         $assessment->save();
-        $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy']);
+        $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy', 'academicYear', 'term']);
 
         return $assessment;
     }
@@ -155,7 +167,7 @@ final class PreschoolAssessmentService
         $assessment->finalized_at = Carbon::now();
         $assessment->finalized_by_user_id = $user->id;
         $assessment->save();
-        $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy']);
+        $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy', 'academicYear', 'term']);
 
         return $assessment;
     }
@@ -172,7 +184,7 @@ final class PreschoolAssessmentService
 
         $assessment->status = PreschoolAssessmentStatus::ARCHIVED;
         $assessment->save();
-        $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy']);
+        $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy', 'academicYear', 'term']);
 
         return $assessment;
     }
@@ -182,7 +194,7 @@ final class PreschoolAssessmentService
         $this->ensureUserCanAccessStudent($user, $student);
 
         $assessments = PreschoolStudentAssessment::query()
-            ->with(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy'])
+            ->with(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy', 'academicYear', 'term'])
             ->where('student_id', $student->id)
             ->orderByDesc('assessment_date')
             ->orderByDesc('id')

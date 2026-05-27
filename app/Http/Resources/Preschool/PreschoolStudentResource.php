@@ -34,6 +34,11 @@ class PreschoolStudentResource extends JsonResource
                         'enrolledAt' => $class->pivot->enrolled_at?->toISOString(),
                         'academicYear' => $class->pivot->academic_year,
                         'termLabel' => $class->pivot->term_label,
+                        'academicYearId' => $class->pivot->academic_year_id,
+                        'termId' => $class->pivot->term_id,
+                        'enrollmentStatus' => $class->pivot->enrollment_status ?? $class->pivot->status ?? 'active',
+                        'enrollmentStartedAt' => $class->pivot->enrollment_started_at?->toISOString(),
+                        'enrollmentEndedAt' => $class->pivot->enrollment_ended_at?->toISOString(),
                         'updatedAt' => $class->pivot->updated_at?->toISOString(),
                     ];
                 })
@@ -54,6 +59,11 @@ class PreschoolStudentResource extends JsonResource
                         'enrolledAt' => $class->pivot->enrolled_at?->toISOString(),
                         'academicYear' => $class->pivot->academic_year,
                         'termLabel' => $class->pivot->term_label,
+                        'academicYearId' => $class->pivot->academic_year_id,
+                        'termId' => $class->pivot->term_id,
+                        'enrollmentStatus' => $class->pivot->enrollment_status ?? $class->pivot->status ?? 'active',
+                        'enrollmentStartedAt' => $class->pivot->enrollment_started_at?->toISOString(),
+                        'enrollmentEndedAt' => $class->pivot->enrollment_ended_at?->toISOString(),
                         'updatedAt' => $class->pivot->updated_at?->toISOString(),
                     ];
                 })

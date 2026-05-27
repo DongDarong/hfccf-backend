@@ -9,6 +9,7 @@ use App\Http\Resources\Preschool\PreschoolAttendanceResource;
 use App\Models\PreschoolAttendanceRecord;
 use App\Models\PreschoolClass;
 use App\Models\User;
+use App\Support\PreschoolAcademicLifecycleService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class PreschoolAttendanceController extends Controller
         $this->applyAttendanceFilters($request, $query);
 
         $paginator = $query
-            ->with(['student', 'preschoolClass', 'recordedBy'])
+            ->with(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term'])
             ->orderByDesc('attendance_date')
             ->orderByDesc('id')
             ->paginate($this->perPage($request), ['*'], 'page', $this->page($request));
@@ -52,6 +53,7 @@ class PreschoolAttendanceController extends Controller
         }
 
         $data = $request->validated();
+        $academicContext = app(PreschoolAcademicLifecycleService::class)->currentContext();
         $attendance = PreschoolAttendanceRecord::query()->create([
             'class_id' => $data['class_id'],
             'student_id' => $data['student_id'],
@@ -59,9 +61,11 @@ class PreschoolAttendanceController extends Controller
             'attendance_date' => $data['attendance_date'],
             'status' => $data['status'],
             'note' => $data['note'] ?? null,
+            'academic_year_id' => $academicContext['academic_year_id'] ?? null,
+            'term_id' => $academicContext['term_id'] ?? null,
         ]);
 
-        $attendance->load(['student', 'preschoolClass', 'recordedBy']);
+        $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term']);
 
         return response()->json([
             'success' => true,
@@ -99,7 +103,7 @@ class PreschoolAttendanceController extends Controller
         }
 
         $attendance->save();
-        $attendance->load(['student', 'preschoolClass', 'recordedBy']);
+        $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term']);
 
         return response()->json([
             'success' => true,
@@ -120,7 +124,7 @@ class PreschoolAttendanceController extends Controller
         $this->applyAttendanceFilters($request, $query);
 
         $paginator = $query
-            ->with(['student', 'preschoolClass', 'recordedBy'])
+            ->with(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term'])
             ->orderByDesc('attendance_date')
             ->orderByDesc('id')
             ->paginate($this->perPage($request), ['*'], 'page', $this->page($request));
