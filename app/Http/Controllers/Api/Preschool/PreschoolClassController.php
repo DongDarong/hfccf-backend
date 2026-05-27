@@ -11,6 +11,7 @@ use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolClassTeacherAssignment;
 use App\Models\User;
 use App\Support\PreschoolAcademicLifecycleService;
+use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -103,6 +104,11 @@ class PreschoolClassController extends Controller
         }
 
         $data = $request->validated();
+        if (($data['teacher_user_id'] ?? null) !== null || ! empty($data['student_ids'] ?? [])) {
+            if ($response = app(PreschoolLifecycleGuardService::class)->assignmentWriteLock($request->user(), $data)) {
+                return $response;
+            }
+        }
         $class = PreschoolClass::query()->create([
             'code' => $data['code'],
             'name' => $data['name'],
@@ -171,6 +177,11 @@ class PreschoolClassController extends Controller
         }
 
         $data = $request->validated();
+        if (array_key_exists('teacher_user_id', $data) || array_key_exists('student_ids', $data)) {
+            if ($response = app(PreschoolLifecycleGuardService::class)->assignmentWriteLock($request->user(), $data)) {
+                return $response;
+            }
+        }
 
         foreach (['code', 'name', 'level', 'schedule', 'status', 'room', 'notes'] as $field) {
             if (array_key_exists($field, $data)) {

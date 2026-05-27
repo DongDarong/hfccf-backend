@@ -10,6 +10,7 @@ use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentAssessment;
 use App\Models\User;
 use App\Support\PreschoolAssessmentService;
+use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,12 @@ class PreschoolStudentAssessmentController extends Controller
             return $response;
         }
 
-        $assessment = $service->createAssessment($request->user(), $student, $request->validated());
+        $data = $request->validated();
+        if ($response = app(PreschoolLifecycleGuardService::class)->assessmentWriteLock($request->user(), $data, null, $student)) {
+            return $response;
+        }
+
+        $assessment = $service->createAssessment($request->user(), $student, $data);
 
         return response()->json([
             'success' => true,
@@ -64,7 +70,12 @@ class PreschoolStudentAssessmentController extends Controller
             return $response;
         }
 
-        $updated = $service->updateAssessment($request->user(), $assessment, $request->validated());
+        $data = $request->validated();
+        if ($response = app(PreschoolLifecycleGuardService::class)->assessmentWriteLock($request->user(), $data, $assessment)) {
+            return $response;
+        }
+
+        $updated = $service->updateAssessment($request->user(), $assessment, $data);
 
         return response()->json([
             'success' => true,
@@ -78,6 +89,10 @@ class PreschoolStudentAssessmentController extends Controller
     public function finalize(Request $request, PreschoolStudentAssessment $assessment, PreschoolAssessmentService $service): JsonResponse
     {
         if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        if ($response = app(PreschoolLifecycleGuardService::class)->assessmentWriteLock($request->user(), [], $assessment)) {
             return $response;
         }
 
@@ -95,6 +110,10 @@ class PreschoolStudentAssessmentController extends Controller
     public function archive(Request $request, PreschoolStudentAssessment $assessment, PreschoolAssessmentService $service): JsonResponse
     {
         if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        if ($response = app(PreschoolLifecycleGuardService::class)->assessmentWriteLock($request->user(), [], $assessment)) {
             return $response;
         }
 

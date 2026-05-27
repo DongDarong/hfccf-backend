@@ -33,6 +33,8 @@ class UpdatePreschoolStudentAssessmentRequest extends FormRequest
             'rating' => ['sometimes', 'nullable', 'string', 'max:50', Rule::in(PreschoolAssessmentRating::values())],
             'observation' => ['sometimes', 'nullable', 'string'],
             'teacher_comment' => ['sometimes', 'nullable', 'string'],
+            'override_locked_context' => ['sometimes', 'boolean'],
+            'override_reason' => ['required_if:override_locked_context,1', 'nullable', 'string', 'max:500'],
         ];
     }
 }

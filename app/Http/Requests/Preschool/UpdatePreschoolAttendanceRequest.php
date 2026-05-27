@@ -22,6 +22,8 @@ class UpdatePreschoolAttendanceRequest extends FormRequest
             'attendance_date' => ['sometimes', 'required', 'date'],
             'status' => ['sometimes', 'required', Rule::in(['present', 'absent', 'late', 'excused'])],
             'note' => ['sometimes', 'nullable', 'string'],
+            'override_locked_context' => ['sometimes', 'boolean'],
+            'override_reason' => ['required_if:override_locked_context,1', 'nullable', 'string', 'max:500'],
         ];
     }
 }

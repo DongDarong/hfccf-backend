@@ -10,6 +10,7 @@ use App\Models\PreschoolAttendanceRecord;
 use App\Models\PreschoolClass;
 use App\Models\User;
 use App\Support\PreschoolAcademicLifecycleService;
+use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,6 +54,9 @@ class PreschoolAttendanceController extends Controller
         }
 
         $data = $request->validated();
+        if ($response = app(PreschoolLifecycleGuardService::class)->attendanceWriteLock($request->user(), $data)) {
+            return $response;
+        }
         $academicContext = app(PreschoolAcademicLifecycleService::class)->currentContext();
         $attendance = PreschoolAttendanceRecord::query()->create([
             'class_id' => $data['class_id'],
@@ -96,6 +100,9 @@ class PreschoolAttendanceController extends Controller
         }
 
         $data = $request->validated();
+        if ($response = app(PreschoolLifecycleGuardService::class)->attendanceWriteLock($request->user(), $data, $attendance)) {
+            return $response;
+        }
         foreach (['class_id', 'student_id', 'attendance_date', 'status', 'note'] as $field) {
             if (array_key_exists($field, $data)) {
                 $attendance->{$field} = $data[$field];

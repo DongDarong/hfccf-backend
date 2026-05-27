@@ -47,6 +47,8 @@ class StorePreschoolStudentRequest extends FormRequest
             'class_ids' => ['sometimes', 'array'],
             'class_ids.*' => ['integer', 'exists:preschool_classes,id'],
             'avatar' => ['sometimes', 'nullable', 'image', 'max:4096'],
+            'override_locked_context' => ['sometimes', 'boolean'],
+            'override_reason' => ['required_if:override_locked_context,1', 'nullable', 'string', 'max:500'],
         ];
     }
 }
