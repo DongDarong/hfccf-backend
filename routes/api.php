@@ -188,6 +188,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |----------------------------------------------------------------------
     */
 
+    // Preschool stays split into admin setup, teacher operations, assessment
+    // output, and guardian/governance records. Teachers never get setup or
+    // payment administration privileges here; the controllers enforce that.
     Route::prefix('preschool')->group(function (): void {
         Route::get('dashboard', [PreschoolDashboardController::class, 'index']);
 
