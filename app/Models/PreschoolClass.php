@@ -58,6 +58,17 @@ class PreschoolClass extends Model
     }
 
     /**
+     * Teacher ownership history stays separate from the current teacher_user_id
+     * column so Preschool admins can review reassignment changes without
+     * treating teacher records as login accounts or overwriting the current
+     * classroom owner.
+     */
+    public function teacherAssignments(): HasMany
+    {
+        return $this->hasMany(PreschoolClassTeacherAssignment::class, 'class_id');
+    }
+
+    /**
      * Keep schedule rows attached to the class model so timetable pages can
      * reuse the same Preschool class context without duplicating fields.
      */

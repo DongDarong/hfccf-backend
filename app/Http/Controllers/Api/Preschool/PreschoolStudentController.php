@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Preschool\StorePreschoolStudentRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolStudentRequest;
 use App\Http\Resources\Preschool\PreschoolStudentResource;
+use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolStudent;
 use App\Models\User;
 use App\Support\ImageStorage;
@@ -228,23 +229,45 @@ class PreschoolStudentController extends Controller
     private function syncStudentClasses(PreschoolStudent $student, ?array $classIds): void
     {
         if ($classIds === null) {
-            $student->classes()->syncWithoutDetaching([]);
+            // Keep history rows intact when the caller is not changing class
+            // membership. The inactive pivots remain available for assignment
+            // and transfer history while the active roster stays unchanged.
 
             return;
         }
 
-        $student->classes()->sync(
-            collect($classIds)->mapWithKeys(static fn ($classId) => [
-                $classId => [
-                    'enrolled_at' => now(),
-                    'status' => 'active',
-                ],
-            ])->all(),
-        );
+        $targetClassIds = collect($classIds)
+            ->filter()
+            ->map(static fn ($classId) => trim((string) $classId))
+            ->filter()
+            ->unique()
+            ->values();
+
+        foreach ($targetClassIds as $classId) {
+            $assignment = PreschoolClassStudent::query()->firstOrNew([
+                'class_id' => $classId,
+                'student_id' => $student->id,
+            ]);
+
+            if (! $assignment->exists || ($assignment->status ?? null) !== 'active') {
+                $assignment->enrolled_at = now();
+            }
+
+            $assignment->status = 'active';
+            $assignment->save();
+        }
+
+        PreschoolClassStudent::query()
+            ->where('student_id', $student->id)
+            ->whereNotIn('class_id', $targetClassIds->all())
+            ->update(['status' => 'inactive']);
 
         $student->load('classes');
         foreach ($student->classes as $class) {
-            $class->students_count = $class->students()->count();
+            $class->students_count = PreschoolClassStudent::query()
+                ->where('class_id', $class->id)
+                ->where('status', 'active')
+                ->count();
             $class->save();
         }
     }
