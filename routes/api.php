@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
+use App\Http\Controllers\Api\Preschool\PreschoolInstitutionalGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolLifecycleAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolExportGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
@@ -295,6 +296,11 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('report-comparisons/options', [PreschoolExportGovernanceController::class, 'comparisonOptions']);
         Route::post('report-comparisons', [PreschoolExportGovernanceController::class, 'compare']);
         Route::get('institutional-timeline', [PreschoolExportGovernanceController::class, 'timeline']);
+        Route::get('governance-review', [PreschoolInstitutionalGovernanceController::class, 'review']);
+        Route::get('governance-review/analytics', [PreschoolInstitutionalGovernanceController::class, 'analytics']);
+        Route::get('institutional-reconstruction', [PreschoolInstitutionalGovernanceController::class, 'reconstruct']);
+        Route::get('institutional-reconstruction/{context}', [PreschoolInstitutionalGovernanceController::class, 'show']);
+        Route::get('institutional-replay', [PreschoolInstitutionalGovernanceController::class, 'replay']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
         // Academic lifecycle records stay admin-only so the year/term backbone
