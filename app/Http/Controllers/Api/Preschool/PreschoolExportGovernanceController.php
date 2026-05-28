@@ -3,24 +3,22 @@
 namespace App\Http\Controllers\Api\Preschool;
 
 use App\Http\Controllers\Controller;
-use App\Models\PreschoolReportSnapshot;
-use App\Models\User;
+use App\Models\PreschoolReportExportRecord;
 use App\Support\PreschoolExportGovernanceService;
 use App\Support\PreschoolLifecycleAuditService;
-use App\Support\PreschoolSnapshotArchiveService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Snapshot archive access stays admin-only so immutable report history can be
- * reviewed, compared, and exported without exposing a new teacher workflow.
+ * Export governance stays admin-only so immutable export history, archive
+ * downloads, and comparison tools remain institutional review utilities
+ * instead of becoming a teacher-facing workflow.
  */
-class PreschoolReportSnapshotController extends Controller
+class PreschoolExportGovernanceController extends Controller
 {
     public function __construct(
-        private readonly PreschoolSnapshotArchiveService $archiveService,
         private readonly PreschoolExportGovernanceService $exportGovernanceService,
         private readonly PreschoolLifecycleAuditService $auditService,
     ) {}
@@ -34,35 +32,34 @@ class PreschoolReportSnapshotController extends Controller
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'export_type' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'export_format' => ['sometimes', 'nullable', 'string', 'max:32'],
             'academic_year_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_academic_years,id'],
             'term_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_terms,id'],
             'report_period_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_report_periods,id'],
-            'class_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_classes,id'],
-            'student_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_students,id'],
-            'snapshot_type' => ['sometimes', 'nullable', 'string', 'max:64'],
-            'lifecycle_state' => ['sometimes', 'nullable', 'string', 'max:32'],
-            'generated_from' => ['sometimes', 'nullable', 'date'],
-            'generated_to' => ['sometimes', 'nullable', 'date'],
-            'generated_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'actor_user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'source' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'exported_from' => ['sometimes', 'nullable', 'date'],
+            'exported_to' => ['sometimes', 'nullable', 'date'],
             'search' => ['sometimes', 'nullable', 'string', 'max:191'],
         ]);
 
-        $paginator = $this->archiveService->paginate(
+        $paginator = $this->exportGovernanceService->paginate(
             $validated,
             (int) ($validated['per_page'] ?? 20),
             (int) ($validated['page'] ?? 1),
         );
 
-        $items = $paginator->getCollection()->map(fn (PreschoolReportSnapshot $snapshot): array => $this->archiveService->preview($snapshot));
+        $items = $paginator->getCollection()->map(fn (PreschoolReportExportRecord $record): array => $this->exportGovernanceService->previewRecord($record));
 
-        $this->recordAudit($request, 'report_snapshot.archive_viewed', 'report_snapshot_archive', 'list', null, [
+        $this->recordAudit($request, 'report_export.archive_viewed', 'report_export_archive', 'list', null, [
             'filters' => $validated,
             'resultCount' => $paginator->total(),
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Preschool snapshot archive retrieved successfully.',
+            'message' => 'Preschool export governance retrieved successfully.',
             'data' => [
                 'items' => $items->values()->all(),
                 'pagination' => [
@@ -75,21 +72,21 @@ class PreschoolReportSnapshotController extends Controller
         ], Response::HTTP_OK);
     }
 
-    public function show(Request $request, PreschoolReportSnapshot $snapshot): JsonResponse
+    public function show(Request $request, PreschoolReportExportRecord $exportRecord): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {
             return $response;
         }
 
-        $payload = $this->archiveService->detail($snapshot);
+        $payload = $this->exportGovernanceService->detail($exportRecord);
 
-        $this->recordAudit($request, 'report_snapshot.archive_viewed', 'report_snapshot', (string) $snapshot->id, $snapshot, [
+        $this->recordAudit($request, 'report_export.archive_viewed', 'report_export_record', (string) $exportRecord->id, null, [
             'detail' => true,
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Preschool snapshot retrieved successfully.',
+            'message' => 'Preschool export record retrieved successfully.',
             'data' => $payload,
         ], Response::HTTP_OK);
     }
@@ -101,32 +98,83 @@ class PreschoolReportSnapshotController extends Controller
         }
 
         $validated = $request->validate([
+            'export_type' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'export_format' => ['sometimes', 'nullable', 'string', 'max:32'],
             'academic_year_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_academic_years,id'],
             'term_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_terms,id'],
             'report_period_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_report_periods,id'],
-            'class_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_classes,id'],
-            'student_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_students,id'],
-            'snapshot_type' => ['sometimes', 'nullable', 'string', 'max:64'],
-            'lifecycle_state' => ['sometimes', 'nullable', 'string', 'max:32'],
-            'generated_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
-            'generated_from' => ['sometimes', 'nullable', 'date'],
-            'generated_to' => ['sometimes', 'nullable', 'date'],
+            'actor_user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'source' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'exported_from' => ['sometimes', 'nullable', 'date'],
+            'exported_to' => ['sometimes', 'nullable', 'date'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:191'],
         ]);
 
-        $payload = $this->archiveService->analytics($validated);
+        $payload = $this->exportGovernanceService->overview($validated);
 
-        $this->recordAudit($request, 'report_snapshot.analytics_viewed', 'report_snapshot_archive', 'analytics', null, [
+        $this->recordAudit($request, 'report_export.analytics_viewed', 'report_export_archive', 'analytics', null, [
             'filters' => $validated,
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Preschool snapshot analytics retrieved successfully.',
+            'message' => 'Preschool export analytics retrieved successfully.',
             'data' => $payload,
         ], Response::HTTP_OK);
     }
 
-    public function exportCsv(Request $request): StreamedResponse|JsonResponse
+    public function comparisonOptions(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $validated = $request->validate([
+            'export_type' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'export_format' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'academic_year_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_academic_years,id'],
+            'term_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_terms,id'],
+            'report_period_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_report_periods,id'],
+            'actor_user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'source' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'exported_from' => ['sometimes', 'nullable', 'date'],
+            'exported_to' => ['sometimes', 'nullable', 'date'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:191'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool export comparison options retrieved successfully.',
+            'data' => $this->exportGovernanceService->options($validated),
+        ], Response::HTTP_OK);
+    }
+
+    public function compare(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $validated = $request->validate([
+            'comparison_mode' => ['required', 'string', 'max:64'],
+            'left_context' => ['required', 'array'],
+            'right_context' => ['required', 'array'],
+        ]);
+
+        $payload = $this->exportGovernanceService->compare($validated);
+
+        $this->recordAudit($request, 'report_export.comparison_viewed', 'report_export_archive', 'comparison', null, [
+            'comparisonMode' => $validated['comparison_mode'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool historical comparison retrieved successfully.',
+            'data' => $payload,
+        ], Response::HTTP_OK);
+    }
+
+    public function timeline(Request $request): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {
             return $response;
@@ -136,52 +184,46 @@ class PreschoolReportSnapshotController extends Controller
             'academic_year_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_academic_years,id'],
             'term_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_terms,id'],
             'report_period_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_report_periods,id'],
-            'class_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_classes,id'],
-            'student_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_students,id'],
-            'snapshot_type' => ['sometimes', 'nullable', 'string', 'max:64'],
-            'lifecycle_state' => ['sometimes', 'nullable', 'string', 'max:32'],
-            'generated_from' => ['sometimes', 'nullable', 'date'],
-            'generated_to' => ['sometimes', 'nullable', 'date'],
-            'generated_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
-            'search' => ['sometimes', 'nullable', 'string', 'max:191'],
-            'export_reason' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'actor_user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'export_type' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'export_format' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'source' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'limit' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $rows = $this->archiveService->exportRows($validated);
-        $snapshotIds = $rows->pluck('id')->filter()->map(fn ($value) => (int) $value)->values()->all();
-        $checksum = hash('sha256', $rows->map(function (array $row): string {
-            return json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
-        })->implode("\n"));
+        $payload = $this->exportGovernanceService->timeline($validated, (int) ($validated['limit'] ?? 50));
 
-        $exportRecord = $this->exportGovernanceService->recordExport([
-            'actor_user_id' => $request->user()?->id,
-            'actor_role' => $request->user()?->role_code,
-            'export_type' => 'snapshot_archive',
-            'export_format' => 'csv',
-            'export_source' => 'snapshot',
-            'academic_year_id' => $validated['academic_year_id'] ?? null,
-            'term_id' => $validated['term_id'] ?? null,
-            'report_period_id' => $validated['report_period_id'] ?? null,
+        $this->recordAudit($request, 'report_export.timeline_viewed', 'report_export_archive', 'timeline', null, [
             'filters' => $validated,
-            'snapshot_ids' => $snapshotIds,
-            'record_count' => $rows->count(),
-            'file_name' => sprintf('preschool-snapshot-archive-%s.csv', now()->format('Ymd-His')),
-            'checksum' => $checksum,
-            'export_reason' => $validated['export_reason'] ?? null,
-            'request_context' => $this->auditService->requestContext($request, [
-                'exportType' => 'snapshot_archive',
-                'exportFormat' => 'csv',
-            ]),
-            'exported_at' => now(),
         ]);
 
-        $this->recordAudit($request, 'report_export.created', 'report_export_record', (string) $exportRecord->id, null, [
-            'filters' => $validated,
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool institutional timeline retrieved successfully.',
+            'data' => [
+                'items' => $payload,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function downloadCsv(Request $request, PreschoolReportExportRecord $exportRecord): StreamedResponse|JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $rows = $this->exportGovernanceService->rowsForRecord($exportRecord);
+        $filename = $exportRecord->file_name ?: sprintf(
+            'preschool-export-%s-%s.csv',
+            $exportRecord->export_type,
+            now()->format('Ymd-His'),
+        );
+
+        $this->recordAudit($request, 'report_export.downloaded', 'report_export_record', (string) $exportRecord->id, $exportRecord, [
+            'exportType' => $exportRecord->export_type,
+            'exportFormat' => $exportRecord->export_format,
             'rowCount' => $rows->count(),
-            'exportRecordId' => $exportRecord->id,
         ]);
-
-        $filename = $exportRecord->file_name ?: sprintf('preschool-snapshot-archive-%s.csv', now()->format('Ymd-His'));
 
         return response()->streamDownload(function () use ($rows): void {
             $stream = fopen('php://output', 'w');
@@ -245,7 +287,7 @@ class PreschoolReportSnapshotController extends Controller
         ]);
     }
 
-    private function authorizeAdmin(?User $user): ?JsonResponse
+    private function authorizeAdmin(?\App\Models\User $user): ?JsonResponse
     {
         if (! $user) {
             return response()->json([
@@ -269,7 +311,7 @@ class PreschoolReportSnapshotController extends Controller
     /**
      * @param  array<string, mixed>  $context
      */
-    private function recordAudit(Request $request, string $actionType, string $entityType, string $entityId, ?PreschoolReportSnapshot $snapshot = null, array $context = []): void
+    private function recordAudit(Request $request, string $actionType, string $entityType, string $entityId, ?PreschoolReportExportRecord $record = null, array $context = []): void
     {
         $user = $request->user();
 
@@ -279,9 +321,9 @@ class PreschoolReportSnapshotController extends Controller
             'action_type' => $actionType,
             'entity_type' => $entityType,
             'entity_id' => $entityId,
-            'academic_year_id' => $snapshot?->academic_year_id,
-            'term_id' => $snapshot?->term_id,
-            'report_period_id' => $snapshot?->report_period_id,
+            'academic_year_id' => $record?->academic_year_id,
+            'term_id' => $record?->term_id,
+            'report_period_id' => $record?->report_period_id,
             'previous_state' => null,
             'new_state' => $context,
             'request_context' => $this->auditService->requestContext($request, $context),

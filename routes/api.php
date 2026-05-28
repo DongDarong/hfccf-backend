@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
 use App\Http\Controllers\Api\Preschool\PreschoolLifecycleAuditController;
+use App\Http\Controllers\Api\Preschool\PreschoolExportGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
@@ -285,6 +286,15 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('report-snapshots/analytics', [PreschoolReportSnapshotController::class, 'analytics']);
         Route::get('report-snapshots/export.csv', [PreschoolReportSnapshotController::class, 'exportCsv']);
         Route::get('report-snapshots/{snapshot}', [PreschoolReportSnapshotController::class, 'show']);
+        // Export governance stays admin-only so export records, comparison
+        // tooling, and timeline review remain institutional audit surfaces.
+        Route::get('report-exports', [PreschoolExportGovernanceController::class, 'index']);
+        Route::get('report-exports/analytics', [PreschoolExportGovernanceController::class, 'analytics']);
+        Route::get('report-exports/{exportRecord}', [PreschoolExportGovernanceController::class, 'show']);
+        Route::get('report-exports/{exportRecord}/download.csv', [PreschoolExportGovernanceController::class, 'downloadCsv']);
+        Route::get('report-comparisons/options', [PreschoolExportGovernanceController::class, 'comparisonOptions']);
+        Route::post('report-comparisons', [PreschoolExportGovernanceController::class, 'compare']);
+        Route::get('institutional-timeline', [PreschoolExportGovernanceController::class, 'timeline']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
         // Academic lifecycle records stay admin-only so the year/term backbone

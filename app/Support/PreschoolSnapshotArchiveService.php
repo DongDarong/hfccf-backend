@@ -324,6 +324,18 @@ class PreschoolSnapshotArchiveService
     /**
      * @param  array<string, mixed>  $filters
      */
+    public function collectSnapshots(array $filters = []): Collection
+    {
+        return $this->baseQuery($filters)
+            ->orderByDesc('generated_at')
+            ->orderByDesc('snapshot_version')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
     private function baseQuery(array $filters): Builder
     {
         $query = PreschoolReportSnapshot::query()
@@ -389,7 +401,7 @@ class PreschoolSnapshotArchiveService
         return $values ?: $allowed;
     }
 
-    private function transformSnapshot(PreschoolReportSnapshot $snapshot, bool $includePayload = false): array
+    public function transformSnapshot(PreschoolReportSnapshot $snapshot, bool $includePayload = false): array
     {
         $snapshot->loadMissing(['student', 'preschoolClass', 'academicYear', 'term', 'reportPeriod', 'generatedBy']);
 
