@@ -277,6 +277,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::patch('report-periods/{reportPeriod}/lock', [PreschoolReportPeriodController::class, 'lock']);
         Route::patch('report-periods/{reportPeriod}/archive', [PreschoolReportPeriodController::class, 'archive']);
         Route::get('lifecycle-audit-logs', [PreschoolLifecycleAuditController::class, 'index']);
+        Route::get('lifecycle-audit-analytics', [PreschoolLifecycleAuditController::class, 'analytics']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
         // Academic lifecycle records stay admin-only so the year/term backbone

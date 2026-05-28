@@ -69,6 +69,7 @@ class PreschoolReportPeriodService
 
                 return $row + [
                     'id' => null,
+                    'reportPeriodId' => null,
                     'status' => 'finalized',
                     'isDraft' => false,
                     'isActive' => false,
@@ -266,6 +267,7 @@ class PreschoolReportPeriodService
     {
         return array_merge($this->contextSnapshot($period), [
             'id' => $period->id,
+            'reportPeriodId' => $period->id,
             'fromDate' => $period->from_date?->toDateString(),
             'toDate' => $period->to_date?->toDateString(),
             'summarySnapshot' => $period->summary_snapshot,
@@ -298,6 +300,7 @@ class PreschoolReportPeriodService
             'report_period_archived_at' => $period->archived_at?->toISOString(),
             'academic_year_id' => $period->academic_year_id,
             'term_id' => $period->term_id,
+            'reportPeriodId' => $period->id,
         ];
     }
 

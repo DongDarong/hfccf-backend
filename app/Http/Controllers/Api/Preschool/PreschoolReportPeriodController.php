@@ -10,6 +10,7 @@ use App\Models\PreschoolStudent;
 use App\Models\User;
 use App\Support\PreschoolLifecycleAuditService;
 use App\Support\PreschoolReportPeriodService;
+use App\Support\PreschoolReportSnapshotService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -111,7 +112,15 @@ class PreschoolReportPeriodController extends Controller
 
         $previous = $service->snapshot($reportPeriod->fresh(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy']));
         $updated = $service->finalize($reportPeriod, $request->user());
-        $this->recordAudit($request, 'report_period.finalized', $updated, $previous, $service->snapshot($updated));
+        $freezeSummary = app(PreschoolReportSnapshotService::class)->freezeReportPeriod($updated, $request->user());
+        $updated = $updated->fresh(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy']);
+        $this->recordAudit(
+            $request,
+            'report_period.finalized',
+            $updated,
+            $previous,
+            array_merge($service->snapshot($updated), ['freezeSummary' => $freezeSummary]),
+        );
 
         return response()->json([
             'success' => true,
@@ -130,7 +139,15 @@ class PreschoolReportPeriodController extends Controller
 
         $previous = $service->snapshot($reportPeriod->fresh(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy']));
         $updated = $service->lock($reportPeriod, $request->user());
-        $this->recordAudit($request, 'report_period.locked', $updated, $previous, $service->snapshot($updated));
+        $freezeSummary = app(PreschoolReportSnapshotService::class)->freezeReportPeriod($updated, $request->user());
+        $updated = $updated->fresh(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy']);
+        $this->recordAudit(
+            $request,
+            'report_period.locked',
+            $updated,
+            $previous,
+            array_merge($service->snapshot($updated), ['freezeSummary' => $freezeSummary]),
+        );
 
         return response()->json([
             'success' => true,
@@ -149,7 +166,15 @@ class PreschoolReportPeriodController extends Controller
 
         $previous = $service->snapshot($reportPeriod->fresh(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy']));
         $updated = $service->archive($reportPeriod, $request->user());
-        $this->recordAudit($request, 'report_period.archived', $updated, $previous, $service->snapshot($updated));
+        $freezeSummary = app(PreschoolReportSnapshotService::class)->freezeReportPeriod($updated, $request->user());
+        $updated = $updated->fresh(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy']);
+        $this->recordAudit(
+            $request,
+            'report_period.archived',
+            $updated,
+            $previous,
+            array_merge($service->snapshot($updated), ['freezeSummary' => $freezeSummary]),
+        );
 
         return response()->json([
             'success' => true,

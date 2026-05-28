@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\PreschoolClass;
+use App\Models\PreschoolReportSnapshot;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -27,7 +28,7 @@ final class PreschoolClassroomReportService
             'class' => $this->classSnapshot($class),
             'periods' => $periods->all(),
             'period' => $selectedPeriod ? $this->periodFromPeriods($periods, $selectedPeriod) : null,
-            'report' => $selectedPeriod ? $this->classroomReport($user, $class, $selectedPeriod, $periods) : null,
+            'report' => $selectedPeriod ? $this->classroomReportForPeriods($user, $class, $selectedPeriod, $periods) : null,
         ];
     }
 
@@ -42,10 +43,41 @@ final class PreschoolClassroomReportService
             ]);
         }
 
-        return $this->classroomReport($user, $class, $selectedPeriod, $periods);
+        return $this->classroomReportForPeriods($user, $class, $selectedPeriod, $periods);
     }
 
-    private function classroomReport(User $user, PreschoolClass $class, string $periodLabel, Collection $periods): array
+    private function classroomReportForPeriods(User $user, PreschoolClass $class, string $periodLabel, Collection $periods): array
+    {
+        $period = $this->periodFromPeriods($periods, $periodLabel);
+        if ($period) {
+            $snapshot = app(PreschoolReportSnapshotService::class)->latestForContext('classroom_report', $this->snapshotContext($class, $period));
+            if ($snapshot) {
+                return $this->decorateReport($snapshot->snapshot_payload['report'] ?? $snapshot->snapshot_payload, $snapshot);
+            }
+        }
+
+        $report = $this->buildClassroomReport($user, $class, $periodLabel, $periods);
+
+        if ($period && $this->isFrozenPeriod($period)) {
+            $snapshot = app(PreschoolReportSnapshotService::class)->storeSnapshot(
+                'classroom_report',
+                $this->snapshotContext($class, $period),
+                [
+                    'class' => $this->classSnapshot($class),
+                    'period' => $period,
+                    'report' => $report,
+                ],
+                $user,
+                true,
+            );
+
+            return $this->decorateReport($report, $snapshot);
+        }
+
+        return $this->decorateReport($report, null);
+    }
+
+    private function buildClassroomReport(User $user, PreschoolClass $class, string $periodLabel, Collection $periods): array
     {
         $assessments = $this->aggregation->finalizedAssessmentsForClass($user, $class, $periodLabel);
         $period = $this->periodFromPeriods($periods, $periodLabel);
@@ -235,5 +267,30 @@ final class PreschoolClassroomReportService
     private function normalizeLabel(string $periodLabel): string
     {
         return trim($periodLabel);
+    }
+
+    private function snapshotContext(PreschoolClass $class, array $period): array
+    {
+        return [
+            'class_id' => $class->id,
+            'academic_year_id' => $period['academicYearId'] ?? null,
+            'term_id' => $period['termId'] ?? null,
+            'report_period_id' => $period['reportPeriodId'] ?? $period['id'] ?? null,
+            'lifecycle_state' => $period['status'] ?? 'finalized',
+        ];
+    }
+
+    private function decorateReport(array $report, ?PreschoolReportSnapshot $snapshot): array
+    {
+        return array_merge($report, [
+            'source' => $snapshot ? 'snapshot' : 'live',
+            'snapshot' => $snapshot ? app(PreschoolReportSnapshotService::class)->snapshotPayload($snapshot) : null,
+            'frozen' => (bool) $snapshot,
+        ]);
+    }
+
+    private function isFrozenPeriod(array $period): bool
+    {
+        return in_array(strtolower((string) ($period['status'] ?? '')), ['finalized', 'locked', 'archived'], true);
     }
 }
