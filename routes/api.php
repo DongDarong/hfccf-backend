@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
 use App\Http\Controllers\Api\Preschool\PreschoolLifecycleAuditController;
+use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
@@ -278,6 +279,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::patch('report-periods/{reportPeriod}/archive', [PreschoolReportPeriodController::class, 'archive']);
         Route::get('lifecycle-audit-logs', [PreschoolLifecycleAuditController::class, 'index']);
         Route::get('lifecycle-audit-analytics', [PreschoolLifecycleAuditController::class, 'analytics']);
+        // Snapshot archive routes stay admin-only so immutable report history can
+        // be reviewed and exported without exposing a new teacher workflow.
+        Route::get('report-snapshots', [PreschoolReportSnapshotController::class, 'index']);
+        Route::get('report-snapshots/analytics', [PreschoolReportSnapshotController::class, 'analytics']);
+        Route::get('report-snapshots/export.csv', [PreschoolReportSnapshotController::class, 'exportCsv']);
+        Route::get('report-snapshots/{snapshot}', [PreschoolReportSnapshotController::class, 'show']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
         // Academic lifecycle records stay admin-only so the year/term backbone
