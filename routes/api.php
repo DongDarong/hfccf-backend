@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolInstitutionalGovernanceControlle
 use App\Http\Controllers\Api\Preschool\PreschoolLifecycleAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolExportGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGovernanceDiffController;
+use App\Http\Controllers\Api\Preschool\PreschoolGovernanceCaseController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
@@ -310,6 +311,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('integrity-review', [PreschoolGovernanceDiffController::class, 'integrityReview']);
         Route::get('integrity-review/{context}', [PreschoolGovernanceDiffController::class, 'showIntegrityReview']);
         Route::post('integrity-review/{context}', [PreschoolGovernanceDiffController::class, 'review']);
+        // Governance cases turn diff and integrity findings into owned review
+        // work items so admins can escalate and resolve institutional risks
+        // without mutating snapshots or live report data.
+        Route::get('governance-cases', [PreschoolGovernanceCaseController::class, 'index']);
+        Route::get('governance-cases/assignees', [PreschoolGovernanceCaseController::class, 'assignees']);
+        Route::post('governance-cases', [PreschoolGovernanceCaseController::class, 'store']);
+        Route::get('governance-cases/{case}', [PreschoolGovernanceCaseController::class, 'show']);
+        Route::patch('governance-cases/{case}', [PreschoolGovernanceCaseController::class, 'update']);
+        Route::post('governance-cases/{case}/assign', [PreschoolGovernanceCaseController::class, 'assign']);
+        Route::post('governance-cases/{case}/evidence', [PreschoolGovernanceCaseController::class, 'evidence']);
+        Route::post('governance-cases/{case}/escalate', [PreschoolGovernanceCaseController::class, 'escalate']);
+        Route::post('governance-cases/{case}/resolve', [PreschoolGovernanceCaseController::class, 'resolve']);
+        Route::post('governance-cases/{case}/close', [PreschoolGovernanceCaseController::class, 'close']);
+        Route::post('governance-cases/{case}/reopen', [PreschoolGovernanceCaseController::class, 'reopen']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
         // Academic lifecycle records stay admin-only so the year/term backbone
