@@ -8,6 +8,7 @@ use App\Http\Requests\Preschool\UpdatePreschoolScheduleRequest;
 use App\Http\Resources\Preschool\PreschoolScheduleEntryResource;
 use App\Models\PreschoolScheduleEntry;
 use App\Models\User;
+use App\Support\PreschoolLifecycleGuardService;
 use App\Support\PreschoolScheduleService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
@@ -55,6 +56,9 @@ class PreschoolScheduleController extends Controller
         }
 
         $payload = $request->validated();
+        if ($response = app(PreschoolLifecycleGuardService::class)->scheduleWriteLock($request->user(), $payload)) {
+            return $response;
+        }
         $conflicts = $service->detectConflicts(null, $payload);
 
         if ($conflicts !== []) {
@@ -67,7 +71,7 @@ class PreschoolScheduleController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $schedule = $service->createSchedule($request->user(), $payload)->load(['preschoolClass.teacher', 'teacher']);
+        $schedule = $service->createSchedule($request->user(), $payload)->load(['preschoolClass.teacher', 'teacher', 'academicYear', 'term']);
 
         return response()->json([
             'success' => true,
@@ -84,7 +88,7 @@ class PreschoolScheduleController extends Controller
             return $response;
         }
 
-        $schedule->load(['preschoolClass.teacher', 'teacher']);
+        $schedule->load(['preschoolClass.teacher', 'teacher', 'academicYear', 'term']);
 
         return response()->json([
             'success' => true,
@@ -102,6 +106,9 @@ class PreschoolScheduleController extends Controller
         }
 
         $payload = $request->validated();
+        if ($response = app(PreschoolLifecycleGuardService::class)->scheduleWriteLock($request->user(), $payload, $schedule)) {
+            return $response;
+        }
         $conflicts = $service->detectConflicts($schedule, $payload);
 
         if ($conflicts !== []) {
@@ -128,6 +135,10 @@ class PreschoolScheduleController extends Controller
     public function destroy(Request $request, PreschoolScheduleEntry $schedule, PreschoolScheduleService $service): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        if ($response = app(PreschoolLifecycleGuardService::class)->scheduleWriteLock($request->user(), [], $schedule)) {
             return $response;
         }
 

@@ -77,7 +77,7 @@ class PreschoolAssessmentApiTest extends TestCase
 
         $this->putJson("/api/preschool/assessments/{$assessmentId}", [
             'score' => 95,
-        ])->assertStatus(422);
+        ])->assertStatus(409);
 
         $this->getJson("/api/preschool/students/{$student->id}/progress-summary")
             ->assertOk()

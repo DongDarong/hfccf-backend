@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Models\PreschoolStudent;
+use App\Models\PreschoolReportPeriod;
+use App\Models\PreschoolReportSnapshot;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -20,25 +22,25 @@ final class PreschoolReportService
      */
     public function bundle(User $user, PreschoolStudent $student, ?string $periodLabel = null): array
     {
-        $periods = $this->aggregation->reportPeriods($user, $student);
+        $periods = app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
         $selectedPeriod = $this->resolveSelectedPeriod($periods, $periodLabel);
 
         return [
             'student' => $this->studentSnapshot($student),
             'periods' => $periods->all(),
             'period' => $selectedPeriod ? $this->periodFromPeriods($periods, $selectedPeriod) : null,
-            'report' => $selectedPeriod ? $this->studentReport($user, $student, $selectedPeriod, $periods) : null,
+            'report' => $selectedPeriod ? $this->studentReportForPeriods($user, $student, $selectedPeriod, $periods) : null,
         ];
     }
 
     public function reportPeriods(User $user, ?PreschoolStudent $student = null): Collection
     {
-        return $this->aggregation->reportPeriods($user, $student);
+        return app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
     }
 
     public function studentReportForPeriod(User $user, PreschoolStudent $student, string $periodLabel): array
     {
-        $periods = $this->aggregation->reportPeriods($user, $student);
+        $periods = app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
         $selectedPeriod = $this->normalizeLabel($periodLabel);
 
         if ($periods->doesntContain('label', $selectedPeriod)) {
@@ -47,10 +49,41 @@ final class PreschoolReportService
             ]);
         }
 
-        return $this->studentReport($user, $student, $selectedPeriod, $periods);
+        return $this->studentReportForPeriods($user, $student, $selectedPeriod, $periods);
     }
 
-    private function studentReport(User $user, PreschoolStudent $student, string $periodLabel, Collection $periods): array
+    private function studentReportForPeriods(User $user, PreschoolStudent $student, string $periodLabel, Collection $periods): array
+    {
+        $period = $this->periodFromPeriods($periods, $periodLabel);
+        if ($period) {
+            $snapshot = app(PreschoolReportSnapshotService::class)->latestForContext('student_report', $this->snapshotContext($student, $period));
+            if ($snapshot) {
+                return $this->decorateReport($snapshot->snapshot_payload['report'] ?? $snapshot->snapshot_payload, $snapshot);
+            }
+        }
+
+        $report = $this->buildStudentReport($user, $student, $periodLabel, $periods);
+
+        if ($period && $this->isFrozenPeriod($period)) {
+            $snapshot = app(PreschoolReportSnapshotService::class)->storeSnapshot(
+                'student_report',
+                $this->snapshotContext($student, $period),
+                [
+                    'student' => $this->studentSnapshot($student),
+                    'period' => $period,
+                    'report' => $report,
+                ],
+                $user,
+                true,
+            );
+
+            return $this->decorateReport($report, $snapshot);
+        }
+
+        return $this->decorateReport($report, null);
+    }
+
+    private function buildStudentReport(User $user, PreschoolStudent $student, string $periodLabel, Collection $periods): array
     {
         $assessments = $this->aggregation->finalizedAssessmentsForStudent($user, $student, $periodLabel);
         $period = $this->periodFromPeriods($periods, $periodLabel);
@@ -205,5 +238,30 @@ final class PreschoolReportService
     private function normalizeLabel(string $periodLabel): string
     {
         return trim($periodLabel);
+    }
+
+    private function snapshotContext(PreschoolStudent $student, array $period): array
+    {
+        return [
+            'student_id' => $student->id,
+            'academic_year_id' => $period['academicYearId'] ?? null,
+            'term_id' => $period['termId'] ?? null,
+            'report_period_id' => $period['reportPeriodId'] ?? $period['id'] ?? null,
+            'lifecycle_state' => $period['status'] ?? 'finalized',
+        ];
+    }
+
+    private function decorateReport(array $report, ?PreschoolReportSnapshot $snapshot): array
+    {
+        return array_merge($report, [
+            'source' => $snapshot ? 'snapshot' : 'live',
+            'snapshot' => $snapshot ? app(PreschoolReportSnapshotService::class)->snapshotPayload($snapshot) : null,
+            'frozen' => (bool) $snapshot,
+        ]);
+    }
+
+    private function isFrozenPeriod(array $period): bool
+    {
+        return in_array(strtolower((string) ($period['status'] ?? '')), ['finalized', 'locked', 'archived'], true);
     }
 }

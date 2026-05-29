@@ -22,6 +22,8 @@ class StorePreschoolAttendanceRequest extends FormRequest
             'attendance_date' => ['required', 'date'],
             'status' => ['required', Rule::in(['present', 'absent', 'late', 'excused'])],
             'note' => ['nullable', 'string'],
+            'override_locked_context' => ['sometimes', 'boolean'],
+            'override_reason' => ['required_if:override_locked_context,1', 'nullable', 'string', 'max:500'],
         ];
     }
 }

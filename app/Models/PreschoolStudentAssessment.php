@@ -17,6 +17,8 @@ class PreschoolStudentAssessment extends Model
         'category_id',
         'assessed_by_user_id',
         'period_label',
+        'academic_year_id',
+        'term_id',
         'assessment_date',
         'score',
         'rating',
@@ -59,6 +61,16 @@ class PreschoolStudentAssessment extends Model
     public function finalizedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'finalized_by_user_id', 'id');
+    }
+
+    public function academicYear(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolAcademicYear::class, 'academic_year_id');
+    }
+
+    public function term(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolAcademicTerm::class, 'term_id');
     }
 
     public function isEditable(): bool

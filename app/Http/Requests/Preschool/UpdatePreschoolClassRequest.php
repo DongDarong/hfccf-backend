@@ -44,6 +44,8 @@ class UpdatePreschoolClassRequest extends FormRequest
             'notes' => ['sometimes', 'nullable', 'string'],
             'student_ids' => ['sometimes', 'array'],
             'student_ids.*' => ['integer', 'exists:preschool_students,id'],
+            'override_locked_context' => ['sometimes', 'boolean'],
+            'override_reason' => ['required_if:override_locked_context,1', 'nullable', 'string', 'max:500'],
         ];
     }
 }

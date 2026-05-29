@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
+use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
@@ -21,9 +22,16 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
+use App\Http\Controllers\Api\Preschool\PreschoolInstitutionalGovernanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolLifecycleAuditController;
+use App\Http\Controllers\Api\Preschool\PreschoolExportGovernanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolGovernanceDiffController;
+use App\Http\Controllers\Api\Preschool\PreschoolGovernanceCaseController;
+use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
+use App\Http\Controllers\Api\Preschool\PreschoolSettingsBackboneController;
 use App\Http\Controllers\Api\Preschool\PreschoolScheduleController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
@@ -267,6 +275,70 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         // Reports stay on finalized assessment data so the frontend can render
         // stable summary screens without inventing a separate reporting store.
         Route::get('report-periods', [PreschoolReportPeriodController::class, 'index']);
+        Route::post('report-periods', [PreschoolReportPeriodController::class, 'store']);
+        Route::patch('report-periods/{reportPeriod}', [PreschoolReportPeriodController::class, 'update']);
+        Route::patch('report-periods/{reportPeriod}/activate', [PreschoolReportPeriodController::class, 'activate']);
+        Route::patch('report-periods/{reportPeriod}/finalize', [PreschoolReportPeriodController::class, 'finalize']);
+        Route::patch('report-periods/{reportPeriod}/lock', [PreschoolReportPeriodController::class, 'lock']);
+        Route::patch('report-periods/{reportPeriod}/archive', [PreschoolReportPeriodController::class, 'archive']);
+        Route::get('lifecycle-audit-logs', [PreschoolLifecycleAuditController::class, 'index']);
+        Route::get('lifecycle-audit-analytics', [PreschoolLifecycleAuditController::class, 'analytics']);
+        // Snapshot archive routes stay admin-only so immutable report history can
+        // be reviewed and exported without exposing a new teacher workflow.
+        Route::get('report-snapshots', [PreschoolReportSnapshotController::class, 'index']);
+        Route::get('report-snapshots/analytics', [PreschoolReportSnapshotController::class, 'analytics']);
+        Route::get('report-snapshots/export.csv', [PreschoolReportSnapshotController::class, 'exportCsv']);
+        Route::get('report-snapshots/{snapshot}', [PreschoolReportSnapshotController::class, 'show']);
+        // Export governance stays admin-only so export records, comparison
+        // tooling, and timeline review remain institutional audit surfaces.
+        Route::get('report-exports', [PreschoolExportGovernanceController::class, 'index']);
+        Route::get('report-exports/analytics', [PreschoolExportGovernanceController::class, 'analytics']);
+        Route::get('report-exports/{exportRecord}', [PreschoolExportGovernanceController::class, 'show']);
+        Route::get('report-exports/{exportRecord}/download.csv', [PreschoolExportGovernanceController::class, 'downloadCsv']);
+        Route::get('report-comparisons/options', [PreschoolExportGovernanceController::class, 'comparisonOptions']);
+        Route::post('report-comparisons', [PreschoolExportGovernanceController::class, 'compare']);
+        Route::get('institutional-timeline', [PreschoolExportGovernanceController::class, 'timeline']);
+        Route::get('governance-review', [PreschoolInstitutionalGovernanceController::class, 'review']);
+        Route::get('governance-review/analytics', [PreschoolInstitutionalGovernanceController::class, 'analytics']);
+        Route::get('institutional-reconstruction', [PreschoolInstitutionalGovernanceController::class, 'reconstruct']);
+        Route::get('institutional-reconstruction/{context}', [PreschoolInstitutionalGovernanceController::class, 'show']);
+        Route::get('institutional-replay', [PreschoolInstitutionalGovernanceController::class, 'replay']);
+        // Governance diff and institutional integrity review stay admin-only so
+        // historical comparisons can be reviewed without adding a new staff
+        // write surface or duplicating reconstruction logic.
+        Route::get('governance-diff/summary', [PreschoolGovernanceDiffController::class, 'summary']);
+        Route::get('governance-diff', [PreschoolGovernanceDiffController::class, 'compare']);
+        Route::get('integrity-review', [PreschoolGovernanceDiffController::class, 'integrityReview']);
+        Route::get('integrity-review/{context}', [PreschoolGovernanceDiffController::class, 'showIntegrityReview']);
+        Route::post('integrity-review/{context}', [PreschoolGovernanceDiffController::class, 'review']);
+        // Governance cases turn diff and integrity findings into owned review
+        // work items so admins can escalate and resolve institutional risks
+        // without mutating snapshots or live report data.
+        Route::get('governance-cases', [PreschoolGovernanceCaseController::class, 'index']);
+        Route::get('governance-cases/assignees', [PreschoolGovernanceCaseController::class, 'assignees']);
+        Route::post('governance-cases', [PreschoolGovernanceCaseController::class, 'store']);
+        Route::get('governance-cases/{case}', [PreschoolGovernanceCaseController::class, 'show']);
+        Route::patch('governance-cases/{case}', [PreschoolGovernanceCaseController::class, 'update']);
+        Route::post('governance-cases/{case}/assign', [PreschoolGovernanceCaseController::class, 'assign']);
+        Route::post('governance-cases/{case}/evidence', [PreschoolGovernanceCaseController::class, 'evidence']);
+        Route::post('governance-cases/{case}/escalate', [PreschoolGovernanceCaseController::class, 'escalate']);
+        Route::post('governance-cases/{case}/resolve', [PreschoolGovernanceCaseController::class, 'resolve']);
+        Route::post('governance-cases/{case}/close', [PreschoolGovernanceCaseController::class, 'close']);
+        Route::post('governance-cases/{case}/reopen', [PreschoolGovernanceCaseController::class, 'reopen']);
+        Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
+        Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
+        // Academic lifecycle records stay admin-only so the year/term backbone
+        // can drive attendance, schedules, assignments, and reports without
+        // turning settings into a monolithic write path.
+        Route::get('academic-lifecycle', [PreschoolAcademicLifecycleController::class, 'index']);
+        Route::post('academic-years', [PreschoolAcademicLifecycleController::class, 'storeAcademicYear']);
+        Route::patch('academic-years/{academicYear}', [PreschoolAcademicLifecycleController::class, 'updateAcademicYear']);
+        Route::patch('academic-years/{academicYear}/activate', [PreschoolAcademicLifecycleController::class, 'activateAcademicYear']);
+        Route::patch('academic-years/{academicYear}/close', [PreschoolAcademicLifecycleController::class, 'closeAcademicYear']);
+        Route::post('terms', [PreschoolAcademicLifecycleController::class, 'storeTerm']);
+        Route::patch('terms/{term}', [PreschoolAcademicLifecycleController::class, 'updateTerm']);
+        Route::patch('terms/{term}/activate', [PreschoolAcademicLifecycleController::class, 'activateTerm']);
+        Route::patch('terms/{term}/close', [PreschoolAcademicLifecycleController::class, 'closeTerm']);
         Route::get('students/{student}/reports', [PreschoolStudentReportController::class, 'index']);
         Route::get('students/{student}/reports/{period}', [PreschoolStudentReportController::class, 'show']);
         Route::get('classes/{class}/reports', [PreschoolClassroomReportController::class, 'index']);

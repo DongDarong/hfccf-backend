@@ -10,6 +10,8 @@ use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolStudent;
 use App\Models\User;
 use App\Support\ImageStorage;
+use App\Support\PreschoolAcademicLifecycleService;
+use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -104,6 +106,11 @@ class PreschoolStudentController extends Controller
         }
 
         $data = $request->validated();
+        if (! empty($data['class_ids'] ?? [])) {
+            if ($response = app(PreschoolLifecycleGuardService::class)->assignmentWriteLock($request->user(), $data)) {
+                return $response;
+            }
+        }
         $student = PreschoolStudent::query()->create([
             'student_code' => $data['student_code'] ?? $this->nextStudentCode(),
             'first_name' => $data['first_name'],
@@ -170,6 +177,11 @@ class PreschoolStudentController extends Controller
         }
 
         $data = $request->validated();
+        if (array_key_exists('class_ids', $data)) {
+            if ($response = app(PreschoolLifecycleGuardService::class)->assignmentWriteLock($request->user(), $data)) {
+                return $response;
+            }
+        }
 
         foreach (['student_code', 'first_name', 'last_name', 'gender', 'date_of_birth', 'guardian_name', 'guardian_phone', 'address', 'status'] as $field) {
             if (array_key_exists($field, $data)) {
@@ -226,8 +238,15 @@ class PreschoolStudentController extends Controller
         ], Response::HTTP_OK);
     }
 
+    private function academicContext(): array
+    {
+        return app(PreschoolAcademicLifecycleService::class)->currentContext();
+    }
+
     private function syncStudentClasses(PreschoolStudent $student, ?array $classIds): void
     {
+        $academicContext = $this->academicContext();
+
         if ($classIds === null) {
             // Keep history rows intact when the caller is not changing class
             // membership. The inactive pivots remain available for assignment
@@ -253,6 +272,13 @@ class PreschoolStudentController extends Controller
                 $assignment->enrolled_at = now();
             }
 
+            $assignment->academic_year = $academicContext['academic_year'];
+            $assignment->term_label = $academicContext['term_label'];
+            $assignment->academic_year_id = $academicContext['academic_year_id'] ?? null;
+            $assignment->term_id = $academicContext['term_id'] ?? null;
+            $assignment->enrollment_status = 'active';
+            $assignment->enrollment_started_at = $assignment->enrollment_started_at ?: now();
+            $assignment->enrollment_ended_at = null;
             $assignment->status = 'active';
             $assignment->save();
         }
@@ -260,7 +286,11 @@ class PreschoolStudentController extends Controller
         PreschoolClassStudent::query()
             ->where('student_id', $student->id)
             ->whereNotIn('class_id', $targetClassIds->all())
-            ->update(['status' => 'inactive']);
+            ->update([
+                'status' => 'inactive',
+                'enrollment_status' => 'inactive',
+                'enrollment_ended_at' => now(),
+            ]);
 
         $student->load('classes');
         foreach ($student->classes as $class) {

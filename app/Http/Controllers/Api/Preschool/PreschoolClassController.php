@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Preschool\StorePreschoolClassRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolClassRequest;
 use App\Http\Resources\Preschool\PreschoolClassResource;
+use App\Models\PreschoolClass;
 use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolClassTeacherAssignment;
-use App\Models\PreschoolClass;
 use App\Models\User;
+use App\Support\PreschoolAcademicLifecycleService;
+use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -102,6 +104,11 @@ class PreschoolClassController extends Controller
         }
 
         $data = $request->validated();
+        if (($data['teacher_user_id'] ?? null) !== null || ! empty($data['student_ids'] ?? [])) {
+            if ($response = app(PreschoolLifecycleGuardService::class)->assignmentWriteLock($request->user(), $data)) {
+                return $response;
+            }
+        }
         $class = PreschoolClass::query()->create([
             'code' => $data['code'],
             'name' => $data['name'],
@@ -170,6 +177,11 @@ class PreschoolClassController extends Controller
         }
 
         $data = $request->validated();
+        if (array_key_exists('teacher_user_id', $data) || array_key_exists('student_ids', $data)) {
+            if ($response = app(PreschoolLifecycleGuardService::class)->assignmentWriteLock($request->user(), $data)) {
+                return $response;
+            }
+        }
 
         foreach (['code', 'name', 'level', 'schedule', 'status', 'room', 'notes'] as $field) {
             if (array_key_exists($field, $data)) {
@@ -231,8 +243,15 @@ class PreschoolClassController extends Controller
         ], Response::HTTP_OK);
     }
 
+    private function academicContext(): array
+    {
+        return app(PreschoolAcademicLifecycleService::class)->currentContext();
+    }
+
     private function syncClassStudents(PreschoolClass $class, ?array $studentIds): void
     {
+        $academicContext = $this->academicContext();
+
         if ($studentIds === null) {
             // Assignment state is preserved on the pivot table, so we only
             // recalculate the active count when the caller is not changing the
@@ -266,6 +285,13 @@ class PreschoolClassController extends Controller
                 $assignment->enrolled_at = now();
             }
 
+            $assignment->academic_year = $academicContext['academic_year'];
+            $assignment->term_label = $academicContext['term_label'];
+            $assignment->academic_year_id = $academicContext['academic_year_id'] ?? null;
+            $assignment->term_id = $academicContext['term_id'] ?? null;
+            $assignment->enrollment_status = 'active';
+            $assignment->enrollment_started_at = $assignment->enrollment_started_at ?: now();
+            $assignment->enrollment_ended_at = null;
             $assignment->status = 'active';
             $assignment->save();
         }
@@ -273,7 +299,11 @@ class PreschoolClassController extends Controller
         PreschoolClassStudent::query()
             ->where('class_id', $class->id)
             ->whereNotIn('student_id', $targetStudentIds->all())
-            ->update(['status' => 'inactive']);
+            ->update([
+                'status' => 'inactive',
+                'enrollment_status' => 'inactive',
+                'enrollment_ended_at' => now(),
+            ]);
 
         $class->students_count = PreschoolClassStudent::query()
             ->where('class_id', $class->id)
@@ -289,6 +319,7 @@ class PreschoolClassController extends Controller
      */
     private function syncTeacherAssignmentHistory(PreschoolClass $class, ?string $teacherUserId, ?string $teacherDisplayName = null): void
     {
+        $academicContext = $this->academicContext();
         $teacherUserId = trim((string) $teacherUserId);
         $teacherDisplayName = $this->resolveTeacherDisplayName($teacherUserId, $teacherDisplayName);
 
@@ -302,6 +333,8 @@ class PreschoolClassController extends Controller
             if ($activeAssignment) {
                 $activeAssignment->status = 'inactive';
                 $activeAssignment->ended_at = now();
+                $activeAssignment->academic_year_id = $academicContext['academic_year_id'] ?? $activeAssignment->academic_year_id;
+                $activeAssignment->term_id = $academicContext['term_id'] ?? $activeAssignment->term_id;
                 $activeAssignment->save();
             }
 
@@ -309,10 +342,13 @@ class PreschoolClassController extends Controller
         }
 
         if ($activeAssignment && (string) $activeAssignment->teacher_user_id === $teacherUserId) {
+            $activeAssignment->academic_year_id = $academicContext['academic_year_id'] ?? $activeAssignment->academic_year_id;
+            $activeAssignment->term_id = $academicContext['term_id'] ?? $activeAssignment->term_id;
             if ($teacherDisplayName !== null && trim((string) $teacherDisplayName) !== trim((string) $activeAssignment->teacher_display_name)) {
                 $activeAssignment->teacher_display_name = $teacherDisplayName;
-                $activeAssignment->save();
             }
+
+            $activeAssignment->save();
 
             return;
         }
@@ -329,6 +365,10 @@ class PreschoolClassController extends Controller
             'teacher_display_name' => $teacherDisplayName,
             'status' => 'active',
             'assigned_at' => now(),
+            'academic_year' => $this->academicContext()['academic_year'],
+            'term_label' => $this->academicContext()['term_label'],
+            'academic_year_id' => $this->academicContext()['academic_year_id'] ?? null,
+            'term_id' => $this->academicContext()['term_id'] ?? null,
             'ended_at' => null,
         ]);
     }

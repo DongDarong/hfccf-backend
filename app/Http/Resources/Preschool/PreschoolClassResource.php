@@ -3,12 +3,26 @@
 namespace App\Http\Resources\Preschool;
 
 use App\Models\PreschoolClass;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /** @mixin PreschoolClass */
 class PreschoolClassResource extends JsonResource
 {
+    private static function toIsoString(mixed $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value)->toISOString();
+        }
+
+        return Carbon::parse((string) $value)->toISOString();
+    }
+
     public function toArray(Request $request): array
     {
         $activeStudentAssignments = $this->whenLoaded('students', function () {
@@ -21,8 +35,17 @@ class PreschoolClassResource extends JsonResource
                         'studentCode' => $student->student_code,
                         'fullName' => trim($student->first_name.' '.$student->last_name),
                         'status' => $student->pivot->status ?? 'active',
-                        'enrolledAt' => $student->pivot->enrolled_at?->toISOString(),
-                        'updatedAt' => $student->pivot->updated_at?->toISOString(),
+                        // Pivot timestamps may be hydrated as strings after class
+                        // assignment updates, so normalize them before responding.
+                        'enrolledAt' => self::toIsoString($student->pivot->enrolled_at),
+                        'academicYear' => $student->pivot->academic_year,
+                        'termLabel' => $student->pivot->term_label,
+                        'academicYearId' => $student->pivot->academic_year_id,
+                        'termId' => $student->pivot->term_id,
+                        'enrollmentStatus' => $student->pivot->enrollment_status ?? $student->pivot->status ?? 'active',
+                        'enrollmentStartedAt' => self::toIsoString($student->pivot->enrollment_started_at),
+                        'enrollmentEndedAt' => self::toIsoString($student->pivot->enrollment_ended_at),
+                        'updatedAt' => self::toIsoString($student->pivot->updated_at),
                     ];
                 })
                 ->all();
@@ -37,8 +60,15 @@ class PreschoolClassResource extends JsonResource
                         'studentCode' => $student->student_code,
                         'fullName' => trim($student->first_name.' '.$student->last_name),
                         'status' => $student->pivot->status ?? 'active',
-                        'enrolledAt' => $student->pivot->enrolled_at?->toISOString(),
-                        'updatedAt' => $student->pivot->updated_at?->toISOString(),
+                        'enrolledAt' => self::toIsoString($student->pivot->enrolled_at),
+                        'academicYear' => $student->pivot->academic_year,
+                        'termLabel' => $student->pivot->term_label,
+                        'academicYearId' => $student->pivot->academic_year_id,
+                        'termId' => $student->pivot->term_id,
+                        'enrollmentStatus' => $student->pivot->enrollment_status ?? $student->pivot->status ?? 'active',
+                        'enrollmentStartedAt' => self::toIsoString($student->pivot->enrollment_started_at),
+                        'enrollmentEndedAt' => self::toIsoString($student->pivot->enrollment_ended_at),
+                        'updatedAt' => self::toIsoString($student->pivot->updated_at),
                     ];
                 })
                 ->all();
@@ -54,10 +84,14 @@ class PreschoolClassResource extends JsonResource
                         'teacherUserId' => $assignment->teacher_user_id,
                         'teacherDisplayName' => $assignment->teacher_display_name,
                         'status' => $assignment->status ?? 'active',
-                        'assignedAt' => $assignment->assigned_at?->toISOString(),
-                        'endedAt' => $assignment->ended_at?->toISOString(),
+                        'assignedAt' => self::toIsoString($assignment->assigned_at),
+                        'academicYear' => $assignment->academic_year,
+                        'termLabel' => $assignment->term_label,
+                        'academicYearId' => $assignment->academic_year_id,
+                        'termId' => $assignment->term_id,
+                        'endedAt' => self::toIsoString($assignment->ended_at),
                         'notes' => $assignment->notes,
-                        'updatedAt' => $assignment->updated_at?->toISOString(),
+                        'updatedAt' => self::toIsoString($assignment->updated_at),
                     ];
                 })
                 ->all();
@@ -81,9 +115,9 @@ class PreschoolClassResource extends JsonResource
             'status' => $this->status,
             'room' => $this->room,
             'notes' => $this->notes,
-            'createdAt' => $this->created_at?->toISOString(),
-            'updatedAt' => $this->updated_at?->toISOString(),
-            'deletedAt' => $this->deleted_at?->toISOString(),
+            'createdAt' => self::toIsoString($this->created_at),
+            'updatedAt' => self::toIsoString($this->updated_at),
+            'deletedAt' => self::toIsoString($this->deleted_at),
         ];
     }
 }

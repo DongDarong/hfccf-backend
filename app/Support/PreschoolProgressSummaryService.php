@@ -13,6 +13,16 @@ final class PreschoolProgressSummaryService
      */
     public function forStudent(User $user, PreschoolStudent $student): array
     {
-        return app(PreschoolAssessmentService::class)->progressSummary($user, $student);
+        $summary = app(PreschoolAssessmentService::class)->progressSummary($user, $student);
+        $snapshot = app(PreschoolReportSnapshotService::class)->latestForContext('progress_summary', [
+            'student_id' => $student->id,
+        ]);
+
+        return [
+            ...$summary,
+            'source' => $snapshot ? 'snapshot' : 'live',
+            'snapshot' => $snapshot ? app(PreschoolReportSnapshotService::class)->snapshotPayload($snapshot) : null,
+            'frozen' => (bool) $snapshot,
+        ];
     }
 }

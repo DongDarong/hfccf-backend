@@ -28,6 +28,8 @@ final class PreschoolAssessmentAggregationService
             ->orderByDesc('period_label')
             ->get()
             ->map(static function ($row): array {
+                $alignment = app(PreschoolAcademicLifecycleService::class)->resolveForDate($row->to_date ?? $row->from_date);
+
                 return [
                     'label' => (string) ($row->label ?? ''),
                     'fromDate' => $row->from_date ?? null,
@@ -36,6 +38,10 @@ final class PreschoolAssessmentAggregationService
                     'assessmentCount' => (int) ($row->assessment_count ?? 0),
                     'studentCount' => (int) ($row->student_count ?? 0),
                     'classCount' => (int) ($row->class_count ?? 0),
+                    'academicYearId' => $alignment['academic_year_id'] ?? null,
+                    'academicYear' => $alignment['academic_year'] ?? null,
+                    'termId' => $alignment['term_id'] ?? null,
+                    'termLabel' => $alignment['term_label'] ?? null,
                 ];
             })
             ->values();

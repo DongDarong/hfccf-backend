@@ -103,7 +103,7 @@ class HfccfAuthSeeder extends Seeder
             ['role_code' => 'teacher-scholarship', 'permission_code' => 'tasks:write'],
         ]);
 
-        DB::table('users')->upsert([
+        DB::table('users')->upsert([ 
             [
                 'id' => 'usr_001',
                 'first_name' => 'Vanna',
@@ -266,13 +266,17 @@ class HfccfAuthSeeder extends Seeder
             ],
         ], ['id'], ['first_name', 'last_name', 'username', 'email', 'phone', 'role_code', 'department_code', 'status', 'avatar', 'password', 'last_login_at', 'created_at', 'updated_at']);
 
-        DB::statement('
-            INSERT IGNORE INTO `user_permissions` (`user_id`, `permission_code`)
-            SELECT `u`.`id`, `rp`.`permission_code`
-            FROM `users` AS `u`
-            INNER JOIN `role_permissions` AS `rp`
-                ON `rp`.`role_code` = `u`.`role_code`
-        ');
+        $permissionRows = DB::table('users as u')
+            ->join('role_permissions as rp', 'rp.role_code', '=', 'u.role_code')
+            ->selectRaw('u.id as user_id, rp.permission_code')
+            ->get()
+            ->map(static fn ($row): array => [
+                'user_id' => $row->user_id,
+                'permission_code' => $row->permission_code,
+            ])
+            ->all();
+
+        DB::table('user_permissions')->insertOrIgnore($permissionRows);
     }
 }
 

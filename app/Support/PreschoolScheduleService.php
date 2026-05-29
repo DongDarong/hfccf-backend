@@ -94,7 +94,7 @@ class PreschoolScheduleService
         ]);
         $schedule->save();
 
-        return $schedule->refresh()->load(['preschoolClass.teacher', 'teacher']);
+        return $schedule->refresh()->load(['preschoolClass.teacher', 'teacher', 'academicYear', 'term']);
     }
 
     public function archiveSchedule(User $actor, PreschoolScheduleEntry $schedule): PreschoolScheduleEntry
@@ -105,11 +105,13 @@ class PreschoolScheduleService
         $schedule->updated_by_user_id = $actor->id;
         $schedule->save();
 
-        return $schedule->refresh()->load(['preschoolClass.teacher', 'teacher']);
+        return $schedule->refresh()->load(['preschoolClass.teacher', 'teacher', 'academicYear', 'term']);
     }
 
     public function normalizePayload(array $data, ?PreschoolScheduleEntry $schedule = null): array
     {
+        $academicContext = app(PreschoolAcademicLifecycleService::class)->currentContext();
+
         return [
             'class_id' => $this->nullableInt($data['class_id'] ?? $schedule?->class_id),
             'teacher_user_id' => $this->nullableString($data['teacher_user_id'] ?? $schedule?->teacher_user_id),
@@ -122,6 +124,8 @@ class PreschoolScheduleService
             'status' => $this->normalizeStatus($data['status'] ?? $schedule?->status),
             'effective_from' => $this->normalizeDate($data['effective_from'] ?? $schedule?->effective_from),
             'effective_until' => $this->normalizeDate($data['effective_until'] ?? $schedule?->effective_until),
+            'academic_year_id' => $this->nullableInt($data['academic_year_id'] ?? $schedule?->academic_year_id ?? $academicContext['academic_year_id'] ?? null),
+            'term_id' => $this->nullableInt($data['term_id'] ?? $schedule?->term_id ?? $academicContext['term_id'] ?? null),
         ];
     }
 

@@ -40,6 +40,8 @@ class UpdatePreschoolScheduleRequest extends FormRequest
             'status' => ['sometimes', 'nullable', 'string', Rule::in(PreschoolScheduleStatus::values())],
             'effective_from' => ['sometimes', 'nullable', 'date'],
             'effective_until' => ['sometimes', 'nullable', 'date', 'after_or_equal:effective_from'],
+            'override_locked_context' => ['sometimes', 'boolean'],
+            'override_reason' => ['required_if:override_locked_context,1', 'nullable', 'string', 'max:500'],
         ];
     }
 
