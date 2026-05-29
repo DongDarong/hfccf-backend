@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
 use App\Http\Controllers\Api\Preschool\PreschoolInstitutionalGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolLifecycleAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolExportGovernanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolGovernanceDiffController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
@@ -301,6 +302,14 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('institutional-reconstruction', [PreschoolInstitutionalGovernanceController::class, 'reconstruct']);
         Route::get('institutional-reconstruction/{context}', [PreschoolInstitutionalGovernanceController::class, 'show']);
         Route::get('institutional-replay', [PreschoolInstitutionalGovernanceController::class, 'replay']);
+        // Governance diff and institutional integrity review stay admin-only so
+        // historical comparisons can be reviewed without adding a new staff
+        // write surface or duplicating reconstruction logic.
+        Route::get('governance-diff/summary', [PreschoolGovernanceDiffController::class, 'summary']);
+        Route::get('governance-diff', [PreschoolGovernanceDiffController::class, 'compare']);
+        Route::get('integrity-review', [PreschoolGovernanceDiffController::class, 'integrityReview']);
+        Route::get('integrity-review/{context}', [PreschoolGovernanceDiffController::class, 'showIntegrityReview']);
+        Route::post('integrity-review/{context}', [PreschoolGovernanceDiffController::class, 'review']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
         // Academic lifecycle records stay admin-only so the year/term backbone
