@@ -103,7 +103,7 @@ class HfccfAuthSeeder extends Seeder
             ['role_code' => 'teacher-scholarship', 'permission_code' => 'tasks:write'],
         ]);
 
-        DB::table('users')->upsert([
+        DB::table('users')->upsert([ 
             [
                 'id' => 'usr_001',
                 'first_name' => 'Vanna',
