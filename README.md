@@ -18,6 +18,9 @@ Laravel 13 API backend for the HFCCF admin system. The current backend supports 
 - Role, permission, department, and user seed data aligned with the frontend contract
 - User CRUD with permission syncing, avatar upload, and archived deletion flow
 - Preschool module APIs for classes, students, teachers, attendance, and payments
+- Preschool academic lifecycle APIs for academic years, terms, and lifecycle state management
+- Preschool reporting and governance APIs for report periods, snapshots, exports, governance diff, integrity review, lifecycle audit, institutional reconstruction, and governance cases
+- Preschool settings backbone APIs for the academic defaults used across the module
 - Scholarship module APIs for students, applications, reviews, and status workflow
 - English module APIs for classes, students, teachers, tasks, and submissions
 - Sport foundation APIs for teams, players, coaches, matches, events, tournaments, and standings
@@ -34,6 +37,7 @@ The backend currently exposes these stabilized domain areas:
 - Core auth and RBAC
 - User management and profile updates
 - Preschool module
+- Preschool governance and lifecycle audit module
 - Scholarship module
 - English module
 - Sport foundation, including event-driven match scores and tournament standings
@@ -168,6 +172,11 @@ Configured in `app/Providers/AppServiceProvider.php` and applied in `bootstrap/a
 - `app/Http/Middleware/AuthenticateApiToken.php`: bearer token authentication
 - `app/Models/User.php`: Main user model with automatic archiving logic
 - `app/Models/DeletedUser.php`: Archive model for deleted users
+- `app/Models/PreschoolAcademicYear.php`, `app/Models/PreschoolAcademicTerm.php`: Preschool academic lifecycle models
+- `app/Models/PreschoolReportPeriod.php`, `app/Models/PreschoolReportSnapshot.php`, `app/Models/PreschoolReportExportRecord.php`: Preschool reporting and export records
+- `app/Models/PreschoolGovernanceCase.php`, `app/Models/PreschoolGovernanceCaseEvent.php`, `app/Models/PreschoolGovernanceCaseEvidence.php`: Preschool governance case workflow models
+- `app/Models/PreschoolLifecycleAuditLog.php`, `app/Models/PreschoolSettingsBackbone.php`: Preschool lifecycle audit and settings backbone models
+- `app/Support/PreschoolAcademicLifecycleService.php`, `app/Support/PreschoolReportPeriodService.php`, `app/Support/PreschoolSnapshotArchiveService.php`, `app/Support/PreschoolExportGovernanceService.php`, `app/Support/PreschoolGovernanceDiffService.php`, `app/Support/PreschoolInstitutionalIntegrityService.php`, `app/Support/PreschoolInstitutionalReconstructionService.php`, `app/Support/PreschoolLifecycleGuardService.php`, `app/Support/PreschoolSettingsBackboneService.php`, `app/Support/PreschoolGovernanceCaseService.php`: preschool governance and lifecycle services
 - `database/migrations/2026_05_09_043402_create_deleted_users_table.php`: User archive schema
 - `database/seeders/HfccfAuthSeeder.php`: frontend-aligned seed users, roles, and permissions
 
@@ -176,6 +185,8 @@ Configured in `app/Providers/AppServiceProvider.php` and applied in `bootstrap/a
 - User IDs are sequential string IDs such as `usr_001`, `usr_002`, matching the frontend contract.
 - The role code `adminscholarship` is the canonical scholarship admin role used by the frontend and backend.
 - Players and preschool students are data records, not system users.
+- Preschool reporting is context-aware: attendance, assessments, schedules, report periods, snapshots, exports, and governance records all carry academic-year and term context where applicable.
+- Preschool governance workflows are split between immutable audit history and mutable case workflow records.
 - Sport matches derive score snapshots from match events; standings are derived from completed tournament matches.
 - Uploaded images are stored on the configured filesystem disk and optimized asynchronously by queued post-upload jobs.
 - Frontend module integration uses standardized JSON response envelopes with `success`, `message`, and `data`.
