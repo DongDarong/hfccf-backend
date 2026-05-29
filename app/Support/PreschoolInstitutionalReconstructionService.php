@@ -416,7 +416,6 @@ class PreschoolInstitutionalReconstructionService
             ->leftJoin('preschool_classes', 'preschool_classes.id', '=', 'preschool_class_students.class_id')
             ->leftJoin('preschool_students', 'preschool_students.id', '=', 'preschool_class_students.student_id')
             ->select([
-                'preschool_class_students.id',
                 'preschool_class_students.class_id',
                 'preschool_class_students.student_id',
                 'preschool_class_students.academic_year_id',
@@ -471,7 +470,7 @@ class PreschoolInstitutionalReconstructionService
 
         foreach ($classStudentQuery->get() as $row) {
             $events[] = [
-                'id' => 'assignment-student-'.$row->id,
+                'id' => 'assignment-student-'.$row->class_id.'-'.$row->student_id,
                 'source' => 'assignment',
                 'actionType' => 'assignment.student_class.'.strtolower((string) ($row->enrollment_status ?? 'active')),
                 'title' => 'Student assignment',
@@ -561,6 +560,20 @@ class PreschoolInstitutionalReconstructionService
             ->orderByDesc('id')
             ->limit(40)
             ->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function timeline(array $filters, int $limit = 100): array
+    {
+        return $this->mergeTimeline(
+            $this->snapshotTimeline($this->snapshots($filters)),
+            $this->auditEvents($filters, $limit)->all(),
+            $this->exportEvents($filters, $limit)->all(),
+            $this->assignmentEvents($filters),
+            $this->reportPeriodTimeline($this->reportPeriods($filters)),
+        );
     }
 
     /**

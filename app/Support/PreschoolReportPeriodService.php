@@ -33,7 +33,7 @@ class PreschoolReportPeriodService
             return collect();
         }
 
-        $derivedKeys = $derived->map(fn (array $row): string => $this->periodKey($row['label'] ?? '', $row['academicYearId'] ?? null, $row['termId'] ?? null))->all();
+        $derivedKeys = $derived->map(fn (array $row): string => $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null))->all();
 
         $records = PreschoolReportPeriod::query()
             ->with(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy'])
@@ -41,7 +41,7 @@ class PreschoolReportPeriodService
                 $query->where(function (Builder $builder) use ($derived): void {
                     foreach ($derived as $row) {
                         $builder->orWhere(function (Builder $inner) use ($row): void {
-                            $inner->where('period_label', $row['label'] ?? '')
+                            $inner->where('period_label', $this->rowLabel($row))
                                 ->where('academic_year_id', $row['academicYearId'] ?? null)
                                 ->where('term_id', $row['termId'] ?? null);
                         });
@@ -52,7 +52,7 @@ class PreschoolReportPeriodService
             ->orderByDesc('id')
             ->get();
 
-        $periods = $records->map(fn (PreschoolReportPeriod $period) => $this->snapshot($period))->keyBy(fn (array $row) => $this->periodKey($row['label'], $row['academicYearId'] ?? null, $row['termId'] ?? null));
+        $periods = $records->map(fn (PreschoolReportPeriod $period) => $this->snapshot($period))->keyBy(fn (array $row) => $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null));
 
         if ($derived->isEmpty()) {
             return $records->map(fn (PreschoolReportPeriod $period) => $this->snapshot($period))->values();
@@ -60,7 +60,7 @@ class PreschoolReportPeriodService
 
         $combined = $derived
             ->map(function (array $row) use ($periods): array {
-                $key = $this->periodKey($row['label'] ?? '', $row['academicYearId'] ?? null, $row['termId'] ?? null);
+                $key = $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null);
                 $existing = $periods->get($key);
 
                 if ($existing) {
@@ -80,7 +80,7 @@ class PreschoolReportPeriodService
             })
             ->values();
 
-        $derivedKeys = $combined->map(fn (array $row) => $this->periodKey($row['label'] ?? '', $row['academicYearId'] ?? null, $row['termId'] ?? null))->all();
+        $derivedKeys = $combined->map(fn (array $row) => $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null))->all();
         $manualPeriods = $records
             ->filter(fn (PreschoolReportPeriod $period) => ! in_array($this->periodKey($period->period_label, $period->academic_year_id, $period->term_id), $derivedKeys, true))
             ->map(fn (PreschoolReportPeriod $period) => $this->snapshot($period));
@@ -267,6 +267,8 @@ class PreschoolReportPeriodService
     {
         return array_merge($this->contextSnapshot($period), [
             'id' => $period->id,
+            'label' => $period->period_label,
+            'periodLabel' => $period->period_label,
             'reportPeriodId' => $period->id,
             'fromDate' => $period->from_date?->toDateString(),
             'toDate' => $period->to_date?->toDateString(),
@@ -315,13 +317,13 @@ class PreschoolReportPeriodService
     private function syncDerivedPeriods(Collection $derived): void
     {
         foreach ($derived as $row) {
-            $key = $this->periodKey($row['label'] ?? '', $row['academicYearId'] ?? null, $row['termId'] ?? null);
+            $key = $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null);
             if ($key === '--') {
                 continue;
             }
 
             $period = PreschoolReportPeriod::query()->firstOrNew([
-                'period_label' => $row['label'] ?? '',
+                'period_label' => $this->rowLabel($row),
                 'academic_year_id' => $row['academicYearId'] ?? null,
                 'term_id' => $row['termId'] ?? null,
             ]);
@@ -339,6 +341,14 @@ class PreschoolReportPeriodService
     private function periodKey(mixed $label, mixed $academicYearId, mixed $termId): string
     {
         return trim((string) $label).'|'.((string) $academicYearId).'|'.((string) $termId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function rowLabel(array $row): string
+    {
+        return trim((string) ($row['label'] ?? $row['periodLabel'] ?? $row['period_label'] ?? ''));
     }
 
     private function normalizeStatus(mixed $value): string
