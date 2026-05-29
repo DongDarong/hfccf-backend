@@ -402,7 +402,7 @@ class PreschoolGovernanceCaseController extends Controller
      */
     private function statusValues(): array
     {
-        return PreschoolGovernanceCase::STATUSES;
+        return PreschoolGovernanceCaseService::STATUSES;
     }
 
     /**
@@ -410,7 +410,7 @@ class PreschoolGovernanceCaseController extends Controller
      */
     private function severityValues(): array
     {
-        return PreschoolGovernanceCase::SEVERITIES;
+        return PreschoolGovernanceCaseService::SEVERITIES;
     }
 
     /**
@@ -418,7 +418,7 @@ class PreschoolGovernanceCaseController extends Controller
      */
     private function sourceValues(): array
     {
-        return PreschoolGovernanceCase::SOURCE_TYPES;
+        return PreschoolGovernanceCaseService::SOURCE_TYPES;
     }
 
     /**
