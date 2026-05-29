@@ -255,6 +255,7 @@ class PreschoolApiTest extends TestCase
 
         $class = $this->createPreschoolClass('PS-CLASS-530', 'Attendance Class');
         $student = $this->createPreschoolStudent('PS-STU-530', 'Attendance', 'Student');
+        $this->attachStudentToClass($class->id, $student->id);
 
         $create = $this->postJson('/api/preschool/attendance', [
             'class_id' => $class->id,
@@ -446,5 +447,18 @@ class PreschoolApiTest extends TestCase
         ]);
 
         return DB::table('preschool_students')->where('id', $studentId)->first();
+    }
+
+    private function attachStudentToClass(int $classId, int $studentId): void
+    {
+        DB::table('preschool_class_students')->insert([
+            'class_id' => $classId,
+            'student_id' => $studentId,
+            'enrolled_at' => now(),
+            'status' => 'active',
+            'enrollment_status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }
