@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
 use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolEnrollmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomResourceController;
@@ -262,6 +263,32 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('attendance', [PreschoolAttendanceController::class, 'index']);
         Route::post('attendance', [PreschoolAttendanceController::class, 'store']);
         Route::put('attendance/{id}', [PreschoolAttendanceController::class, 'update']);
+        // Admin-only attendance review and correction routes stay under the same
+        // attendance prefix so staff can manage records and missing attendance
+        // without needing a separate admin segment or duplicating the controller.
+        Route::get('attendance/summary', [PreschoolAttendanceController::class, 'summary']);
+        Route::get('attendance/missing', [PreschoolAttendanceController::class, 'missing']);
+        Route::get('attendance/class-summary', [PreschoolAttendanceController::class, 'classSummary']);
+        Route::post('attendance/{id}/review', [PreschoolAttendanceController::class, 'review']);
+        Route::post('attendance/{id}/flag', [PreschoolAttendanceController::class, 'flag']);
+
+        // Enrollment routes form a complete admission workflow: draft → submitted
+        // → under_review → approved/waitlisted/rejected → enrolled. Static segments
+        // (summary, {application}/submit, etc.) sit before the model binding so
+        // they are never resolved as application IDs.
+        Route::get('enrollments', [PreschoolEnrollmentController::class, 'index']);
+        Route::post('enrollments', [PreschoolEnrollmentController::class, 'store']);
+        Route::get('enrollments/summary', [PreschoolEnrollmentController::class, 'summary']);
+        Route::get('enrollments/{application}', [PreschoolEnrollmentController::class, 'show']);
+        Route::patch('enrollments/{application}', [PreschoolEnrollmentController::class, 'update']);
+        Route::post('enrollments/{application}/submit', [PreschoolEnrollmentController::class, 'submit']);
+        Route::post('enrollments/{application}/review', [PreschoolEnrollmentController::class, 'review']);
+        Route::post('enrollments/{application}/approve', [PreschoolEnrollmentController::class, 'approve']);
+        Route::post('enrollments/{application}/reject', [PreschoolEnrollmentController::class, 'reject']);
+        Route::post('enrollments/{application}/waitlist', [PreschoolEnrollmentController::class, 'waitlist']);
+        Route::post('enrollments/{application}/cancel', [PreschoolEnrollmentController::class, 'cancel']);
+        Route::post('enrollments/{application}/enroll', [PreschoolEnrollmentController::class, 'enroll']);
+        Route::patch('enrollments/{application}/documents/{document}', [PreschoolEnrollmentController::class, 'updateDocument']);
 
         // Assessment routes stay alongside the rest of Preschool CRUD so staff
         // can track progress without a separate module or report workflow.
