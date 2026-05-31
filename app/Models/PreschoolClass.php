@@ -8,10 +8,35 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * PreschoolClass
+ *
+ * Represents a single classroom unit within the preschool. A class is taught
+ * by one teacher and can have many enrolled students. The tuition_fee field
+ * drives the auto-generated payment that is created when a student is enrolled
+ * into this class via PreschoolEnrollmentService::enrollAsStudent().
+ *
+ * @property int         $id
+ * @property string      $code
+ * @property string      $name
+ * @property string|null $teacher_user_id
+ * @property string|null $teacher_display_name
+ * @property string|null $level
+ * @property string|null $schedule
+ * @property int         $students_count
+ * @property string|null $tuition_fee   Per-term fee charged to enrolled students
+ * @property string      $status        active|inactive|archived
+ * @property string|null $room
+ * @property string|null $notes
+ * @property \Carbon\Carbon $created_at
+ * @property \Carbon\Carbon $updated_at
+ * @property \Carbon\Carbon|null $deleted_at
+ */
 class PreschoolClass extends Model
 {
     use SoftDeletes;
 
+    /** @var list<string> Columns safe for mass-assignment */
     protected $fillable = [
         'code',
         'name',
@@ -20,15 +45,20 @@ class PreschoolClass extends Model
         'level',
         'schedule',
         'students_count',
+        'tuition_fee',
         'status',
         'room',
         'notes',
     ];
 
+    /**
+     * @return array<string, string> Column cast definitions
+     */
     protected function casts(): array
     {
         return [
             'students_count' => 'integer',
+            'tuition_fee'    => 'decimal:2',
         ];
     }
 

@@ -452,6 +452,8 @@ class PreschoolEnrollmentController extends Controller
             }
         }
 
+        // enrollAsStudent() runs all writes inside a DB::transaction() and
+        // dispatches PaymentCreatedOnEnrollment post-commit when a class was set.
         $student = $this->enrollment->enrollAsStudent(
             $application,
             $request->user(),
@@ -459,6 +461,10 @@ class PreschoolEnrollmentController extends Controller
             $data['academic_year_id'] ?? null,
             $data['term_id'] ?? null
         );
+
+        // Read the auto-created payment from the service property so the
+        // response can include it without an extra DB query.
+        $payment = $this->enrollment->lastCreatedPayment;
 
         $application->status = 'enrolled';
         $application->enrolled_by_user_id = $request->user()->id;
@@ -470,7 +476,33 @@ class PreschoolEnrollmentController extends Controller
         $this->enrollment->logDecision($application, 'enrolled', 'approved', 'enrolled', $request->user(), "Student #{$student->student_code} created.");
         $this->writeAuditLog('preschool_enrollment.enrolled', $application, $request->user(), ['student_id' => $student->id, 'student_code' => $student->student_code]);
 
-        return $this->applicationResponse($request, $application, "Application enrolled. Student {$student->student_code} created.");
+        // Load application relations for the resource response
+        $application->load([
+            'requestedAcademicYear', 'requestedTerm', 'preferredClass',
+            'reviewedBy', 'approvedBy', 'enrolledBy', 'enrolledStudent',
+            'documents', 'decisionLogs.actor',
+        ]);
+
+        // Return a custom response that includes the created payment alongside
+        // the application so the frontend can display the payment confirmation.
+        return response()->json([
+            'success' => true,
+            'message' => "Application enrolled. Student {$student->student_code} created.",
+            'data'    => [
+                'application' => PreschoolEnrollmentResource::make($application)->resolve($request),
+                // Null when no class was assigned; frontend must handle both cases.
+                'payment'     => $payment ? [
+                    'id'             => $payment->id,
+                    'amount'         => $payment->amount,
+                    'currency'       => $payment->currency ?? 'USD',
+                    'paymentStatus'  => $payment->payment_status,
+                    'description'    => $payment->description,
+                    'dueDate'        => $payment->due_date?->toDateString(),
+                    'termId'         => $payment->term_id,
+                    'academicYearId' => $payment->academic_year_id,
+                ] : null,
+            ],
+        ]);
     }
 
     // ── Document checklist update ────────────────────────────────────────────
