@@ -139,8 +139,8 @@ class SportAttendanceController extends SportController
         $data = $request->validate([
             'attendance_type' => ['required', 'string', 'in:player,coach'],
             'team_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_teams,id'],
-            'player_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_players,id'],
-            'coach_id' => ['sometimes', 'nullable', 'string', 'max:16'],
+            'player_id' => ['required_if:attendance_type,player', 'nullable', 'integer', 'exists:sport_players,id'],
+            'coach_id' => ['required_if:attendance_type,coach', 'nullable', 'string', 'max:16'],
             'attendance_date' => ['required', 'date'],
             'status' => ['required', 'string', 'in:present,absent,late,excused'],
             'note' => ['sometimes', 'nullable', 'string'],
@@ -171,8 +171,8 @@ class SportAttendanceController extends SportController
         $data = $request->validate([
             'attendance_type' => ['sometimes', 'required_with:attendance_date,status', 'string', 'in:player,coach'],
             'team_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_teams,id'],
-            'player_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_players,id'],
-            'coach_id' => ['sometimes', 'nullable', 'string', 'max:16'],
+            'player_id' => ['required_if:attendance_type,player', 'nullable', 'integer', 'exists:sport_players,id'],
+            'coach_id' => ['required_if:attendance_type,coach', 'nullable', 'string', 'max:16'],
             'attendance_date' => ['sometimes', 'required', 'date'],
             'status' => ['sometimes', 'required', 'string', 'in:present,absent,late,excused'],
             'note' => ['sometimes', 'nullable', 'string'],
@@ -222,8 +222,10 @@ class SportAttendanceController extends SportController
         }
 
         if ($attendance) {
+            $subjectKey = $this->resolveAttendanceSubjectKey($attendanceType, $playerId, $coachId);
             $attendance->fill([
                 'attendance_type' => $attendanceType,
+                'subject_key' => $subjectKey,
                 'team_id' => $teamId,
                 'player_id' => $playerId,
                 'coach_user_id' => $coachId,
@@ -237,17 +239,11 @@ class SportAttendanceController extends SportController
             return $attendance;
         }
 
+        $subjectKey = $this->resolveAttendanceSubjectKey($attendanceType, $playerId, $coachId);
+
         $query = SportAttendanceRecord::query()
-            ->where('attendance_type', $attendanceType)
+            ->where('subject_key', $subjectKey)
             ->whereDate('attendance_date', $attendanceDate);
-
-        if ($attendanceType === 'player' && $playerId) {
-            $query->where('player_id', $playerId);
-        }
-
-        if ($attendanceType === 'coach' && $coachId) {
-            $query->where('coach_user_id', $coachId);
-        }
 
         if ($teamId !== null) {
             $query->where('team_id', $teamId);
@@ -258,6 +254,7 @@ class SportAttendanceController extends SportController
         if ($existing) {
             $existing->fill([
                 'attendance_type' => $attendanceType,
+                'subject_key' => $subjectKey,
                 'team_id' => $teamId,
                 'player_id' => $playerId,
                 'coach_user_id' => $coachId,
@@ -273,6 +270,7 @@ class SportAttendanceController extends SportController
 
         return SportAttendanceRecord::query()->create([
             'attendance_type' => $attendanceType,
+            'subject_key' => $subjectKey,
             'team_id' => $teamId,
             'player_id' => $playerId,
             'coach_user_id' => $coachId,
@@ -281,5 +279,14 @@ class SportAttendanceController extends SportController
             'status' => $status,
             'note' => $note,
         ]);
+    }
+
+    private function resolveAttendanceSubjectKey(string $attendanceType, ?int $playerId, ?string $coachId): string
+    {
+        if ($attendanceType === 'coach') {
+            return 'coach:'.trim((string) $coachId);
+        }
+
+        return 'player:'.(string) ($playerId ?? '');
     }
 }

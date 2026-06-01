@@ -9,6 +9,7 @@ class SportAttendanceRecord extends Model
 {
     protected $fillable = [
         'attendance_type',
+        'subject_key',
         'team_id',
         'player_id',
         'coach_user_id',
