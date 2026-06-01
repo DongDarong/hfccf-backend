@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\Scholarship\ScholarshipDashboardController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipReviewController;
 use App\Http\Controllers\Api\Scholarship\ScholarshipStudentController;
 use App\Http\Controllers\Api\Sport\SportAdminCoachTeamAssignmentController;
+use App\Http\Controllers\Api\Sport\SportAttendanceController;
 use App\Http\Controllers\Api\Sport\SportApprovalController;
 use App\Http\Controllers\Api\Sport\SportCoachController;
 use App\Http\Controllers\Api\Sport\SportCoachTeamController;
@@ -512,6 +513,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('coaches/{id}', [SportCoachController::class, 'show']);
         Route::put('coaches/{id}', [SportCoachController::class, 'update']);
         Route::delete('coaches/{id}', [SportCoachController::class, 'destroy']);
+        Route::get('attendance', [SportAttendanceController::class, 'index']);
+        Route::post('attendance', [SportAttendanceController::class, 'store']);
+        Route::put('attendance/{id}', [SportAttendanceController::class, 'update']);
         Route::get('coach/teams', [SportCoachTeamController::class, 'index']);
         Route::get('coach/teams/{team}', [SportCoachTeamController::class, 'show']);
         Route::post('coach/teams/{team}/players', [SportCoachTeamController::class, 'storePlayer']);
