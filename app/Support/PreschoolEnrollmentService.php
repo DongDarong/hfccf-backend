@@ -214,7 +214,7 @@ class PreschoolEnrollmentService
         ): PreschoolStudent {
             // ── Step 1: Create the student record from application data ────────
             $student = PreschoolStudent::create([
-                'student_code'   => $this->nextStudentCode(),
+                'student_code'   => PreschoolStudent::nextStudentCode(),
                 'first_name'     => $application->first_name,
                 'last_name'      => $application->last_name,
                 'gender'         => $application->gender,
@@ -317,20 +317,4 @@ class PreschoolEnrollmentService
         return $student;
     }
 
-    /**
-     * Generate the next sequential student code in the PS-STU-### series.
-     *
-     * @return string  e.g. "PS-STU-042"
-     */
-    private function nextStudentCode(): string
-    {
-        $last = PreschoolStudent::query()
-            ->whereRaw("student_code LIKE 'PS-STU-%'")
-            ->orderByRaw("CAST(SUBSTRING(student_code, 8) AS UNSIGNED) DESC")
-            ->value('student_code');
-
-        $next = $last ? (int) substr($last, 7) + 1 : 1;
-
-        return sprintf('PS-STU-%03d', $next);
-    }
 }

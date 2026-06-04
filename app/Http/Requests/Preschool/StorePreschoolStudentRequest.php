@@ -44,6 +44,7 @@ class StorePreschoolStudentRequest extends FormRequest
             'guardian_phone' => ['nullable', 'string', 'max:32'],
             'address' => ['nullable', 'string', 'max:255'],
             'status' => ['required', Rule::in(['active', 'pending', 'inactive', 'graduated'])],
+            'student_type' => ['sometimes', 'nullable', Rule::in(['paying', 'non_paying'])],
             'class_ids' => ['sometimes', 'array'],
             'class_ids.*' => ['integer', 'exists:preschool_classes,id'],
             'avatar' => ['sometimes', 'nullable', 'image', 'max:4096'],
