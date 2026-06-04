@@ -193,7 +193,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::delete('teachers/{id}', [PreschoolTeacherController::class, 'destroy']);
         Route::get('teacher/my-students', [PreschoolTeacherController::class, 'myStudents']);
         Route::get('teacher/my-classes', [PreschoolTeacherController::class, 'myClasses']);
-        Route::get('teacher/attendance', [PreschoolAttendanceController::class, 'teacherAttendance']);
 
         Route::get('classes', [PreschoolClassController::class, 'index']);
         Route::post('classes', [PreschoolClassController::class, 'store']);

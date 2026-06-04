@@ -121,46 +121,6 @@ class PreschoolAttendanceController extends Controller
         ], Response::HTTP_OK);
     }
 
-    public function teacherAttendance(Request $request): JsonResponse
-    {
-        if ($response = $this->authorizeAny($request->user())) {
-            return $response;
-        }
-
-        $query = $this->attendanceQueryForUser($request->user());
-        $this->applyAttendanceFilters($request, $query);
-
-        $paginator = $query
-            ->with(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term'])
-            ->orderByDesc('attendance_date')
-            ->orderByDesc('id')
-            ->paginate($this->perPage($request), ['*'], 'page', $this->page($request));
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Teacher attendance retrieved successfully.',
-            'data' => [
-                'items' => PreschoolAttendanceResource::collection($paginator->getCollection())->resolve($request),
-                'pagination' => $this->paginationShape($paginator),
-            ],
-        ], Response::HTTP_OK);
-    }
-
-    private function attendanceQueryForUser(User $user): Builder
-    {
-        $query = PreschoolAttendanceRecord::query();
-
-        if ($user->role_code === 'teacher-preschool') {
-            $teacherClassIds = PreschoolClass::query()
-                ->where('teacher_user_id', $user->id)
-                ->pluck('id')
-                ->all();
-            $query->whereIn('class_id', $teacherClassIds);
-        }
-
-        return $query;
-    }
-
     private function applyAttendanceFilters(Request $request, Builder $query): void
     {
         $search = trim((string) $request->query('search', ''));
