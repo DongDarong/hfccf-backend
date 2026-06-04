@@ -24,7 +24,7 @@ class PreschoolAttendanceController extends Controller
             return $response;
         }
 
-        $query = $this->attendanceQueryForUser($request->user());
+        $query = PreschoolAttendanceRecord::query();
         $this->applyAttendanceFilters($request, $query);
 
         $paginator = $query
