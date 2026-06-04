@@ -89,6 +89,7 @@ class PreschoolStudentResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'publicId' => $this->public_id,
             'studentCode' => $this->student_code,
             'firstName' => $this->first_name,
             'lastName' => $this->last_name,
@@ -102,6 +103,7 @@ class PreschoolStudentResource extends JsonResource
             'guardianSource' => $guardianSnapshot['source'] ?? 'legacy',
             'address' => $this->address,
             'status' => $this->status,
+            'studentType' => $this->student_type,
             'avatarUrl' => ImageStorage::url($this->avatar),
             // Active class assignments power the current roster count, while the
             // full classAssignments payload preserves historical transfers and

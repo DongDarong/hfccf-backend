@@ -112,7 +112,7 @@ class PreschoolStudentController extends Controller
             }
         }
         $student = PreschoolStudent::query()->create([
-            'student_code' => $data['student_code'] ?? $this->nextStudentCode(),
+            'student_code' => $data['student_code'] ?? PreschoolStudent::nextStudentCode(),
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
             'gender' => $data['gender'] ?? null,
@@ -121,6 +121,7 @@ class PreschoolStudentController extends Controller
             'guardian_phone' => $data['guardian_phone'] ?? null,
             'address' => $data['address'] ?? null,
             'status' => $data['status'],
+            'student_type' => $data['student_type'] ?? 'paying',
             'avatar' => ImageStorage::store($request->file('avatar'), 'preschool/students'),
         ]);
 
@@ -183,7 +184,7 @@ class PreschoolStudentController extends Controller
             }
         }
 
-        foreach (['student_code', 'first_name', 'last_name', 'gender', 'date_of_birth', 'guardian_name', 'guardian_phone', 'address', 'status'] as $field) {
+        foreach (['student_code', 'first_name', 'last_name', 'gender', 'date_of_birth', 'guardian_name', 'guardian_phone', 'address', 'status', 'student_type'] as $field) {
             if (array_key_exists($field, $data)) {
                 $student->{$field} = $data[$field];
             }
@@ -300,20 +301,6 @@ class PreschoolStudentController extends Controller
                 ->count();
             $class->save();
         }
-    }
-
-    private function nextStudentCode(): string
-    {
-        $maxNumeric = PreschoolStudent::withTrashed()
-            ->pluck('student_code')
-            ->map(static function (string $code): int {
-                return (int) preg_replace('/^PS-STU-/', '', $code);
-            })
-            ->max() ?? 0;
-
-        $next = $maxNumeric + 1;
-
-        return 'PS-STU-'.str_pad((string) $next, 3, '0', STR_PAD_LEFT);
     }
 
     private function authorizeAdmin(?User $user): ?JsonResponse
