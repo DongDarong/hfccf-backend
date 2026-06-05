@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Dsam;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Dsam\FormSectionResource;
 use App\Models\Dsam\FormSection;
 use App\Models\Dsam\FormTemplate;
 use Illuminate\Http\JsonResponse;
@@ -50,7 +51,7 @@ class FormSectionController extends Controller
             'order_index' => $maxOrder + 1,
         ]);
 
-        return $this->created($section, 'Section created.');
+        return $this->created(new FormSectionResource($section), 'Section created.');
     }
 
     public function update(Request $request, FormTemplate $dsamForm, FormSection $section): JsonResponse
@@ -75,7 +76,7 @@ class FormSectionController extends Controller
 
         $section->update($validated);
 
-        return $this->ok($section->fresh(), 'Section updated.');
+        return $this->ok(new FormSectionResource($section->fresh()), 'Section updated.');
     }
 
     public function destroy(Request $request, FormTemplate $dsamForm, FormSection $section): JsonResponse

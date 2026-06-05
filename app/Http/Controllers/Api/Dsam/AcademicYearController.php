@@ -30,7 +30,7 @@ class AcademicYearController extends Controller
             $query->where('organization_id', $request->user()->organization_id);
         }
 
-        return $this->ok($query->get());
+        return $this->ok(AcademicYearResource::collection($query->get()));
     }
 
     public function store(Request $request): JsonResponse
@@ -53,7 +53,7 @@ class AcademicYearController extends Controller
             $year->setCurrent();
         }
 
-        return $this->created($year->fresh(), 'Academic year created.');
+        return $this->created(new AcademicYearResource($year->fresh()), 'Academic year created.');
     }
 
     public function show(Request $request, AcademicYear $academicYear): JsonResponse
@@ -62,7 +62,7 @@ class AcademicYearController extends Controller
             return $guard;
         }
 
-        return $this->ok($academicYear);
+        return $this->ok(new AcademicYearResource($academicYear));
     }
 
     public function update(Request $request, AcademicYear $academicYear): JsonResponse
@@ -79,7 +79,7 @@ class AcademicYearController extends Controller
 
         $academicYear->update($validated);
 
-        return $this->ok($academicYear->fresh(), 'Academic year updated.');
+        return $this->ok(new AcademicYearResource($academicYear->fresh()), 'Academic year updated.');
     }
 
     public function destroy(Request $request, AcademicYear $academicYear): JsonResponse
@@ -105,6 +105,6 @@ class AcademicYearController extends Controller
 
         $academicYear->setCurrent();
 
-        return $this->ok($academicYear->fresh(), 'Academic year set as current.');
+        return $this->ok(new AcademicYearResource($academicYear->fresh()), 'Academic year set as current.');
     }
 }

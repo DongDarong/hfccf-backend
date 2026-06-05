@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Dsam;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Dsam\OrganizationResource;
 use App\Models\Organization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,7 +36,7 @@ class OrganizationController extends Controller
         $paginator = $query->orderBy('name')->paginate($validated['per_page'] ?? 20);
 
         return $this->ok(
-            $paginator->items(),
+            OrganizationResource::collection($paginator->items()),
             null,
             $this->paginationMeta($paginator),
         );
@@ -60,7 +61,7 @@ class OrganizationController extends Controller
 
         $org = Organization::create($validated);
 
-        return $this->created($org, 'Organization created.');
+        return $this->created(new OrganizationResource($org), 'Organization created.');
     }
 
     public function show(Request $request, Organization $organization): JsonResponse
@@ -71,7 +72,7 @@ class OrganizationController extends Controller
 
         $organization->load(['schools', 'academicYears']);
 
-        return $this->ok($organization);
+        return $this->ok(new OrganizationResource($organization));
     }
 
     public function update(Request $request, Organization $organization): JsonResponse
@@ -94,7 +95,7 @@ class OrganizationController extends Controller
 
         $organization->update($validated);
 
-        return $this->ok($organization->fresh(), 'Organization updated.');
+        return $this->ok(new OrganizationResource($organization->fresh()), 'Organization updated.');
     }
 
     public function destroy(Request $request, Organization $organization): JsonResponse

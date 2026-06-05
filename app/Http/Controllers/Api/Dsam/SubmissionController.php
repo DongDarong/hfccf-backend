@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Dsam;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Dsam\FormSubmissionResource;
 use App\Models\Dsam\Answer;
 use App\Models\Dsam\FormSubmission;
 use App\Models\Dsam\FormTemplate;
@@ -52,7 +53,7 @@ class SubmissionController extends Controller
 
         $paginator = $query->orderByDesc('updated_at')->paginate($validated['per_page'] ?? 20);
 
-        return $this->ok($paginator->items(), null, $this->paginationMeta($paginator));
+        return $this->ok(FormSubmissionResource::collection($paginator->items()), null, $this->paginationMeta($paginator));
     }
 
     // ── Create (start assessment) ─────────────────────────────────────────────
@@ -93,7 +94,7 @@ class SubmissionController extends Controller
         ]);
 
         return $this->created(
-            $submission->load(['student', 'formTemplate', 'academicYear']),
+            new FormSubmissionResource($submission->load(['student', 'formTemplate', 'academicYear'])),
             'Assessment started.',
         );
     }
@@ -116,7 +117,7 @@ class SubmissionController extends Controller
             'approvals.actor',
         ]);
 
-        return $this->ok($dsamSubmission);
+        return $this->ok(new FormSubmissionResource($dsamSubmission));
     }
 
     // ── Save draft (auto-save) ────────────────────────────────────────────────
@@ -165,7 +166,7 @@ class SubmissionController extends Controller
         });
 
         return $this->ok(
-            $dsamSubmission->fresh()->load('answers', 'scores'),
+            new FormSubmissionResource($dsamSubmission->fresh()->load('answers', 'scores')),
             'Progress saved.',
         );
     }
@@ -199,7 +200,7 @@ class SubmissionController extends Controller
         });
 
         return $this->ok(
-            $dsamSubmission->fresh()->load('scores.section', 'approvals.actor'),
+            new FormSubmissionResource($dsamSubmission->fresh()->load('scores.section', 'approvals.actor')),
             'Assessment submitted.',
         );
     }
@@ -235,7 +236,7 @@ class SubmissionController extends Controller
             ]);
         });
 
-        return $this->ok($dsamSubmission->fresh()->load('approvals.actor'), 'Assessment approved.');
+        return $this->ok(new FormSubmissionResource($dsamSubmission->fresh()->load('approvals.actor')), 'Assessment approved.');
     }
 
     public function reject(Request $request, FormSubmission $dsamSubmission): JsonResponse
@@ -266,7 +267,7 @@ class SubmissionController extends Controller
             ]);
         });
 
-        return $this->ok($dsamSubmission->fresh()->load('approvals.actor'), 'Assessment rejected.');
+        return $this->ok(new FormSubmissionResource($dsamSubmission->fresh()->load('approvals.actor')), 'Assessment rejected.');
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────

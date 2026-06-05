@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Dsam;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Dsam\FormTemplateResource;
 use App\Models\Dsam\FormTemplate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -52,7 +53,7 @@ class FormTemplateController extends Controller
 
         $paginator = $query->orderByDesc('created_at')->paginate($validated['per_page'] ?? 20);
 
-        return $this->ok($paginator->items(), null, $this->paginationMeta($paginator));
+        return $this->ok(FormTemplateResource::collection($paginator->items()), null, $this->paginationMeta($paginator));
     }
 
     // ── Create ────────────────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ class FormTemplateController extends Controller
         ]);
 
         return $this->created(
-            $template->load(['academicYear', 'sections']),
+            new FormTemplateResource($template->load(['academicYear', 'sections'])),
             'Form template created.',
         );
     }
@@ -105,7 +106,7 @@ class FormTemplateController extends Controller
             'sections.allQuestions.options',
         ]);
 
-        return $this->ok($dsamForm);
+        return $this->ok(new FormTemplateResource($dsamForm));
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
@@ -135,7 +136,7 @@ class FormTemplateController extends Controller
 
         $dsamForm->update($validated);
 
-        return $this->ok($dsamForm->fresh()->load('academicYear'), 'Form template updated.');
+        return $this->ok(new FormTemplateResource($dsamForm->fresh()->load('academicYear')), 'Form template updated.');
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────
@@ -177,7 +178,7 @@ class FormTemplateController extends Controller
             'published_by' => $request->user()->id,
         ]);
 
-        return $this->ok($dsamForm->fresh(), 'Form published.');
+        return $this->ok(new FormTemplateResource($dsamForm->fresh()), 'Form published.');
     }
 
     // ── Duplicate ─────────────────────────────────────────────────────────────
@@ -198,7 +199,7 @@ class FormTemplateController extends Controller
             'parent_template_id' => null,
         ]);
 
-        return $this->created($copy->load('sections'), 'Form duplicated.');
+        return $this->created(new FormTemplateResource($copy->load('sections')), 'Form duplicated.');
     }
 
     // ── New version ───────────────────────────────────────────────────────────
@@ -225,7 +226,7 @@ class FormTemplateController extends Controller
             'academic_year_id'   => $validated['academic_year_id'] ?? $dsamForm->academic_year_id,
         ]);
 
-        return $this->created($copy->load('sections'), 'New version created.');
+        return $this->created(new FormTemplateResource($copy->load('sections')), 'New version created.');
     }
 
     // ── Version history ───────────────────────────────────────────────────────

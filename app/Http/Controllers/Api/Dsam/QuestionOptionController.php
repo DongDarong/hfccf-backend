@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Dsam;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Dsam\QuestionOptionResource;
 use App\Models\Dsam\Question;
 use App\Models\Dsam\QuestionOption;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,7 @@ class QuestionOptionController extends Controller
             return $guard;
         }
 
-        return $this->ok($dsamQuestion->options);
+        return $this->ok(QuestionOptionResource::collection($dsamQuestion->options));
     }
 
     public function store(Request $request, Question $dsamQuestion): JsonResponse
@@ -47,7 +48,7 @@ class QuestionOptionController extends Controller
             'order_index' => $maxOrder + 1,
         ]);
 
-        return $this->created($option, 'Option created.');
+        return $this->created(new QuestionOptionResource($option), 'Option created.');
     }
 
     public function update(Request $request, Question $dsamQuestion, QuestionOption $option): JsonResponse
@@ -71,7 +72,7 @@ class QuestionOptionController extends Controller
 
         $option->update($validated);
 
-        return $this->ok($option->fresh(), 'Option updated.');
+        return $this->ok(new QuestionOptionResource($option->fresh()), 'Option updated.');
     }
 
     public function destroy(Request $request, Question $dsamQuestion, QuestionOption $option): JsonResponse
@@ -106,6 +107,6 @@ class QuestionOptionController extends Controller
                 ->update(['order_index' => $index]);
         }
 
-        return $this->ok($dsamQuestion->options, 'Options reordered.');
+        return $this->ok(QuestionOptionResource::collection($dsamQuestion->options), 'Options reordered.');
     }
 }

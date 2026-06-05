@@ -39,7 +39,7 @@ class SchoolController extends Controller
 
         $paginator = $query->orderBy('name')->paginate($validated['per_page'] ?? 20);
 
-        return $this->ok($paginator->items(), null, $this->paginationMeta($paginator));
+        return $this->ok(SchoolResource::collection($paginator->items()), null, $this->paginationMeta($paginator));
     }
 
     public function store(Request $request): JsonResponse
@@ -60,7 +60,7 @@ class SchoolController extends Controller
             'phone'           => ['sometimes', 'nullable', 'string', 'max:50'],
         ]);
 
-        return $this->created(School::create($validated), 'School created.');
+        return $this->created(new SchoolResource(School::create($validated)), 'School created.');
     }
 
     public function show(Request $request, School $school): JsonResponse
@@ -69,7 +69,7 @@ class SchoolController extends Controller
             return $guard;
         }
 
-        return $this->ok($school->load('organization'));
+        return $this->ok(new SchoolResource($school->load('organization')));
     }
 
     public function update(Request $request, School $school): JsonResponse
@@ -92,7 +92,7 @@ class SchoolController extends Controller
 
         $school->update($validated);
 
-        return $this->ok($school->fresh(), 'School updated.');
+        return $this->ok(new SchoolResource($school->fresh()), 'School updated.');
     }
 
     public function destroy(Request $request, School $school): JsonResponse

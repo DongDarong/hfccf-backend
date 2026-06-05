@@ -83,6 +83,8 @@ use App\Http\Controllers\Api\Dsam\QuestionController;
 use App\Http\Controllers\Api\Dsam\QuestionOptionController;
 use App\Http\Controllers\Api\Dsam\QuestionTypeController;
 use App\Http\Controllers\Api\Dsam\SchoolController as DsamSchoolController;
+use App\Http\Controllers\Api\Dsam\StudentHistoryController;
+use App\Http\Controllers\Api\Dsam\StudentProfileController;
 use App\Http\Controllers\Api\Dsam\SubmissionController as DsamSubmissionController;
 use Illuminate\Support\Facades\Route;
 
@@ -712,6 +714,14 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::put('questions/{dsamQuestion}/options/{option}', [QuestionOptionController::class, 'update']);
         Route::delete('questions/{dsamQuestion}/options/{option}', [QuestionOptionController::class, 'destroy']);
         Route::post('questions/{dsamQuestion}/options/reorder', [QuestionOptionController::class, 'reorder']);
+
+        // Submissions
+        // Student profile & history (DSAM extensions on preschool_students)
+        Route::get('students/{student}/profile', [StudentProfileController::class, 'show']);
+        Route::put('students/{student}/profile', [StudentProfileController::class, 'upsert']);
+        Route::get('students/{student}/histories', [StudentHistoryController::class, 'index']);
+        Route::post('students/{student}/histories', [StudentHistoryController::class, 'store']);
+        Route::put('students/{student}/histories/{history}', [StudentHistoryController::class, 'update']);
 
         // Submissions
         Route::get('submissions', [DsamSubmissionController::class, 'index']);

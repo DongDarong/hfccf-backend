@@ -20,6 +20,6 @@ class QuestionTypeController extends Controller
             'icon', 'has_options', 'has_scoring', 'config_schema', 'sort_order',
         ]);
 
-        return $this->ok($types);
+        return $this->ok(QuestionTypeResource::collection($types));
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Dsam;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Dsam\QuestionResource;
 use App\Models\Dsam\FormSection;
 use App\Models\Dsam\Question;
 use Illuminate\Http\JsonResponse;
@@ -94,7 +95,7 @@ class QuestionController extends Controller
 
         $question->update($validated);
 
-        return $this->ok($question->fresh()->load('questionType', 'options'), 'Question updated.');
+        return $this->ok(new QuestionResource($question->fresh()->load('questionType', 'options')), 'Question updated.');
     }
 
     public function destroy(Request $request, FormSection $dsamSection, Question $question): JsonResponse
