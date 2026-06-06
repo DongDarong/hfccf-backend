@@ -17,6 +17,11 @@ class FormSubmission extends Model
 
     protected $table = 'dsam_form_submissions';
 
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     protected $fillable = [
         'form_template_id',
         'student_id',

@@ -320,7 +320,12 @@ class SubmissionController extends Controller
 
             SubmissionScore::updateOrCreate(
                 ['submission_id' => $submission->id, 'form_section_id' => $section->id],
-                compact('raw_score', 'weighted_score', 'max_score', 'percentage'),
+                [
+                    'raw_score'      => $rawScore,
+                    'weighted_score' => $weightedScore,
+                    'max_score'      => $maxScore,
+                    'percentage'     => $percentage,
+                ],
             );
 
             $totalScore += $weightedScore;
