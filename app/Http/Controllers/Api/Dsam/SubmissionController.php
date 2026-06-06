@@ -28,12 +28,14 @@ class SubmissionController extends Controller
         }
 
         $validated = $request->validate([
+            'search'           => ['sometimes', 'nullable', 'string', 'max:100'],
             'student_id'       => ['sometimes', 'integer'],
             'form_template_id' => ['sometimes', 'integer'],
             'academic_year_id' => ['sometimes', 'integer'],
             'status'           => ['sometimes', 'string', 'in:draft,in_progress,submitted,under_review,approved,rejected,archived'],
             'risk_level'       => ['sometimes', 'string', 'in:low,medium,high,critical'],
             'per_page'         => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'page'             => ['sometimes', 'integer', 'min:1'],
         ]);
 
         $user  = $request->user();
@@ -43,6 +45,16 @@ class SubmissionController extends Controller
         // Evaluators see only their own submissions; admins see all
         if (! in_array($user->role_code, self::APPROVER_ROLES, true)) {
             $query->where('submitted_by', $user->id);
+        }
+
+        if (! empty($validated['search'])) {
+            $term = '%'.$validated['search'].'%';
+            $query->where(function ($q) use ($term): void {
+                $q->whereHas('student', fn ($s) => $s->where('first_name', 'like', $term)
+                    ->orWhere('last_name', 'like', $term)
+                    ->orWhere('student_code', 'like', $term))
+                  ->orWhereHas('formTemplate', fn ($f) => $f->where('name', 'like', $term));
+            });
         }
 
         foreach (['student_id', 'form_template_id', 'academic_year_id', 'status', 'risk_level'] as $filter) {
