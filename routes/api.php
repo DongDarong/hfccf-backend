@@ -690,6 +690,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::put('forms/{dsamForm}', [FormTemplateController::class, 'update']);
         Route::delete('forms/{dsamForm}', [FormTemplateController::class, 'destroy']);
         Route::post('forms/{dsamForm}/publish', [FormTemplateController::class, 'publish']);
+        Route::post('forms/{dsamForm}/archive', [FormTemplateController::class, 'archive']);
         Route::post('forms/{dsamForm}/duplicate', [FormTemplateController::class, 'duplicate']);
         Route::post('forms/{dsamForm}/new-version', [FormTemplateController::class, 'newVersion']);
         Route::get('forms/{dsamForm}/versions', [FormTemplateController::class, 'versions']);

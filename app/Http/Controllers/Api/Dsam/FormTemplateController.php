@@ -181,6 +181,27 @@ class FormTemplateController extends Controller
         return $this->ok(new FormTemplateResource($dsamForm->fresh()), 'Form published.');
     }
 
+    // ── Archive ───────────────────────────────────────────────────────────────
+
+    public function archive(Request $request, FormTemplate $dsamForm): JsonResponse
+    {
+        if ($guard = $this->requireRoles($request->user(), self::ADMIN_ROLES)) {
+            return $guard;
+        }
+
+        if ($dsamForm->status === 'archived') {
+            return $this->error('Form is already archived.');
+        }
+
+        if ($dsamForm->isDraft()) {
+            return $this->error('Draft forms cannot be archived. Delete instead.');
+        }
+
+        $dsamForm->update(['status' => 'archived']);
+
+        return $this->ok(new FormTemplateResource($dsamForm->fresh()), 'Form archived.');
+    }
+
     // ── Duplicate ─────────────────────────────────────────────────────────────
 
     public function duplicate(Request $request, FormTemplate $dsamForm): JsonResponse
