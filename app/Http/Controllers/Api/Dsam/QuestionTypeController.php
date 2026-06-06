@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Dsam;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Dsam\QuestionTypeResource;
 use App\Models\Dsam\QuestionType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
