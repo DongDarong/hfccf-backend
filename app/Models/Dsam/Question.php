@@ -15,6 +15,7 @@ class Question extends Model
     protected $table = 'dsam_questions';
 
     protected $fillable = [
+        'uuid',
         'form_section_id',
         'question_type_id',
         'parent_question_id',
