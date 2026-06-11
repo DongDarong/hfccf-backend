@@ -150,6 +150,7 @@ class DsamDevSeeder extends Seeder
 
         // Q1 — guardian status
         $q1 = $s1->allQuestions()->create([
+            'uuid'             => (string) Str::uuid(),
             'question_type_id' => $radioType->id,
             'label'            => 'What is the primary guardian situation?',
             'label_kh'         => 'តើស្ថានភាពអ្នកអាណាព្យាបាលចម្បងជាអ្វី?',
@@ -167,6 +168,7 @@ class DsamDevSeeder extends Seeder
 
         // Q2 — monthly income
         $s1->allQuestions()->create([
+            'uuid'             => (string) Str::uuid(),
             'question_type_id' => $numType->id,
             'label'            => 'Estimated monthly household income (USD)',
             'label_kh'         => 'ប្រាក់ចំណូលគ្រួសារប្រចាំខែ (ដុល្លារ)',
@@ -187,6 +189,7 @@ class DsamDevSeeder extends Seeder
 
         $checkboxType = QuestionType::where('name', 'checkbox')->first();
         $q3 = $s2->allQuestions()->create([
+            'uuid'             => (string) Str::uuid(),
             'question_type_id' => $checkboxType->id,
             'label'            => 'Which utilities does the household have?',
             'label_kh'         => 'គ្រួសារមានសេវាកម្មអ្វីខ្លះ?',
@@ -213,6 +216,7 @@ class DsamDevSeeder extends Seeder
 
         $ratingType = QuestionType::where('name', 'rating_scale')->first();
         $s3->allQuestions()->create([
+            'uuid'             => (string) Str::uuid(),
             'question_type_id' => $ratingType->id,
             'label'            => 'How would you rate the child\'s school attendance regularity?',
             'label_kh'         => 'តើអ្នកវាយតម្លៃការចូលរៀនប្រចាំថ្ងៃរបស់សិស្សយ៉ាងដូចម្ដេច?',
@@ -233,6 +237,7 @@ class DsamDevSeeder extends Seeder
         ]);
 
         $s4->allQuestions()->create([
+            'uuid'             => (string) Str::uuid(),
             'question_type_id' => $radioType->id,
             'label'            => 'What is the child\'s general health status?',
             'label_kh'         => 'តើស្ថានភាពសុខភាពទូទៅរបស់កុមារជាយ៉ាងណា?',
