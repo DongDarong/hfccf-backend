@@ -115,6 +115,7 @@ class DsamDevSeeder extends Seeder
         }
 
         $form = FormTemplate::create([
+            'uuid'             => (string) Str::uuid(),
             'organization_id'  => $org->id,
             'academic_year_id' => $currentYear->id,
             'name'             => 'Annual Student Assessment 2025-2026',

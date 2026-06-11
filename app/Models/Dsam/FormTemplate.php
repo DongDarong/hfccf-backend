@@ -18,6 +18,7 @@ class FormTemplate extends Model
     protected $table = 'dsam_form_templates';
 
     protected $fillable = [
+        'uuid',
         'organization_id',
         'academic_year_id',
         'parent_template_id',
