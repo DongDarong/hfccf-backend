@@ -13,6 +13,7 @@ use App\Models\StudentHistory;
 use App\Models\PreschoolStudent;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class DsamDevSeeder extends Seeder
 {
@@ -22,6 +23,7 @@ class DsamDevSeeder extends Seeder
         $org = Organization::firstOrCreate(
             ['email' => 'admin@hfccf.org'],
             [
+                'uuid'      => (string) Str::uuid(),
                 'name'      => 'HFCCF',
                 'name_kh'   => 'សង្គមការពារកុមារ HFCCF',
                 'type'      => 'ngo',
