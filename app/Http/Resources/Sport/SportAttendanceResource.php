@@ -12,12 +12,10 @@ class SportAttendanceResource extends JsonResource
     public function toArray(Request $request): array
     {
         $player = $this->relationLoaded('player') ? $this->player : null;
-        $coach = $this->relationLoaded('coach') ? $this->coach : null;
         $team = $this->relationLoaded('team') ? $this->team : null;
         $fallbackTeam = $player?->team;
 
         $playerName = trim(($player?->first_name ?? '').' '.($player?->last_name ?? ''));
-        $coachName = trim(($coach?->first_name ?? '').' '.($coach?->last_name ?? ''));
         $recordedByName = trim(($this->recordedBy?->first_name ?? '').' '.($this->recordedBy?->last_name ?? ''));
 
         return [
@@ -27,9 +25,7 @@ class SportAttendanceResource extends JsonResource
             'teamName' => $team?->name ?? $fallbackTeam?->name,
             'playerId' => $this->player_id,
             'playerName' => $playerName,
-            'coachId' => $this->coach_user_id,
-            'coachName' => $coachName,
-            'personName' => $this->attendance_type === 'coach' ? $coachName : $playerName,
+            'personName' => $playerName,
             'recordedByUserId' => $this->recorded_by_user_id,
             'recordedByName' => $recordedByName !== '' ? $recordedByName : $this->recordedBy?->username,
             'attendanceDate' => $this->attendance_date?->toDateString(),

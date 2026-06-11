@@ -25,10 +25,8 @@ class SportAttendanceController extends SportController
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'attendance_type' => ['sometimes', 'nullable', 'string', 'in:player,coach'],
             'team_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_teams,id'],
             'player_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_players,id'],
-            'coach_id' => ['sometimes', 'nullable', 'string', 'max:16'],
             'status' => ['sometimes', 'nullable', 'string', 'max:32'],
             'attendance_date' => ['sometimes', 'nullable', 'date'],
             'date_from' => ['sometimes', 'nullable', 'date'],
@@ -40,10 +38,8 @@ class SportAttendanceController extends SportController
         $page = (int) ($validated['page'] ?? 1);
         $perPage = (int) ($validated['per_page'] ?? 10);
         $search = trim((string) ($validated['search'] ?? ''));
-        $attendanceType = trim((string) ($validated['attendance_type'] ?? ''));
         $teamId = (int) ($validated['team_id'] ?? 0);
         $playerId = (int) ($validated['player_id'] ?? 0);
-        $coachId = trim((string) ($validated['coach_id'] ?? ''));
         $status = trim((string) ($validated['status'] ?? ''));
         $attendanceDate = trim((string) ($validated['attendance_date'] ?? ''));
         $dateFrom = trim((string) ($validated['date_from'] ?? ''));
@@ -51,11 +47,9 @@ class SportAttendanceController extends SportController
         $sortBy = (string) ($validated['sort_by'] ?? 'attendance_date');
         $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $query = SportAttendanceRecord::query()->with(['team', 'player.team', 'coach', 'recordedBy']);
-
-        if ($attendanceType !== '') {
-            $query->where('attendance_type', $attendanceType);
-        }
+        $query = SportAttendanceRecord::query()
+            ->where('attendance_type', 'player')
+            ->with(['team', 'player.team', 'recordedBy']);
 
         if ($teamId > 0) {
             $query->where('team_id', $teamId);
@@ -63,10 +57,6 @@ class SportAttendanceController extends SportController
 
         if ($playerId > 0) {
             $query->where('player_id', $playerId);
-        }
-
-        if ($coachId !== '') {
-            $query->where('coach_user_id', $coachId);
         }
 
         if ($status !== '') {
@@ -137,10 +127,8 @@ class SportAttendanceController extends SportController
         }
 
         $data = $request->validate([
-            'attendance_type' => ['required', 'string', 'in:player,coach'],
             'team_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_teams,id'],
-            'player_id' => ['required_if:attendance_type,player', 'nullable', 'integer', 'exists:sport_players,id'],
-            'coach_id' => ['required_if:attendance_type,coach', 'nullable', 'string', 'max:16'],
+            'player_id' => ['required', 'nullable', 'integer', 'exists:sport_players,id'],
             'attendance_date' => ['required', 'date'],
             'status' => ['required', 'string', 'in:present,absent,late,excused'],
             'note' => ['sometimes', 'nullable', 'string'],
@@ -151,7 +139,7 @@ class SportAttendanceController extends SportController
         return ApiResponse::successResponse(
             'Sport attendance saved successfully.',
             [
-                'attendance' => SportAttendanceResource::make($attendance->load(['team', 'player.team', 'coach', 'recordedBy']))->resolve($request),
+                'attendance' => SportAttendanceResource::make($attendance->load(['team', 'player.team', 'recordedBy']))->resolve($request),
             ],
             Response::HTTP_CREATED,
         );
@@ -169,10 +157,8 @@ class SportAttendanceController extends SportController
         }
 
         $data = $request->validate([
-            'attendance_type' => ['sometimes', 'required_with:attendance_date,status', 'string', 'in:player,coach'],
             'team_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_teams,id'],
-            'player_id' => ['required_if:attendance_type,player', 'nullable', 'integer', 'exists:sport_players,id'],
-            'coach_id' => ['required_if:attendance_type,coach', 'nullable', 'string', 'max:16'],
+            'player_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_players,id'],
             'attendance_date' => ['sometimes', 'required', 'date'],
             'status' => ['sometimes', 'required', 'string', 'in:present,absent,late,excused'],
             'note' => ['sometimes', 'nullable', 'string'],
@@ -183,14 +169,13 @@ class SportAttendanceController extends SportController
         return ApiResponse::successResponse(
             'Sport attendance updated successfully.',
             [
-                'attendance' => SportAttendanceResource::make($attendance->load(['team', 'player.team', 'coach', 'recordedBy']))->resolve($request),
+                'attendance' => SportAttendanceResource::make($attendance->load(['team', 'player.team', 'recordedBy']))->resolve($request),
             ],
         );
     }
 
     private function upsertAttendance(?SportAttendanceRecord $attendance, array $data, ?User $user): SportAttendanceRecord
     {
-        $attendanceType = (string) ($data['attendance_type'] ?? $attendance?->attendance_type ?? 'player');
         $attendanceDate = (string) ($data['attendance_date'] ?? $attendance?->attendance_date?->toDateString() ?? '');
         $status = (string) ($data['status'] ?? $attendance?->status ?? 'present');
         $note = $data['note'] ?? $attendance?->note;
@@ -200,35 +185,20 @@ class SportAttendanceController extends SportController
         $playerId = array_key_exists('player_id', $data)
             ? ($data['player_id'] !== null ? (int) $data['player_id'] : null)
             : $attendance?->player_id;
-        $coachId = array_key_exists('coach_id', $data)
-            ? ($data['coach_id'] !== null ? trim((string) $data['coach_id']) : null)
-            : $attendance?->coach_user_id;
 
-        if ($attendanceType === 'player') {
-            $player = $playerId ? SportPlayer::query()->with('team')->find($playerId) : null;
-            $teamId = $teamId ?: $player?->team_id;
-            $playerId = $player?->id ?? $playerId;
-            $coachId = null;
-        } else {
-            $coach = $coachId !== null && $coachId !== '' ? $this->resolveUserReference($coachId, 'coach') : null;
-            $coachId = $coach?->id ?? ($coachId !== '' ? $coachId : null);
-            $playerId = null;
-            if (! $teamId && $coachId) {
-                $teamId = SportTeam::query()
-                    ->where('coach_user_id', $coachId)
-                    ->orderBy('id')
-                    ->value('id');
-            }
-        }
+        $player = $playerId ? SportPlayer::query()->with('team')->find($playerId) : null;
+        $teamId = $teamId ?: $player?->team_id;
+        $playerId = $player?->id ?? $playerId;
+
+        $subjectKey = 'player:'.(string) ($playerId ?? '');
 
         if ($attendance) {
-            $subjectKey = $this->resolveAttendanceSubjectKey($attendanceType, $playerId, $coachId);
             $attendance->fill([
-                'attendance_type' => $attendanceType,
+                'attendance_type' => 'player',
                 'subject_key' => $subjectKey,
                 'team_id' => $teamId,
                 'player_id' => $playerId,
-                'coach_user_id' => $coachId,
+                'coach_user_id' => null,
                 'recorded_by_user_id' => $attendance->recorded_by_user_id ?: $user?->id,
                 'attendance_date' => $attendanceDate,
                 'status' => $status,
@@ -238,8 +208,6 @@ class SportAttendanceController extends SportController
 
             return $attendance;
         }
-
-        $subjectKey = $this->resolveAttendanceSubjectKey($attendanceType, $playerId, $coachId);
 
         $query = SportAttendanceRecord::query()
             ->where('subject_key', $subjectKey)
@@ -253,11 +221,11 @@ class SportAttendanceController extends SportController
 
         if ($existing) {
             $existing->fill([
-                'attendance_type' => $attendanceType,
+                'attendance_type' => 'player',
                 'subject_key' => $subjectKey,
                 'team_id' => $teamId,
                 'player_id' => $playerId,
-                'coach_user_id' => $coachId,
+                'coach_user_id' => null,
                 'recorded_by_user_id' => $existing->recorded_by_user_id ?: $user?->id,
                 'attendance_date' => $attendanceDate,
                 'status' => $status,
@@ -269,24 +237,15 @@ class SportAttendanceController extends SportController
         }
 
         return SportAttendanceRecord::query()->create([
-            'attendance_type' => $attendanceType,
+            'attendance_type' => 'player',
             'subject_key' => $subjectKey,
             'team_id' => $teamId,
             'player_id' => $playerId,
-            'coach_user_id' => $coachId,
+            'coach_user_id' => null,
             'recorded_by_user_id' => $user?->id,
             'attendance_date' => $attendanceDate,
             'status' => $status,
             'note' => $note,
         ]);
-    }
-
-    private function resolveAttendanceSubjectKey(string $attendanceType, ?int $playerId, ?string $coachId): string
-    {
-        if ($attendanceType === 'coach') {
-            return 'coach:'.trim((string) $coachId);
-        }
-
-        return 'player:'.(string) ($playerId ?? '');
     }
 }
