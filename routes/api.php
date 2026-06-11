@@ -52,6 +52,7 @@ use App\Http\Controllers\Api\Sport\SportCoachController;
 use App\Http\Controllers\Api\Sport\SportCoachTeamController;
 use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportDivisionController;
+use App\Http\Controllers\Api\Sport\SportPlayingStyleController;
 use App\Http\Controllers\Api\Sport\SportMatchController;
 use App\Http\Controllers\Api\Sport\SportMatchEventController;
 use App\Http\Controllers\Api\Sport\SportMatchSquadController;
@@ -561,6 +562,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('divisions/{id}', [SportDivisionController::class, 'show']);
         Route::put('divisions/{id}', [SportDivisionController::class, 'update']);
         Route::delete('divisions/{id}', [SportDivisionController::class, 'destroy']);
+
+        Route::get('playing-styles', [SportPlayingStyleController::class, 'index']);
+        Route::post('playing-styles', [SportPlayingStyleController::class, 'store']);
+        Route::get('playing-styles/{id}', [SportPlayingStyleController::class, 'show']);
+        Route::put('playing-styles/{id}', [SportPlayingStyleController::class, 'update']);
+        Route::delete('playing-styles/{id}', [SportPlayingStyleController::class, 'destroy']);
 
         Route::get('players', [SportPlayerController::class, 'index']);
         Route::post('players', [SportPlayerController::class, 'store']);
