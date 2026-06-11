@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\Dsam\FormSubmission;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PreschoolStudent extends Model
@@ -129,5 +131,27 @@ class PreschoolStudent extends Model
     public function activeStudentGuardians(): HasMany
     {
         return $this->studentGuardians()->where('status', 'active');
+    }
+
+    // ── DSAM extensions ───────────────────────────────────────────────────────
+
+    public function profile(): HasOne
+    {
+        return $this->hasOne(StudentProfile::class, 'student_id');
+    }
+
+    public function histories(): HasMany
+    {
+        return $this->hasMany(StudentHistory::class, 'student_id')->orderByDesc('created_at');
+    }
+
+    public function dsamSubmissions(): HasMany
+    {
+        return $this->hasMany(FormSubmission::class, 'student_id');
+    }
+
+    public function latestDsamSubmission(): HasOne
+    {
+        return $this->hasOne(FormSubmission::class, 'student_id')->latestOfMany();
     }
 }

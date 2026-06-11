@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Dsam\FormSubmission;
+use App\Models\Dsam\FormTemplate;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -150,6 +152,21 @@ class User extends Authenticatable
     public function guardianPortalAccount(): HasMany
     {
         return $this->hasMany(PreschoolGuardianPortalAccount::class, 'user_id', 'id');
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function createdFormTemplates(): HasMany
+    {
+        return $this->hasMany(FormTemplate::class, 'created_by', 'id');
+    }
+
+    public function submittedAssessments(): HasMany
+    {
+        return $this->hasMany(FormSubmission::class, 'submitted_by', 'id');
     }
 
     private function resolveAvatarUrl(mixed $value): ?string

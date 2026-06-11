@@ -15,9 +15,7 @@ return new class extends Migration
 
         DB::table('sport_attendance_records')->orderBy('id')->chunkById(100, function ($records): void {
             foreach ($records as $record) {
-                $subjectKey = $record->attendance_type === 'coach'
-                    ? 'coach:'.trim((string) $record->coach_user_id)
-                    : 'player:'.trim((string) $record->player_id);
+                $subjectKey = 'player:'.trim((string) $record->player_id);
 
                 DB::table('sport_attendance_records')
                     ->where('id', $record->id)

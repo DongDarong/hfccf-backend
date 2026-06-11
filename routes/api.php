@@ -51,6 +51,8 @@ use App\Http\Controllers\Api\Sport\SportApprovalController;
 use App\Http\Controllers\Api\Sport\SportCoachController;
 use App\Http\Controllers\Api\Sport\SportCoachTeamController;
 use App\Http\Controllers\Api\Sport\SportDashboardController;
+use App\Http\Controllers\Api\Sport\SportDivisionController;
+use App\Http\Controllers\Api\Sport\SportPlayingStyleController;
 use App\Http\Controllers\Api\Sport\SportMatchController;
 use App\Http\Controllers\Api\Sport\SportMatchEventController;
 use App\Http\Controllers\Api\Sport\SportMatchSquadController;
@@ -74,6 +76,18 @@ use App\Http\Controllers\Api\Assessment\AssessmentPrintTemplateController;
 use App\Http\Controllers\Api\Assessment\AssessmentQuestionTypeController;
 use App\Http\Controllers\Api\Assessment\AssessmentReportController;
 use App\Http\Controllers\Api\Assessment\AssessmentAuditLogController;
+use App\Http\Controllers\Api\Dsam\AcademicYearController;
+use App\Http\Controllers\Api\Dsam\DashboardController as DsamDashboardController;
+use App\Http\Controllers\Api\Dsam\FormSectionController;
+use App\Http\Controllers\Api\Dsam\FormTemplateController;
+use App\Http\Controllers\Api\Dsam\OrganizationController as DsamOrganizationController;
+use App\Http\Controllers\Api\Dsam\QuestionController;
+use App\Http\Controllers\Api\Dsam\QuestionOptionController;
+use App\Http\Controllers\Api\Dsam\QuestionTypeController;
+use App\Http\Controllers\Api\Dsam\SchoolController as DsamSchoolController;
+use App\Http\Controllers\Api\Dsam\StudentHistoryController;
+use App\Http\Controllers\Api\Dsam\StudentProfileController;
+use App\Http\Controllers\Api\Dsam\SubmissionController as DsamSubmissionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -543,6 +557,18 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::patch('roster/{membership}', [SportTeamRosterController::class, 'update']);
         Route::delete('roster/{membership}', [SportTeamRosterController::class, 'destroy']);
 
+        Route::get('divisions', [SportDivisionController::class, 'index']);
+        Route::post('divisions', [SportDivisionController::class, 'store']);
+        Route::get('divisions/{id}', [SportDivisionController::class, 'show']);
+        Route::put('divisions/{id}', [SportDivisionController::class, 'update']);
+        Route::delete('divisions/{id}', [SportDivisionController::class, 'destroy']);
+
+        Route::get('playing-styles', [SportPlayingStyleController::class, 'index']);
+        Route::post('playing-styles', [SportPlayingStyleController::class, 'store']);
+        Route::get('playing-styles/{id}', [SportPlayingStyleController::class, 'show']);
+        Route::put('playing-styles/{id}', [SportPlayingStyleController::class, 'update']);
+        Route::delete('playing-styles/{id}', [SportPlayingStyleController::class, 'destroy']);
+
         Route::get('players', [SportPlayerController::class, 'index']);
         Route::post('players', [SportPlayerController::class, 'store']);
         Route::get('players/{id}', [SportPlayerController::class, 'show']);
@@ -647,5 +673,79 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
         // Audit logs
         Route::get('audit-logs', [AssessmentAuditLogController::class, 'index']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | DSAM — Dynamic Student Assessment Management
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('dsam')->group(function (): void {
+        Route::get('dashboard', [DsamDashboardController::class, 'index']);
+
+        // Lookup
+        Route::get('question-types', [QuestionTypeController::class, 'index']);
+
+        // Organizations
+        Route::apiResource('organizations', DsamOrganizationController::class);
+
+        // Academic years
+        Route::apiResource('academic-years', AcademicYearController::class);
+        Route::post('academic-years/{academicYear}/set-current', [AcademicYearController::class, 'setCurrent']);
+
+        // Schools
+        Route::apiResource('schools', DsamSchoolController::class);
+
+        // Form templates
+        Route::get('forms', [FormTemplateController::class, 'index']);
+        Route::post('forms', [FormTemplateController::class, 'store']);
+        Route::get('forms/{dsamForm}', [FormTemplateController::class, 'show']);
+        Route::put('forms/{dsamForm}', [FormTemplateController::class, 'update']);
+        Route::delete('forms/{dsamForm}', [FormTemplateController::class, 'destroy']);
+        Route::post('forms/{dsamForm}/publish', [FormTemplateController::class, 'publish']);
+        Route::post('forms/{dsamForm}/archive', [FormTemplateController::class, 'archive']);
+        Route::post('forms/{dsamForm}/duplicate', [FormTemplateController::class, 'duplicate']);
+        Route::post('forms/{dsamForm}/new-version', [FormTemplateController::class, 'newVersion']);
+        Route::get('forms/{dsamForm}/versions', [FormTemplateController::class, 'versions']);
+
+        // Sections (nested under form)
+        Route::get('forms/{dsamForm}/sections', [FormSectionController::class, 'index']);
+        Route::post('forms/{dsamForm}/sections', [FormSectionController::class, 'store']);
+        Route::put('forms/{dsamForm}/sections/{section}', [FormSectionController::class, 'update']);
+        Route::delete('forms/{dsamForm}/sections/{section}', [FormSectionController::class, 'destroy']);
+        Route::post('forms/{dsamForm}/sections/reorder', [FormSectionController::class, 'reorder']);
+
+        // Questions (nested under section)
+        Route::get('sections/{dsamSection}/questions', [QuestionController::class, 'index']);
+        Route::post('sections/{dsamSection}/questions', [QuestionController::class, 'store']);
+        Route::put('sections/{dsamSection}/questions/{question}', [QuestionController::class, 'update']);
+        Route::delete('sections/{dsamSection}/questions/{question}', [QuestionController::class, 'destroy']);
+        Route::post('sections/{dsamSection}/questions/reorder', [QuestionController::class, 'reorder']);
+
+        // Options (nested under question)
+        Route::get('questions/{dsamQuestion}/options', [QuestionOptionController::class, 'index']);
+        Route::post('questions/{dsamQuestion}/options', [QuestionOptionController::class, 'store']);
+        Route::put('questions/{dsamQuestion}/options/{option}', [QuestionOptionController::class, 'update']);
+        Route::delete('questions/{dsamQuestion}/options/{option}', [QuestionOptionController::class, 'destroy']);
+        Route::post('questions/{dsamQuestion}/options/reorder', [QuestionOptionController::class, 'reorder']);
+
+        // Submissions
+        // Student profile & history (DSAM extensions on preschool_students)
+        Route::get('students/{student}/profile', [StudentProfileController::class, 'show']);
+        Route::put('students/{student}/profile', [StudentProfileController::class, 'upsert']);
+        Route::get('students/{student}/histories', [StudentHistoryController::class, 'index']);
+        Route::post('students/{student}/histories', [StudentHistoryController::class, 'store']);
+        Route::put('students/{student}/histories/{history}', [StudentHistoryController::class, 'update']);
+
+        // Submissions
+        Route::get('submissions', [DsamSubmissionController::class, 'index']);
+        Route::post('submissions', [DsamSubmissionController::class, 'store']);
+        Route::get('submissions/{dsamSubmission}', [DsamSubmissionController::class, 'show']);
+        Route::put('submissions/{dsamSubmission}', [DsamSubmissionController::class, 'update']);
+        Route::delete('submissions/{dsamSubmission}', [DsamSubmissionController::class, 'destroy']);
+        Route::post('submissions/{dsamSubmission}/submit', [DsamSubmissionController::class, 'submit']);
+        Route::post('submissions/{dsamSubmission}/approve', [DsamSubmissionController::class, 'approve']);
+        Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
