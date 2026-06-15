@@ -309,10 +309,18 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::delete('check-logs/{check}', [PreschoolStudentHealthController::class, 'destroyHealthCheck']);
         });
 
-        // Health alerts and audit timelines are split into dedicated routes so
-        // dashboard summaries and student history views can stay read-only.
+        // Health alerts have their own lifecycle routes so the dashboard,
+        // student profile, and teacher workflow can share one canonical alert
+        // stack without exposing the underlying alert model directly in views.
         Route::get('health/alerts', [PreschoolHealthAlertController::class, 'alerts']);
         Route::get('health/dashboard-summary', [PreschoolHealthAlertController::class, 'dashboardSummary']);
+        Route::get('health/alerts/{alert}', [PreschoolHealthAlertController::class, 'show']);
+        Route::post('health/alerts/{alert}/acknowledge', [PreschoolHealthAlertController::class, 'acknowledge']);
+        Route::post('health/alerts/{alert}/assign', [PreschoolHealthAlertController::class, 'assign']);
+        Route::post('health/alerts/{alert}/status', [PreschoolHealthAlertController::class, 'status']);
+        Route::post('health/alerts/{alert}/resolve', [PreschoolHealthAlertController::class, 'resolve']);
+        Route::post('health/alerts/{alert}/close', [PreschoolHealthAlertController::class, 'close']);
+        Route::get('students/{student}/health/alerts', [PreschoolHealthAlertController::class, 'studentAlerts']);
         Route::get('students/{student}/health/audit-logs', [PreschoolStudentHealthAuditController::class, 'index']);
 
         Route::get('attendance', [PreschoolAttendanceController::class, 'index']);
@@ -790,6 +798,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
+
 
 
 

@@ -9,6 +9,7 @@ use App\Models\PreschoolStudentHealthIncident;
 use App\Models\PreschoolStudentMedicalProfile;
 use App\Models\PreschoolStudentMedicationRecord;
 use App\Models\PreschoolStudentVaccinationRecord;
+use App\Services\PreschoolHealthAlertService;
 use App\Services\PreschoolHealthAuditService;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,6 +17,7 @@ class PreschoolStudentHealthObserver
 {
     public function __construct(
         private readonly PreschoolHealthAuditService $auditService,
+        private readonly PreschoolHealthAlertService $alertService,
     ) {
     }
 
@@ -78,6 +80,11 @@ class PreschoolStudentHealthObserver
                 ],
             );
         }
+
+        // Alert lifecycle records are maintained alongside the source records so
+        // the operational dashboard can manage a single canonical alert stack.
+        $this->alertService->syncFromModel($model, $actor);
+        $this->alertService->syncStudentCoverage($student, $actor);
     }
 
     private function isSupported(Model $model): bool

@@ -193,4 +193,11 @@ class PreschoolStudent extends Model
     {
         return $this->hasMany(PreschoolStudentHealthCheckLog::class, 'student_id')->orderByDesc('checked_at');
     }
+
+    public function healthAlerts(): HasMany
+    {
+        return $this->hasMany(PreschoolHealthAlert::class, 'student_id');
+    }
 }
+
+
