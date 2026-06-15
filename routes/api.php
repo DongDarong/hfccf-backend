@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
+use App\Http\Controllers\Api\Preschool\PreschoolHealthAlertController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthController;
 use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
@@ -302,10 +304,16 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
             Route::post('emergency-contacts', [PreschoolStudentHealthController::class, 'storeHealthContact']);
             Route::put('emergency-contacts/{contact}', [PreschoolStudentHealthController::class, 'updateHealthContact']);
             Route::delete('emergency-contacts/{contact}', [PreschoolStudentHealthController::class, 'destroyHealthContact']);
-            Route::get('check-logs', [PreschoolStudentHealthController::class, 'healthChecks']);
-            Route::post('check-logs', [PreschoolStudentHealthController::class, 'storeHealthCheck']);
-            Route::delete('check-logs/{check}', [PreschoolStudentHealthController::class, 'destroyHealthCheck']);
+        Route::get('check-logs', [PreschoolStudentHealthController::class, 'healthChecks']);
+        Route::post('check-logs', [PreschoolStudentHealthController::class, 'storeHealthCheck']);
+        Route::delete('check-logs/{check}', [PreschoolStudentHealthController::class, 'destroyHealthCheck']);
         });
+
+        // Health alerts and audit timelines are split into dedicated routes so
+        // dashboard summaries and student history views can stay read-only.
+        Route::get('health/alerts', [PreschoolHealthAlertController::class, 'alerts']);
+        Route::get('health/dashboard-summary', [PreschoolHealthAlertController::class, 'dashboardSummary']);
+        Route::get('students/{student}/health/audit-logs', [PreschoolStudentHealthAuditController::class, 'index']);
 
         Route::get('attendance', [PreschoolAttendanceController::class, 'index']);
         Route::post('attendance', [PreschoolAttendanceController::class, 'store']);
