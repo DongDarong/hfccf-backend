@@ -133,7 +133,7 @@ class PreschoolStudent extends Model
         return $this->studentGuardians()->where('status', 'active');
     }
 
-    // ── DSAM extensions ───────────────────────────────────────────────────────
+    // ── DSAM extensions ──────────────────────────────────────────────────────
 
     public function profile(): HasOne
     {
@@ -153,5 +153,44 @@ class PreschoolStudent extends Model
     public function latestDsamSubmission(): HasOne
     {
         return $this->hasOne(FormSubmission::class, 'student_id')->latestOfMany();
+    }
+
+    // ── Health records ───────────────────────────────────────────────────────
+    // Health data is intentionally separate from the legacy student profile so
+    // medical updates can be versioned without overwriting intake history.
+
+    public function medicalProfile(): HasOne
+    {
+        return $this->hasOne(PreschoolStudentMedicalProfile::class, 'student_id');
+    }
+
+    public function allergies(): HasMany
+    {
+        return $this->hasMany(PreschoolStudentAllergy::class, 'student_id');
+    }
+
+    public function vaccinationRecords(): HasMany
+    {
+        return $this->hasMany(PreschoolStudentVaccinationRecord::class, 'student_id');
+    }
+
+    public function medicationRecords(): HasMany
+    {
+        return $this->hasMany(PreschoolStudentMedicationRecord::class, 'student_id');
+    }
+
+    public function healthIncidents(): HasMany
+    {
+        return $this->hasMany(PreschoolStudentHealthIncident::class, 'student_id');
+    }
+
+    public function emergencyHealthContacts(): HasMany
+    {
+        return $this->hasMany(PreschoolStudentHealthContact::class, 'student_id');
+    }
+
+    public function healthCheckLogs(): HasMany
+    {
+        return $this->hasMany(PreschoolStudentHealthCheckLog::class, 'student_id')->orderByDesc('checked_at');
     }
 }
