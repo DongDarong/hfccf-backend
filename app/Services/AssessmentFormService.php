@@ -95,9 +95,9 @@ class AssessmentFormService
         });
     }
 
-    public function duplicateForm(AssessmentFormTemplate $template): AssessmentFormTemplate
+    public function duplicateForm(AssessmentFormTemplate $template, array $metadata = []): AssessmentFormTemplate
     {
-        return DB::transaction(function () use ($template) {
+        return DB::transaction(function () use ($template, $metadata) {
             $template->loadMissing([
                 'sections.questions.options',
                 'sections.questions.matrixRows',
@@ -106,7 +106,13 @@ class AssessmentFormService
                 'printTemplates',
             ]);
 
-            $newTemplate = $template->replicate(['deleted_at', 'published_at', 'published_by', 'archived_at', 'archived_by']);
+            $newTemplate = $template->replicate([
+                'deleted_at',
+                'published_at',
+                'published_by',
+                'archived_at',
+                'archived_by',
+            ]);
             $newTemplate->uuid = (string) Str::uuid();
             $newTemplate->code = $this->generateCopyCode($template->code ?? 'FORM');
             $newTemplate->name = $template->name . ' (Copy)';
@@ -118,6 +124,14 @@ class AssessmentFormService
             $newTemplate->published_by = null;
             $newTemplate->archived_at = null;
             $newTemplate->archived_by = null;
+            $newTemplate->duplicated_from_template_id = $template->id;
+            $newTemplate->duplicated_from_version = $template->current_version;
+            $newTemplate->restored_from_template_id = null;
+            $newTemplate->restored_from_version = null;
+            $newTemplate->version_notes = $metadata['version_notes'] ?? $metadata['duplicate_notes'] ?? $template->version_notes;
+            $newTemplate->review_notes = $metadata['review_notes'] ?? null;
+            $newTemplate->reviewed_by = null;
+            $newTemplate->reviewed_at = null;
             $newTemplate->save();
 
             foreach ($template->sections()->with(['questions.options', 'questions.matrixRows'])->orderBy('sort_order')->get() as $section) {
@@ -181,12 +195,21 @@ class AssessmentFormService
         });
     }
 
-    public function publishForm(AssessmentFormTemplate $template, ?string $changeSummary = null): AssessmentFormVersion
+    public function publishForm(AssessmentFormTemplate $template, array $metadata = []): AssessmentFormVersion
     {
-        return DB::transaction(function () use ($template, $changeSummary) {
+        return DB::transaction(function () use ($template, $metadata) {
             $template->loadMissing(['sections.questions.options', 'sections.questions.matrixRows']);
 
-            $version = $this->lifecycle->publishTemplate($template, $changeSummary);
+            $template->version_notes = $metadata['version_notes'] ?? $metadata['publish_notes'] ?? $template->version_notes;
+            $template->review_notes = $metadata['review_notes'] ?? $template->review_notes;
+            $template->reviewed_by = auth()->id();
+            $template->reviewed_at = now();
+            $template->save();
+
+            $version = $this->lifecycle->publishTemplate(
+                $template,
+                $metadata['publish_notes'] ?? $metadata['change_summary'] ?? $metadata['version_notes'] ?? null
+            );
             $template->update([
                 'status' => 'published',
                 'published_at' => $version->published_at,
@@ -203,7 +226,7 @@ class AssessmentFormService
                     'version' => $version->version_number,
                     'status' => 'published',
                 ],
-                meta: ['change_summary' => $changeSummary],
+                meta: ['change_summary' => $metadata['publish_notes'] ?? $metadata['change_summary'] ?? $metadata['version_notes'] ?? null],
             );
 
             return $version;
@@ -222,13 +245,17 @@ class AssessmentFormService
         return $template->fresh();
     }
 
-    public function restoreForm(AssessmentFormTemplate $template, ?User $actor = null): AssessmentFormTemplate
+    public function restoreForm(AssessmentFormTemplate $template, ?User $actor = null, array $metadata = []): AssessmentFormTemplate
     {
         $template->update([
             'status' => 'draft',
             'archived_at' => null,
             'archived_by' => null,
             'updated_by' => $actor?->id ?? auth()->id(),
+            'restored_from_template_id' => $metadata['restored_from_template_id'] ?? $template->id,
+            'restored_from_version' => $metadata['restored_from_version'] ?? $template->current_version,
+            'version_notes' => $metadata['version_notes'] ?? $metadata['restore_notes'] ?? $template->version_notes,
+            'review_notes' => $metadata['review_notes'] ?? $template->review_notes,
         ]);
 
         return $template->fresh();

@@ -20,6 +20,7 @@ class AssessmentLifecycleService
             'scoringRules',
             'riskLevels',
             'printTemplates',
+            'reviewedBy',
         ]);
 
         return [
@@ -32,12 +33,21 @@ class AssessmentLifecycleService
                 'status'     => $template->status,
                 'settings'   => $template->settings,
                 'version'    => $template->current_version,
+                'version_notes' => $template->version_notes,
+                'review_notes'  => $template->review_notes,
+                'reviewed_by'   => $template->reviewed_by,
+                'reviewed_by_name' => trim(($template->reviewedBy?->first_name ?? '').' '.($template->reviewedBy?->last_name ?? '')) ?: null,
+                'reviewed_at'   => $template->reviewed_at?->toIso8601String(),
                 'created_by' => $template->created_by,
                 'updated_by' => $template->updated_by,
                 'published_at' => $template->published_at?->toIso8601String(),
                 'published_by' => $template->published_by,
                 'archived_at' => $template->archived_at?->toIso8601String(),
                 'archived_by' => $template->archived_by,
+                'duplicated_from_template_id' => $template->duplicated_from_template_id,
+                'duplicated_from_version' => $template->duplicated_from_version,
+                'restored_from_template_id' => $template->restored_from_template_id,
+                'restored_from_version' => $template->restored_from_version,
             ],
             'sections' => $template->sections->map(fn ($section) => [
                 'id'          => $section->id,

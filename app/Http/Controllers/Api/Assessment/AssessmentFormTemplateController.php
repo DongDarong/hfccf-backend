@@ -78,6 +78,15 @@ class AssessmentFormTemplateController extends Controller
             'description_kh' => ['sometimes', 'nullable', 'string'],
             'category'    => ['sometimes', 'nullable', 'string', 'max:64'],
             'settings'    => ['sometimes', 'nullable', 'array'],
+            'publish_notes' => ['sometimes', 'nullable', 'string'],
+            'version_notes' => ['sometimes', 'nullable', 'string'],
+            'review_notes' => ['sometimes', 'nullable', 'string'],
+            'duplicate_notes' => ['sometimes', 'nullable', 'string'],
+            'restore_notes' => ['sometimes', 'nullable', 'string'],
+            'duplicated_from_template_id' => ['sometimes', 'nullable', 'integer'],
+            'duplicated_from_version' => ['sometimes', 'nullable', 'integer'],
+            'restored_from_template_id' => ['sometimes', 'nullable', 'integer'],
+            'restored_from_version' => ['sometimes', 'nullable', 'integer'],
             'sections'    => ['sometimes', 'nullable', 'array'],
             'sections.*.id' => ['sometimes', 'nullable', 'integer'],
             'sections.*.code' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -138,6 +147,12 @@ class AssessmentFormTemplateController extends Controller
             'status'     => 'draft',
             'created_by' => $request->user()->id,
             'settings'   => $validated['settings'] ?? null,
+            'version_notes' => $validated['version_notes'] ?? $validated['publish_notes'] ?? null,
+            'review_notes' => $validated['review_notes'] ?? null,
+            'duplicated_from_template_id' => $validated['duplicated_from_template_id'] ?? null,
+            'duplicated_from_version' => $validated['duplicated_from_version'] ?? null,
+            'restored_from_template_id' => $validated['restored_from_template_id'] ?? null,
+            'restored_from_version' => $validated['restored_from_version'] ?? null,
         ]);
 
         if (! empty($validated['sections'])) {
@@ -148,6 +163,11 @@ class AssessmentFormTemplateController extends Controller
             'success' => true,
             'message' => 'Form template created.',
             'data'    => new AssessmentFormTemplateResource($template->fresh([
+                'publishedBy',
+                'archivedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
                 'sections.questions.options',
                 'sections.questions.questionType',
                 'versions',
@@ -166,6 +186,9 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->load([
                 'publishedBy',
                 'archivedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
                 'sections.questions.options',
                 'sections.questions.questionType',
                 'versions',
@@ -189,6 +212,15 @@ class AssessmentFormTemplateController extends Controller
             'description_kh' => ['sometimes', 'nullable', 'string'],
             'category'    => ['sometimes', 'nullable', 'string', 'max:64'],
             'settings'    => ['sometimes', 'nullable', 'array'],
+            'publish_notes' => ['sometimes', 'nullable', 'string'],
+            'version_notes' => ['sometimes', 'nullable', 'string'],
+            'review_notes' => ['sometimes', 'nullable', 'string'],
+            'duplicate_notes' => ['sometimes', 'nullable', 'string'],
+            'restore_notes' => ['sometimes', 'nullable', 'string'],
+            'duplicated_from_template_id' => ['sometimes', 'nullable', 'integer'],
+            'duplicated_from_version' => ['sometimes', 'nullable', 'integer'],
+            'restored_from_template_id' => ['sometimes', 'nullable', 'integer'],
+            'restored_from_version' => ['sometimes', 'nullable', 'integer'],
             'sections'    => ['sometimes', 'nullable', 'array'],
             'sections.*.id' => ['sometimes', 'nullable', 'integer'],
             'sections.*.code' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -262,6 +294,12 @@ class AssessmentFormTemplateController extends Controller
             'description_kh' => $validated['description_kh'] ?? $form->description_kh,
             'category'    => $validated['category'] ?? $form->category,
             'settings'    => $validated['settings'] ?? $form->settings,
+            'version_notes' => $validated['version_notes'] ?? $validated['publish_notes'] ?? $form->version_notes,
+            'review_notes' => $validated['review_notes'] ?? $form->review_notes,
+            'duplicated_from_template_id' => $validated['duplicated_from_template_id'] ?? $form->duplicated_from_template_id,
+            'duplicated_from_version' => $validated['duplicated_from_version'] ?? $form->duplicated_from_version,
+            'restored_from_template_id' => $validated['restored_from_template_id'] ?? $form->restored_from_template_id,
+            'restored_from_version' => $validated['restored_from_version'] ?? $form->restored_from_version,
             'updated_by'  => $request->user()->id,
         ]);
 
@@ -271,6 +309,9 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->fresh([
                 'publishedBy',
                 'archivedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
                 'sections.questions.options',
                 'sections.questions.questionType',
                 'versions',
@@ -316,7 +357,17 @@ class AssessmentFormTemplateController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $version = $this->service->publishForm($form, $request->input('change_summary'));
+        $validated = $request->validate([
+            'publish_notes' => ['sometimes', 'nullable', 'string'],
+            'version_notes' => ['sometimes', 'nullable', 'string'],
+            'review_notes' => ['sometimes', 'nullable', 'string'],
+        ]);
+
+        $version = $this->service->publishForm($form, [
+            'publish_notes' => $validated['publish_notes'] ?? $request->input('change_summary'),
+            'version_notes' => $validated['version_notes'] ?? $form->version_notes,
+            'review_notes' => $validated['review_notes'] ?? $form->review_notes,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -324,6 +375,9 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->fresh([
                 'publishedBy',
                 'archivedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
                 'sections.questions.options',
                 'sections.questions.questionType',
                 'versions',
@@ -337,7 +391,17 @@ class AssessmentFormTemplateController extends Controller
             return $response;
         }
 
-        $copy = $this->service->duplicateForm($form);
+        $validated = $request->validate([
+            'duplicate_notes' => ['sometimes', 'nullable', 'string'],
+            'version_notes' => ['sometimes', 'nullable', 'string'],
+            'review_notes' => ['sometimes', 'nullable', 'string'],
+        ]);
+
+        $copy = $this->service->duplicateForm($form, [
+            'version_notes' => $validated['version_notes'] ?? $validated['duplicate_notes'] ?? $form->version_notes,
+            'duplicate_notes' => $validated['duplicate_notes'] ?? null,
+            'review_notes' => $validated['review_notes'] ?? null,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -345,6 +409,9 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($copy->load([
                 'publishedBy',
                 'archivedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
                 'sections.questions.options',
                 'sections.questions.questionType',
                 'versions',
@@ -366,6 +433,9 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->load([
                 'publishedBy',
                 'archivedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
                 'sections.questions.options',
                 'sections.questions.questionType',
                 'versions',
@@ -379,7 +449,19 @@ class AssessmentFormTemplateController extends Controller
             return $response;
         }
 
-        $form = $this->service->restoreForm($form, $request->user());
+        $validated = $request->validate([
+            'restore_notes' => ['sometimes', 'nullable', 'string'],
+            'version_notes' => ['sometimes', 'nullable', 'string'],
+            'review_notes' => ['sometimes', 'nullable', 'string'],
+        ]);
+
+        $form = $this->service->restoreForm($form, $request->user(), [
+            'restored_from_template_id' => $form->id,
+            'restored_from_version' => $form->current_version,
+            'version_notes' => $validated['version_notes'] ?? $validated['restore_notes'] ?? $form->version_notes,
+            'restore_notes' => $validated['restore_notes'] ?? null,
+            'review_notes' => $validated['review_notes'] ?? null,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -387,6 +469,9 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->load([
                 'publishedBy',
                 'archivedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
                 'sections.questions.options',
                 'sections.questions.questionType',
                 'versions',
@@ -400,7 +485,7 @@ class AssessmentFormTemplateController extends Controller
             return $response;
         }
 
-        $form->loadMissing(['creator', 'updater', 'publishedBy', 'archivedBy']);
+        $form->loadMissing(['creator', 'updater', 'publishedBy', 'archivedBy', 'reviewedBy']);
         $questionTypes = AssessmentQuestionType::query()
             ->get(['id', 'key', 'label'])
             ->keyBy('id');
@@ -510,6 +595,18 @@ class AssessmentFormTemplateController extends Controller
             // the mutable template status may already have advanced or changed
             // after the snapshot was captured.
             'status' => $version->published_at ? 'published' : data_get($templateSnapshot, 'status', $form->status),
+            'publish_notes' => $version->change_summary,
+            'version_notes' => data_get($templateSnapshot, 'version_notes'),
+            'review_notes' => data_get($templateSnapshot, 'review_notes'),
+            'reviewed_by' => [
+                'id' => data_get($templateSnapshot, 'reviewed_by'),
+                'name' => data_get($templateSnapshot, 'reviewed_by_name'),
+            ],
+            'reviewed_at' => data_get($templateSnapshot, 'reviewed_at'),
+            'duplicated_from_template_id' => data_get($templateSnapshot, 'duplicated_from_template_id'),
+            'duplicated_from_version' => data_get($templateSnapshot, 'duplicated_from_version'),
+            'restored_from_template_id' => data_get($templateSnapshot, 'restored_from_template_id'),
+            'restored_from_version' => data_get($templateSnapshot, 'restored_from_version'),
             'created_by' => [
                 'id' => $form->creator?->id ?? data_get($templateSnapshot, 'created_by'),
                 'name' => trim(($form->creator?->first_name ?? '').' '.($form->creator?->last_name ?? '')) ?: null,

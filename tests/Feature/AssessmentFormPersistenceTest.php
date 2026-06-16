@@ -121,13 +121,19 @@ class AssessmentFormPersistenceTest extends TestCase
 
         $this->assertSame($reorderedQuestionIds, $flattenedQuestionIds);
 
-        $publish = $this->postJson("/api/assessment/forms/{$templateId}/publish");
+        $publish = $this->postJson("/api/assessment/forms/{$templateId}/publish", [
+            'publish_notes' => 'Ready for Preschool review',
+            'version_notes' => 'Version 1 for the new cycle',
+            'review_notes' => 'Checked by the curriculum lead',
+        ]);
         $publish
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.status', 'published')
             ->assertJsonPath('data.is_published', true)
-            ->assertJsonPath('data.current_version', 1);
+            ->assertJsonPath('data.current_version', 1)
+            ->assertJsonPath('data.version_notes', 'Version 1 for the new cycle')
+            ->assertJsonPath('data.review_notes', 'Checked by the curriculum lead');
 
         $this->assertDatabaseHas('assessment_form_versions', [
             'template_id' => $templateId,
@@ -143,16 +149,27 @@ class AssessmentFormPersistenceTest extends TestCase
         $this->assertSame(2, $versions[0]['sections_count']);
         $this->assertSame(3, $versions[0]['questions_count']);
         $this->assertSame('published', $versions[0]['status']);
+        $this->assertSame('Ready for Preschool review', $versions[0]['publish_notes']);
+        $this->assertSame('Version 1 for the new cycle', $versions[0]['version_notes']);
+        $this->assertSame('Checked by the curriculum lead', $versions[0]['review_notes']);
         $this->assertArrayHasKey('snapshot', $versions[0]);
         $this->assertSame('Preschool Development Checklist v2', $versions[0]['snapshot']['template']['name']);
         $this->assertSame('short_text', $versions[0]['snapshot']['sections'][0]['questions'][0]['question_type_key']);
 
-        $duplicate = $this->postJson("/api/assessment/forms/{$templateId}/duplicate");
+        $duplicate = $this->postJson("/api/assessment/forms/{$templateId}/duplicate", [
+            'duplicate_notes' => 'Duplicate for spring cohort',
+            'version_notes' => 'Copied from published baseline',
+            'review_notes' => 'Duplicated after approval',
+        ]);
         $duplicate
             ->assertCreated()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.status', 'draft')
-            ->assertJsonPath('data.is_draft', true);
+            ->assertJsonPath('data.is_draft', true)
+            ->assertJsonPath('data.duplicated_from_template_id', $templateId)
+            ->assertJsonPath('data.duplicated_from_version', 1)
+            ->assertJsonPath('data.version_notes', 'Copied from published baseline')
+            ->assertJsonPath('data.review_notes', 'Duplicated after approval');
 
         $copyId = $duplicate->json('data.id');
 
@@ -161,6 +178,18 @@ class AssessmentFormPersistenceTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.status', 'archived')
             ->assertJsonPath('data.is_archived', true);
+
+        $this->postJson("/api/assessment/forms/{$copyId}/restore", [
+            'restore_notes' => 'Restore for correction',
+            'version_notes' => 'Restored draft version note',
+            'review_notes' => 'Restored and ready for edits',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.restored_from_template_id', $copyId)
+            ->assertJsonPath('data.version_notes', 'Restored draft version note')
+            ->assertJsonPath('data.review_notes', 'Restored and ready for edits');
     }
 
     public function test_publish_requires_at_least_one_section_and_question(): void
