@@ -135,6 +135,18 @@ class AssessmentFormPersistenceTest extends TestCase
             'is_current' => 1,
         ]);
 
+        $versions = $this->getJson("/api/assessment/forms/{$templateId}/versions")
+            ->assertOk()
+            ->json('data');
+
+        $this->assertCount(1, $versions);
+        $this->assertSame(2, $versions[0]['sections_count']);
+        $this->assertSame(3, $versions[0]['questions_count']);
+        $this->assertSame('published', $versions[0]['status']);
+        $this->assertArrayHasKey('snapshot', $versions[0]);
+        $this->assertSame('Preschool Development Checklist v2', $versions[0]['snapshot']['template']['name']);
+        $this->assertSame('short_text', $versions[0]['snapshot']['sections'][0]['questions'][0]['question_type_key']);
+
         $duplicate = $this->postJson("/api/assessment/forms/{$templateId}/duplicate");
         $duplicate
             ->assertCreated()

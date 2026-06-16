@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Assessment\AssessmentFormTemplateResource;
 use App\Models\AssessmentFormTemplate;
 use App\Models\AssessmentFormVersion;
+use App\Models\AssessmentQuestionType;
 use App\Models\User;
 use App\Services\AssessmentFormService;
 use Illuminate\Database\Eloquent\Builder;
@@ -399,20 +400,15 @@ class AssessmentFormTemplateController extends Controller
             return $response;
         }
 
+        $form->loadMissing(['creator', 'updater', 'publishedBy', 'archivedBy']);
+        $questionTypes = AssessmentQuestionType::query()
+            ->get(['id', 'key', 'label'])
+            ->keyBy('id');
+
         $versions = $form->versions()
             ->orderBy('version_number')
             ->get()
-            ->map(fn (AssessmentFormVersion $version) => [
-                'id' => $version->id,
-                'template_id' => $version->template_id,
-                'version_number' => $version->version_number,
-                'label' => $version->label,
-                'change_summary' => $version->change_summary,
-                'published_at' => $version->published_at?->toIso8601String(),
-                'published_by' => $version->published_by,
-                'is_current' => (bool) $version->is_current,
-                'created_at' => $version->created_at?->toIso8601String(),
-            ]);
+            ->map(fn (AssessmentFormVersion $version) => $this->shapeVersionResponse($form, $version, $questionTypes));
 
         return response()->json([
             'success' => true,
@@ -438,6 +434,127 @@ class AssessmentFormTemplateController extends Controller
             'perPage'    => $paginator->perPage(),
             'total'      => $paginator->total(),
             'totalPages' => $paginator->lastPage(),
+        ];
+    }
+
+    /**
+     * Shape version data for the Preschool builder review UI.
+     *
+     * The version table is immutable, so we derive counts and current-template
+     * lifecycle fields here instead of adding a second versioning model.
+     */
+    private function shapeVersionResponse(
+        AssessmentFormTemplate $form,
+        AssessmentFormVersion $version,
+        $questionTypes
+    ): array {
+        $snapshot = $version->snapshot ?? [];
+        $sections = data_get($snapshot, 'sections', []);
+        $templateSnapshot = data_get($snapshot, 'template', []);
+        $sectionsCount = is_array($sections) ? count($sections) : 0;
+        $questionsCount = 0;
+
+        $normalizedSections = collect($sections)->map(function ($section) use (&$questionsCount, $questionTypes) {
+            $questions = collect(data_get($section, 'questions', []))->map(function ($question) use ($questionTypes) {
+                $questionTypeId = (int) data_get($question, 'question_type_id', 0);
+                $questionType = $questionTypes->get($questionTypeId);
+
+                return [
+                    'id' => data_get($question, 'id'),
+                    'code' => data_get($question, 'code'),
+                    'label' => data_get($question, 'label'),
+                    'label_kh' => data_get($question, 'label_kh'),
+                    'question_type_id' => $questionTypeId ?: null,
+                    'question_type_key' => $questionType?->key ?? data_get($question, 'question_type_key'),
+                    'question_type_label' => $questionType?->label ?? data_get($question, 'question_type_label'),
+                    'sort_order' => data_get($question, 'sort_order'),
+                    'is_required' => (bool) data_get($question, 'is_required', false),
+                    'is_scored' => (bool) data_get($question, 'is_scored', false),
+                    'max_score' => data_get($question, 'max_score'),
+                    'scoring_weight' => data_get($question, 'scoring_weight'),
+                    'validation_rules' => data_get($question, 'validation_rules', []),
+                    'conditional_logic' => data_get($question, 'conditional_logic', []),
+                    'options' => collect(data_get($question, 'options', []))->map(fn ($option) => [
+                        'id' => data_get($option, 'id'),
+                        'label' => data_get($option, 'label'),
+                        'label_kh' => data_get($option, 'label_kh'),
+                        'value' => data_get($option, 'value'),
+                        'score_value' => data_get($option, 'score_value'),
+                        'sort_order' => data_get($option, 'sort_order'),
+                        'is_other' => (bool) data_get($option, 'is_other', false),
+                        'settings' => data_get($option, 'settings', []),
+                    ])->values(),
+                ];
+            })->values();
+
+            $questionsCount += $questions->count();
+
+            return [
+                'id' => data_get($section, 'id'),
+                'code' => data_get($section, 'code'),
+                'title' => data_get($section, 'title'),
+                'description' => data_get($section, 'description'),
+                'sort_order' => data_get($section, 'sort_order'),
+                'settings' => data_get($section, 'settings', []),
+                'questions' => $questions,
+            ];
+        })->values();
+
+        return [
+            'id' => $version->id,
+            'template_id' => $version->template_id,
+            'version_number' => $version->version_number,
+            'label' => $version->label,
+            // Version rows represent published history snapshots. A published_at
+            // timestamp is the canonical signal for the version lifecycle state;
+            // the mutable template status may already have advanced or changed
+            // after the snapshot was captured.
+            'status' => $version->published_at ? 'published' : data_get($templateSnapshot, 'status', $form->status),
+            'created_by' => [
+                'id' => $form->creator?->id ?? data_get($templateSnapshot, 'created_by'),
+                'name' => trim(($form->creator?->first_name ?? '').' '.($form->creator?->last_name ?? '')) ?: null,
+            ],
+            'updated_by' => [
+                'id' => $form->updater?->id ?? data_get($templateSnapshot, 'updated_by'),
+                'name' => trim(($form->updater?->first_name ?? '').' '.($form->updater?->last_name ?? '')) ?: null,
+            ],
+            'published_by' => [
+                'id' => $form->publishedBy?->id ?? $version->published_by,
+                'name' => trim(($form->publishedBy?->first_name ?? '').' '.($form->publishedBy?->last_name ?? '')) ?: null,
+            ],
+            'published_at' => $version->published_at?->toIso8601String(),
+            'archived_by' => [
+                'id' => $form->archivedBy?->id ?? $form->archived_by,
+                'name' => trim(($form->archivedBy?->first_name ?? '').' '.($form->archivedBy?->last_name ?? '')) ?: null,
+            ],
+            'archived_at' => $form->archived_at?->toIso8601String(),
+            'sections_count' => $sectionsCount,
+            'questions_count' => $questionsCount,
+            'change_summary' => $version->change_summary,
+            'created_at' => $version->created_at?->toIso8601String(),
+            'updated_at' => ($version->published_at?->toIso8601String()) ?? $version->created_at?->toIso8601String(),
+            'is_current' => (bool) $version->is_current,
+            'snapshot' => [
+                'template' => [
+                    'id' => data_get($templateSnapshot, 'id'),
+                    'uuid' => data_get($templateSnapshot, 'uuid'),
+                    'code' => data_get($templateSnapshot, 'code'),
+                    'name' => data_get($templateSnapshot, 'name'),
+                    'module' => data_get($templateSnapshot, 'module'),
+                    'status' => data_get($templateSnapshot, 'status', $form->status),
+                    'settings' => data_get($templateSnapshot, 'settings', []),
+                    'version' => data_get($templateSnapshot, 'version'),
+                    'created_by' => data_get($templateSnapshot, 'created_by', $form->created_by),
+                    'updated_by' => data_get($templateSnapshot, 'updated_by', $form->updated_by),
+                    'published_at' => data_get($templateSnapshot, 'published_at'),
+                    'published_by' => data_get($templateSnapshot, 'published_by'),
+                    'archived_at' => data_get($templateSnapshot, 'archived_at'),
+                    'archived_by' => data_get($templateSnapshot, 'archived_by'),
+                ],
+                'sections' => $normalizedSections,
+                'sections_count' => $sectionsCount,
+                'questions_count' => $questionsCount,
+            ],
         ];
     }
 }
