@@ -6,6 +6,7 @@ use App\Models\Dsam\FormSubmission;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -98,6 +99,23 @@ class PreschoolStudent extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(PreschoolPayment::class, 'student_id');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(PreschoolInvoice::class, 'student_id')->orderByDesc('created_at');
+    }
+
+    public function receipts(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            PreschoolReceipt::class,
+            PreschoolPayment::class,
+            'student_id',
+            'payment_id',
+            'id',
+            'id',
+        )->orderByDesc('issued_at');
     }
 
     /**
@@ -204,4 +222,3 @@ class PreschoolStudent extends Model
         return $this->hasMany(PreschoolGuardianCommunication::class, 'student_id');
     }
 }
-

@@ -21,6 +21,7 @@ class UpdatePreschoolPaymentRequest extends FormRequest
         return [
             'student_id' => ['sometimes', 'required', 'integer', 'exists:preschool_students,id'],
             'class_id' => ['sometimes', 'required', 'integer', 'exists:preschool_classes,id'],
+            'invoice_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_invoices,id'],
             'payment_reference' => ['sometimes', 'nullable', 'string', 'max:100', Rule::unique('preschool_payments', 'payment_reference')->ignore($paymentId)],
             'amount' => ['sometimes', 'required', 'numeric', 'min:0'],
             'currency' => ['sometimes', 'string', 'size:3'],

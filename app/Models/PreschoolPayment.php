@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int              $id
  * @property int              $student_id
  * @property int|null         $class_id
+ * @property int|null         $invoice_id
  * @property int|null         $academic_year_id
  * @property int|null         $term_id
  * @property string|null      $payment_reference
@@ -42,6 +43,7 @@ class PreschoolPayment extends Model
     protected $fillable = [
         'student_id',
         'class_id',
+        'invoice_id',
         'academic_year_id',
         'term_id',
         'payment_reference',
@@ -90,6 +92,11 @@ class PreschoolPayment extends Model
         return $this->belongsTo(PreschoolClass::class, 'class_id');
     }
 
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolInvoice::class, 'invoice_id');
+    }
+
     /**
      * The academic year this payment covers.
      *
@@ -120,5 +127,10 @@ class PreschoolPayment extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function receipts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PreschoolReceipt::class, 'payment_id');
     }
 }

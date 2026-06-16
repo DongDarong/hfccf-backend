@@ -34,6 +34,8 @@ use App\Http\Controllers\Api\Preschool\PreschoolGovernanceDiffController;
 use App\Http\Controllers\Api\Preschool\PreschoolGovernanceCaseController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
+use App\Http\Controllers\Api\Preschool\PreschoolInvoiceController;
+use App\Http\Controllers\Api\Preschool\PreschoolReceiptController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
 use App\Http\Controllers\Api\Preschool\PreschoolSettingsBackboneController;
@@ -458,6 +460,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('payments/{id}', [PreschoolPaymentController::class, 'show']);
         Route::put('payments/{id}', [PreschoolPaymentController::class, 'update']);
         Route::delete('payments/{id}', [PreschoolPaymentController::class, 'destroy']);
+        Route::post('payments/{payment}/receipt', [PreschoolReceiptController::class, 'store']);
+
+        Route::get('invoices', [PreschoolInvoiceController::class, 'index']);
+        Route::post('invoices', [PreschoolInvoiceController::class, 'store']);
+        Route::get('invoices/{invoice}', [PreschoolInvoiceController::class, 'show']);
+        Route::put('invoices/{invoice}', [PreschoolInvoiceController::class, 'update']);
+        Route::post('invoices/{invoice}/issue', [PreschoolInvoiceController::class, 'issue']);
+        Route::post('invoices/{invoice}/cancel', [PreschoolInvoiceController::class, 'cancel']);
+        Route::post('invoices/{invoice}/overdue', [PreschoolInvoiceController::class, 'overdue']);
+        Route::get('invoices/{invoice}/print', [PreschoolInvoiceController::class, 'print']);
+        Route::get('students/{student}/invoices', [PreschoolInvoiceController::class, 'studentInvoices']);
+        Route::get('students/{student}/payment-summary', [PreschoolInvoiceController::class, 'studentPaymentSummary']);
+        Route::get('receipts/{receipt}', [PreschoolReceiptController::class, 'show']);
+        Route::get('receipts/{receipt}/print', [PreschoolReceiptController::class, 'print']);
 
         // Classroom resources are readable by all preschool staff and writable
         // by admins only â€” the controller enforces both access tiers.
@@ -808,6 +824,5 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
-
 
 
