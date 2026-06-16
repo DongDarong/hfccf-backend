@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('preschool_guardian_communications')) {
+            return;
+        }
+
         Schema::create('preschool_guardian_communications', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->nullable()->constrained('preschool_students')->nullOnDelete();
@@ -23,7 +27,7 @@ return new class extends Migration
             $table->timestamp('sent_at')->nullable();
             $table->timestamp('acknowledged_at')->nullable();
             $table->timestamp('failed_at')->nullable();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('created_by', 16)->nullable();
             $table->timestamps();
 
             $table->index(['student_id', 'created_at'], 'preschool_guardian_communications_student_created_index');
@@ -34,6 +38,8 @@ return new class extends Migration
                 ['student_id', 'guardian_id', 'source_type', 'source_id', 'communication_type', 'channel'],
                 'preschool_guardian_communications_dedupe_unique'
             );
+
+            $table->foreign('created_by')->references('id')->on('users')->nullOnDelete();
         });
     }
 

@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('preschool_health_alerts')) {
+            return;
+        }
+
         Schema::create('preschool_health_alerts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->constrained('preschool_students')->cascadeOnDelete();
@@ -18,12 +22,12 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('source_type', 100);
             $table->string('source_id', 100);
-            $table->foreignId('assigned_to_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('acknowledged_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('assigned_to_user_id', 16)->nullable();
+            $table->string('acknowledged_by_user_id', 16)->nullable();
             $table->timestamp('acknowledged_at')->nullable();
-            $table->foreignId('resolved_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('resolved_by_user_id', 16)->nullable();
             $table->timestamp('resolved_at')->nullable();
-            $table->foreignId('closed_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('closed_by_user_id', 16)->nullable();
             $table->timestamp('closed_at')->nullable();
             $table->text('resolution_notes')->nullable();
             $table->timestamps();
@@ -33,6 +37,11 @@ return new class extends Migration
             $table->index(['student_id', 'status'], 'preschool_health_alerts_student_status_index');
             $table->index(['student_id', 'severity'], 'preschool_health_alerts_student_severity_index');
             $table->index(['assigned_to_user_id', 'status'], 'preschool_health_alerts_assignee_status_index');
+
+            $table->foreign('assigned_to_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('acknowledged_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('resolved_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('closed_by_user_id')->references('id')->on('users')->nullOnDelete();
         });
     }
 

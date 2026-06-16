@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('preschool_student_medical_profiles', function (Blueprint $table): void {
+        $this->createTableIfMissing('preschool_student_medical_profiles', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->constrained('preschool_students')->cascadeOnDelete();
             $table->string('blood_type', 10)->nullable();
@@ -16,14 +16,17 @@ return new class extends Migration
             $table->json('current_conditions')->nullable();
             $table->text('medical_notes')->nullable();
             $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('created_by_user_id', 16)->nullable();
+            $table->string('updated_by_user_id', 16)->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->unique('student_id', 'preschool_student_medical_profiles_student_id_unique');
+
+            $table->foreign('created_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('updated_by_user_id')->references('id')->on('users')->nullOnDelete();
         });
 
-        Schema::create('preschool_student_allergies', function (Blueprint $table): void {
+        $this->createTableIfMissing('preschool_student_allergies', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->constrained('preschool_students')->cascadeOnDelete();
             $table->string('allergy_name');
@@ -33,14 +36,17 @@ return new class extends Migration
             $table->text('action_taken')->nullable();
             $table->text('notes')->nullable();
             $table->enum('status', ['active', 'resolved', 'inactive'])->default('active');
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('created_by_user_id', 16)->nullable();
+            $table->string('updated_by_user_id', 16)->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->index(['student_id', 'severity', 'status'], 'preschool_student_allergies_student_severity_status_index');
+
+            $table->foreign('created_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('updated_by_user_id')->references('id')->on('users')->nullOnDelete();
         });
 
-        Schema::create('preschool_student_vaccination_records', function (Blueprint $table): void {
+        $this->createTableIfMissing('preschool_student_vaccination_records', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->constrained('preschool_students')->cascadeOnDelete();
             $table->string('vaccine_name');
@@ -49,14 +55,17 @@ return new class extends Migration
             $table->unsignedInteger('dose_number')->nullable();
             $table->string('provider')->nullable();
             $table->text('notes')->nullable();
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('created_by_user_id', 16)->nullable();
+            $table->string('updated_by_user_id', 16)->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->index(['student_id', 'status'], 'preschool_student_vaccination_records_student_status_index');
+
+            $table->foreign('created_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('updated_by_user_id')->references('id')->on('users')->nullOnDelete();
         });
 
-        Schema::create('preschool_student_medication_records', function (Blueprint $table): void {
+        $this->createTableIfMissing('preschool_student_medication_records', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->constrained('preschool_students')->cascadeOnDelete();
             $table->string('medication_name');
@@ -67,14 +76,17 @@ return new class extends Migration
             $table->date('end_date')->nullable();
             $table->enum('status', ['active', 'inactive', 'stopped', 'completed'])->default('active');
             $table->text('notes')->nullable();
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('created_by_user_id', 16)->nullable();
+            $table->string('updated_by_user_id', 16)->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->index(['student_id', 'status'], 'preschool_student_medication_records_student_status_index');
+
+            $table->foreign('created_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('updated_by_user_id')->references('id')->on('users')->nullOnDelete();
         });
 
-        Schema::create('preschool_student_health_incidents', function (Blueprint $table): void {
+        $this->createTableIfMissing('preschool_student_health_incidents', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->constrained('preschool_students')->cascadeOnDelete();
             $table->dateTime('incident_date');
@@ -84,15 +96,19 @@ return new class extends Migration
             $table->boolean('follow_up_needed')->default(false);
             $table->text('notes')->nullable();
             $table->enum('status', ['open', 'closed', 'resolved'])->default('open');
-            $table->foreignId('reported_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('reported_by_user_id', 16)->nullable();
+            $table->string('created_by_user_id', 16)->nullable();
+            $table->string('updated_by_user_id', 16)->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->index(['student_id', 'severity', 'status'], 'preschool_student_health_incidents_student_severity_status_index');
+
+            $table->foreign('reported_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('created_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('updated_by_user_id')->references('id')->on('users')->nullOnDelete();
         });
 
-        Schema::create('preschool_student_health_contacts', function (Blueprint $table): void {
+        $this->createTableIfMissing('preschool_student_health_contacts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->constrained('preschool_students')->cascadeOnDelete();
             $table->string('name');
@@ -104,14 +120,17 @@ return new class extends Migration
             $table->boolean('receive_alerts')->default(true);
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->text('notes')->nullable();
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('created_by_user_id', 16)->nullable();
+            $table->string('updated_by_user_id', 16)->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->index(['student_id', 'priority'], 'preschool_student_health_contacts_student_priority_index');
+
+            $table->foreign('created_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('updated_by_user_id')->references('id')->on('users')->nullOnDelete();
         });
 
-        Schema::create('preschool_student_health_check_logs', function (Blueprint $table): void {
+        $this->createTableIfMissing('preschool_student_health_check_logs', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('student_id')->constrained('preschool_students')->cascadeOnDelete();
             $table->dateTime('checked_at');
@@ -121,12 +140,16 @@ return new class extends Migration
             $table->string('symptoms')->nullable();
             $table->text('remarks')->nullable();
             $table->enum('status', ['recorded', 'reviewed', 'follow_up'])->default('recorded');
-            $table->foreignId('logged_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('logged_by_user_id', 16)->nullable();
+            $table->string('created_by_user_id', 16)->nullable();
+            $table->string('updated_by_user_id', 16)->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->index(['student_id', 'checked_at'], 'preschool_student_health_check_logs_student_checked_at_index');
+
+            $table->foreign('logged_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('created_by_user_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('updated_by_user_id')->references('id')->on('users')->nullOnDelete();
         });
     }
 
@@ -139,5 +162,14 @@ return new class extends Migration
         Schema::dropIfExists('preschool_student_vaccination_records');
         Schema::dropIfExists('preschool_student_allergies');
         Schema::dropIfExists('preschool_student_medical_profiles');
+    }
+
+    private function createTableIfMissing(string $tableName, \Closure $definition): void
+    {
+        if (Schema::hasTable($tableName)) {
+            return;
+        }
+
+        Schema::create($tableName, $definition);
     }
 };
