@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomResourceController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
+use App\Http\Controllers\Api\Preschool\PreschoolGuardianCommunicationController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
@@ -256,6 +257,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('guardians/governance/issues/{issue}/assign', [PreschoolGuardianGovernanceController::class, 'assign']);
         Route::post('guardians/governance/issues/{issue}/resolve', [PreschoolGuardianGovernanceController::class, 'resolve']);
         Route::post('guardians/governance/issues/{issue}/dismiss', [PreschoolGuardianGovernanceController::class, 'dismiss']);
+        Route::get('guardian-communications', [PreschoolGuardianCommunicationController::class, 'index']);
+        Route::get('students/{student}/guardian-communications', [PreschoolGuardianCommunicationController::class, 'studentTimeline']);
+        Route::get('guardians/{guardian}/communications', [PreschoolGuardianCommunicationController::class, 'guardianTimeline']);
+        Route::post('students/{student}/guardian-communications', [PreschoolGuardianCommunicationController::class, 'store']);
+        Route::post('guardian-communications/{communication}/sent', [PreschoolGuardianCommunicationController::class, 'markSent']);
+        Route::post('guardian-communications/{communication}/acknowledge', [PreschoolGuardianCommunicationController::class, 'acknowledge']);
+        Route::post('guardian-communications/{communication}/cancel', [PreschoolGuardianCommunicationController::class, 'cancel']);
         Route::get('guardians/{guardian}', [PreschoolGuardianController::class, 'show']);
         Route::patch('guardians/{guardian}', [PreschoolGuardianController::class, 'update']);
         Route::delete('guardians/{guardian}', [PreschoolGuardianController::class, 'destroy']);
@@ -800,7 +808,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
-
 
 
 

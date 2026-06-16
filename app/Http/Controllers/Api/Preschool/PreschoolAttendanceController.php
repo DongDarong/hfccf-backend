@@ -11,6 +11,7 @@ use App\Models\PreschoolClass;
 use App\Models\User;
 use App\Support\PreschoolAcademicLifecycleService;
 use App\Support\PreschoolLifecycleGuardService;
+use App\Services\PreschoolGuardianCommunicationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -70,6 +71,7 @@ class PreschoolAttendanceController extends Controller
         ]);
 
         $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term']);
+        app(PreschoolGuardianCommunicationService::class)->syncAttendanceFollowUp($attendance, $request->user());
 
         return response()->json([
             'success' => true,
@@ -111,6 +113,7 @@ class PreschoolAttendanceController extends Controller
 
         $attendance->save();
         $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term']);
+        app(PreschoolGuardianCommunicationService::class)->syncAttendanceFollowUp($attendance, $request->user());
 
         return response()->json([
             'success' => true,

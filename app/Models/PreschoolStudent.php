@@ -198,6 +198,10 @@ class PreschoolStudent extends Model
     {
         return $this->hasMany(PreschoolHealthAlert::class, 'student_id');
     }
-}
 
+    public function guardianCommunications(): HasMany
+    {
+        return $this->hasMany(PreschoolGuardianCommunication::class, 'student_id');
+    }
+}
 

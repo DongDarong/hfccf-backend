@@ -23,6 +23,7 @@ class PreschoolHealthAlertService
     public function __construct(
         private readonly PreschoolHealthAuditService $auditService,
         private readonly NotificationService $notificationService,
+        private readonly PreschoolGuardianCommunicationService $communicationService,
     ) {
     }
 
@@ -95,6 +96,7 @@ class PreschoolHealthAlertService
 
         $this->auditAction($alert, $actor, 'acknowledged', $before, $alert->toArray(), 'teacher', 'Health alert acknowledged.');
         $this->notify($alert, $actor, 'acknowledged', 'Health alert acknowledged', 'A health alert has been acknowledged.', ['status' => 'acknowledged']);
+        $this->communicationService->syncHealthAlert($alert, $actor, 'sent');
 
         return $alert->fresh(['student', 'assignedTo', 'acknowledgedBy', 'resolvedBy', 'closedBy']);
     }
@@ -114,6 +116,7 @@ class PreschoolHealthAlertService
         $this->notify($alert, $actor, 'assigned', 'Health alert assigned', 'A health alert has been assigned for follow-up.', [
             'assigned_to_user_id' => $assignee?->id,
         ], $assignee);
+        $this->communicationService->syncHealthAlert($alert, $actor);
 
         return $alert->fresh(['student', 'assignedTo', 'acknowledgedBy', 'resolvedBy', 'closedBy']);
     }
@@ -130,6 +133,7 @@ class PreschoolHealthAlertService
 
         $this->auditAction($alert, $actor, 'status_changed', $before, $alert->toArray(), 'admin', 'Health alert status changed to '.$status.'.');
         $this->notify($alert, $actor, 'status_changed', 'Health alert status changed', 'A health alert status was updated.', ['status' => $status]);
+        $this->communicationService->syncHealthAlert($alert, $actor, $status === 'closed' || $status === 'resolved' ? 'sent' : 'queued');
 
         return $alert->fresh(['student', 'assignedTo', 'acknowledgedBy', 'resolvedBy', 'closedBy']);
     }
@@ -147,6 +151,7 @@ class PreschoolHealthAlertService
 
         $this->auditAction($alert, $actor, 'resolved', $before, $alert->toArray(), 'admin', 'Health alert resolved.');
         $this->notify($alert, $actor, 'resolved', 'Health alert resolved', 'A health alert has been resolved.', ['resolution_notes' => $notes]);
+        $this->communicationService->syncHealthAlert($alert, $actor, 'sent');
 
         return $alert->fresh(['student', 'assignedTo', 'acknowledgedBy', 'resolvedBy', 'closedBy']);
     }
@@ -164,6 +169,7 @@ class PreschoolHealthAlertService
 
         $this->auditAction($alert, $actor, 'closed', $before, $alert->toArray(), 'admin', 'Health alert closed.');
         $this->notify($alert, $actor, 'closed', 'Health alert closed', 'A health alert has been closed.', ['resolution_notes' => $notes]);
+        $this->communicationService->syncHealthAlert($alert, $actor, 'sent');
 
         return $alert->fresh(['student', 'assignedTo', 'acknowledgedBy', 'resolvedBy', 'closedBy']);
     }
@@ -417,6 +423,8 @@ class PreschoolHealthAlertService
             ]);
         }
 
+        $this->communicationService->syncHealthAlert($alert, $actor);
+
         return $alert->fresh(['student', 'assignedTo', 'acknowledgedBy', 'resolvedBy', 'closedBy']);
     }
 
@@ -630,5 +638,4 @@ class PreschoolHealthAlertService
         }
     }
 }
-
 
