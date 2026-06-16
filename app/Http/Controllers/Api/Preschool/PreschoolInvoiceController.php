@@ -290,7 +290,7 @@ class PreschoolInvoiceController extends PreschoolBillingController
         ], Response::HTTP_OK);
     }
 
-    public function print(Request $request, string $invoice): JsonResponse
+    public function print(Request $request, string $invoice): Response|JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {
             return $response;

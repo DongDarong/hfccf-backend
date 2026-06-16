@@ -12,6 +12,7 @@ use App\Models\PreschoolStudent;
 use App\Models\User;
 use App\Services\PreschoolBillingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Database\Seeders\DatabaseSeeder;
 use Tests\TestCase;
 
@@ -242,6 +243,41 @@ class PreschoolBillingWorkflowTest extends TestCase
         $this->actingWithToken($context['admin'])->getJson('/api/preschool/students/'.$context['student']->id.'/invoices')
             ->assertOk()
             ->assertJsonCount(1, 'data.items');
+    }
+
+    public function test_invoice_print_endpoint_returns_html(): void
+    {
+        $context = $this->createBillingContext();
+        $invoice = $this->createInvoice($context);
+        $this->actingWithToken($context['admin'])->postJson('/api/preschool/invoices/'.$invoice->id.'/issue')->assertOk();
+
+        $response = $this->actingWithToken($context['admin'])->get('/api/preschool/invoices/'.$invoice->id.'/print');
+
+        $response->assertOk()
+            ->assertHeader('content-type', 'text/html; charset=UTF-8')
+            ->assertSee('Preschool Invoice', false)
+            ->assertSee($invoice->invoice_number, false)
+            ->assertSee('Mia Lopez', false)
+            ->assertSee('120.00', false);
+    }
+
+    public function test_invoice_print_endpoint_handles_missing_optional_relationships(): void
+    {
+        $context = $this->createBillingContext();
+        $invoice = $this->createInvoice($context);
+        $this->actingWithToken($context['admin'])->postJson('/api/preschool/invoices/'.$invoice->id.'/issue')->assertOk();
+
+        DB::table('preschool_invoices')
+            ->where('id', $invoice->id)
+            ->update([
+                'academic_year_id' => null,
+                'term_id' => null,
+            ]);
+
+        $response = $this->actingWithToken($context['admin'])->get('/api/preschool/invoices/'.$invoice->id.'/print');
+
+        $response->assertOk()
+            ->assertSee($invoice->invoice_number, false);
     }
 
     public function test_teacher_cannot_manage_invoices_or_receipts(): void

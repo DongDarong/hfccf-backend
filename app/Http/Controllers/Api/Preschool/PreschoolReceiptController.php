@@ -76,7 +76,7 @@ class PreschoolReceiptController extends PreschoolBillingController
         ], Response::HTTP_OK);
     }
 
-    public function print(Request $request, string $receipt): JsonResponse
+    public function print(Request $request, string $receipt): Response|JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {
             return $response;
