@@ -133,6 +133,106 @@ class PreschoolBillingWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_draft_invoice_can_be_deleted(): void
+    {
+        $context = $this->createBillingContext();
+        $invoice = $this->createInvoice($context);
+
+        $response = $this->actingWithToken($context['admin'])->deleteJson('/api/preschool/invoices/'.$invoice->id);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.invoice.id', $invoice->id);
+
+        $this->assertSoftDeleted('preschool_invoices', [
+            'id' => $invoice->id,
+        ]);
+
+        $this->actingWithToken($context['admin'])->getJson('/api/preschool/invoices')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.items');
+    }
+
+    public function test_issued_invoice_cannot_be_deleted(): void
+    {
+        $context = $this->createBillingContext();
+        $invoice = $this->createInvoice($context);
+        $this->actingWithToken($context['admin'])->postJson('/api/preschool/invoices/'.$invoice->id.'/issue')->assertOk();
+
+        $this->actingWithToken($context['admin'])->deleteJson('/api/preschool/invoices/'.$invoice->id)
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('preschool_invoices', [
+            'id' => $invoice->id,
+            'status' => 'issued',
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_partial_invoice_cannot_be_deleted(): void
+    {
+        $context = $this->createBillingContext();
+        $invoice = $this->createInvoice($context);
+        $this->actingWithToken($context['admin'])->postJson('/api/preschool/invoices/'.$invoice->id.'/issue')->assertOk();
+
+        $this->actingWithToken($context['admin'])->postJson('/api/preschool/payments', [
+            'student_id' => $context['student']->id,
+            'class_id' => $context['class']->id,
+            'invoice_id' => $invoice->id,
+            'amount' => 40,
+            'currency' => 'USD',
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'due_date' => now()->addDays(10)->toDateString(),
+        ])->assertCreated();
+
+        $this->actingWithToken($context['admin'])->deleteJson('/api/preschool/invoices/'.$invoice->id)
+            ->assertStatus(422);
+
+        $invoice->refresh();
+        $this->assertSame('partial', $invoice->status);
+        $this->assertNull($invoice->deleted_at);
+    }
+
+    public function test_paid_invoice_cannot_be_deleted(): void
+    {
+        $context = $this->createBillingContext();
+        $invoice = $this->createInvoice($context);
+        $this->actingWithToken($context['admin'])->postJson('/api/preschool/invoices/'.$invoice->id.'/issue')->assertOk();
+
+        $this->actingWithToken($context['admin'])->postJson('/api/preschool/payments', [
+            'student_id' => $context['student']->id,
+            'class_id' => $context['class']->id,
+            'invoice_id' => $invoice->id,
+            'amount' => 120,
+            'currency' => 'USD',
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'due_date' => now()->addDays(10)->toDateString(),
+        ])->assertCreated();
+
+        $this->actingWithToken($context['admin'])->deleteJson('/api/preschool/invoices/'.$invoice->id)
+            ->assertStatus(422);
+
+        $invoice->refresh();
+        $this->assertSame('paid', $invoice->status);
+        $this->assertNull($invoice->deleted_at);
+    }
+
+    public function test_cancelled_invoice_cannot_be_deleted(): void
+    {
+        $context = $this->createBillingContext();
+        $invoice = $this->createInvoice($context);
+        $this->actingWithToken($context['admin'])->postJson('/api/preschool/invoices/'.$invoice->id.'/cancel')->assertOk();
+
+        $this->actingWithToken($context['admin'])->deleteJson('/api/preschool/invoices/'.$invoice->id)
+            ->assertStatus(422);
+
+        $invoice->refresh();
+        $this->assertSame('cancelled', $invoice->status);
+        $this->assertNull($invoice->deleted_at);
+    }
+
     public function test_payment_reduces_invoice_balance_and_updates_status(): void
     {
         $context = $this->createBillingContext();
@@ -312,6 +412,18 @@ class PreschoolBillingWorkflowTest extends TestCase
         ]);
 
         $this->actingWithToken($teacher)->postJson('/api/preschool/payments/'.$payment->id.'/receipt')->assertForbidden();
+    }
+
+    public function test_teacher_cannot_delete_invoices(): void
+    {
+        $context = $this->createBillingContext();
+        $teacher = User::factory()->asTeacherPreschool()->create([
+            'status' => 'active',
+        ]);
+        $invoice = $this->createInvoice($context);
+
+        $this->actingWithToken($teacher)->deleteJson('/api/preschool/invoices/'.$invoice->id)
+            ->assertForbidden();
     }
 
     private function createBillingContext(): array

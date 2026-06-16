@@ -197,6 +197,42 @@ class PreschoolInvoiceController extends PreschoolBillingController
         ], Response::HTTP_OK);
     }
 
+    public function destroy(Request $request, string $invoice): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $invoiceModel = PreschoolInvoice::query()
+            ->with(['student', 'preschoolClass', 'academicYear', 'term', 'items', 'payments.invoice', 'payments.receipts', 'receipts.payment.student', 'receipts.invoice'])
+            ->find($invoice);
+        if (! $invoiceModel) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found.',
+                'data' => null,
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $deleted = $this->billing->deleteDraftInvoice($invoiceModel, $request->user());
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+                'data' => null,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool invoice deleted successfully.',
+            'data' => [
+                'invoice' => PreschoolInvoiceResource::make($deleted)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
     public function overdue(Request $request, string $invoice): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {

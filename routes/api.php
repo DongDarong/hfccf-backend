@@ -466,6 +466,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('invoices', [PreschoolInvoiceController::class, 'store']);
         Route::get('invoices/{invoice}', [PreschoolInvoiceController::class, 'show']);
         Route::put('invoices/{invoice}', [PreschoolInvoiceController::class, 'update']);
+        Route::delete('invoices/{invoice}', [PreschoolInvoiceController::class, 'destroy']);
         Route::post('invoices/{invoice}/issue', [PreschoolInvoiceController::class, 'issue']);
         Route::post('invoices/{invoice}/cancel', [PreschoolInvoiceController::class, 'cancel']);
         Route::post('invoices/{invoice}/overdue', [PreschoolInvoiceController::class, 'overdue']);
@@ -824,5 +825,4 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
-
 

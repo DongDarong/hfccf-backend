@@ -105,6 +105,30 @@ class PreschoolBillingService
         });
     }
 
+    public function deleteDraftInvoice(PreschoolInvoice $invoice, ?User $actor = null): PreschoolInvoice
+    {
+        return DB::transaction(function () use ($invoice, $actor): PreschoolInvoice {
+            $invoice->refresh(['items', 'payments', 'receipts']);
+
+            if ($invoice->status !== 'draft') {
+                throw new \RuntimeException('Only draft invoices can be deleted. Cancel issued invoices instead.');
+            }
+
+            if ($invoice->payments()->exists() || $invoice->receipts()->exists()) {
+                throw new \RuntimeException('Invoices with payments or receipts cannot be deleted.');
+            }
+
+            $invoice->updated_by = $actor?->id;
+            $invoice->save();
+            $invoice->items()->delete();
+            $invoice->delete();
+
+            return PreschoolInvoice::withTrashed()
+                ->with(['student', 'preschoolClass', 'academicYear', 'term', 'items', 'payments', 'receipts'])
+                ->findOrFail($invoice->id);
+        });
+    }
+
     public function markOverdue(PreschoolInvoice $invoice, ?User $actor = null): PreschoolInvoice
     {
         return DB::transaction(function () use ($invoice, $actor): PreschoolInvoice {
