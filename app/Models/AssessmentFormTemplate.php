@@ -26,6 +26,10 @@ class AssessmentFormTemplate extends Model
         'settings',
         'created_by',
         'updated_by',
+        'published_at',
+        'published_by',
+        'archived_at',
+        'archived_by',
     ];
 
     protected function casts(): array
@@ -33,6 +37,8 @@ class AssessmentFormTemplate extends Model
         return [
             'is_locked' => 'boolean',
             'settings' => 'array',
+            'published_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -81,6 +87,21 @@ class AssessmentFormTemplate extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by', 'id');
+    }
+
+    public function publishedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'published_by', 'id');
+    }
+
+    public function archivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by', 'id');
     }
 
     public function getCurrentVersionAttribute(): ?int

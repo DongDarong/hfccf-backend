@@ -673,6 +673,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('forms/{form}/publish', [AssessmentFormTemplateController::class, 'publish']);
         Route::post('forms/{form}/duplicate', [AssessmentFormTemplateController::class, 'duplicate']);
         Route::post('forms/{form}/archive', [AssessmentFormTemplateController::class, 'archive']);
+        Route::post('forms/{form}/restore', [AssessmentFormTemplateController::class, 'restore']);
+        Route::get('forms/{form}/versions', [AssessmentFormTemplateController::class, 'versions']);
 
         // Form sections
         Route::get('forms/{form}/sections', [AssessmentFormSectionController::class, 'index']);

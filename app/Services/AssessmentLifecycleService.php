@@ -129,7 +129,11 @@ class AssessmentLifecycleService
             'is_current'     => true,
         ]);
 
-        $template->update(['status' => 'published']);
+        $template->update([
+            'status' => 'published',
+            'published_at' => $version->published_at,
+            'published_by' => $version->published_by,
+        ]);
         $this->recordAudit(
             entityType: AssessmentFormTemplate::class,
             entityId: $template->id,
