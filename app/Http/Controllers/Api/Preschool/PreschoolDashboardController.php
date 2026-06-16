@@ -7,6 +7,7 @@ use App\Models\PreschoolAttendanceRecord;
 use App\Models\PreschoolClass;
 use App\Models\PreschoolPayment;
 use App\Models\PreschoolStudent;
+use App\Models\PreschoolStudentHealthIncident;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,6 +43,7 @@ class PreschoolDashboardController extends Controller
         $studentQuery = PreschoolStudent::query()->whereNull('deleted_at');
         $attendanceQuery = PreschoolAttendanceRecord::query();
         $paymentQuery = PreschoolPayment::query()->whereNull('deleted_at');
+        $incidentQuery = PreschoolStudentHealthIncident::query()->whereNull('deleted_at');
 
         if ($isTeacher) {
             $classQuery->whereIn('id', $teacherClassIds);
@@ -50,6 +52,9 @@ class PreschoolDashboardController extends Controller
             });
             $attendanceQuery->whereIn('class_id', $teacherClassIds);
             $paymentQuery->whereIn('class_id', $teacherClassIds);
+            $incidentQuery->whereHas('student.classes', static function ($query) use ($teacherClassIds): void {
+                $query->whereIn('preschool_classes.id', $teacherClassIds);
+            });
         }
 
         $today = now()->toDateString();
@@ -65,6 +70,7 @@ class PreschoolDashboardController extends Controller
             'attendanceToday' => (clone $attendanceQuery)->whereDate('attendance_date', $today)->count(),
             'pendingPayments' => (clone $paymentQuery)->where('payment_status', 'pending')->count(),
             'overduePayments' => (clone $paymentQuery)->where('payment_status', 'overdue')->count(),
+            'healthAlerts' => (clone $incidentQuery)->whereIn('severity', ['high', 'critical'])->whereIn('status', ['open', 'resolved'])->count(),
         ];
 
         $recentAttendance = (clone $attendanceQuery)

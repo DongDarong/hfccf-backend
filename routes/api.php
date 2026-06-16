@@ -11,6 +11,9 @@ use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
+use App\Http\Controllers\Api\Preschool\PreschoolHealthAlertController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthAuditController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthController;
 use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolEnrollmentController;
@@ -274,6 +277,51 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::patch('student-guardians/{relationship}', [PreschoolStudentGuardianController::class, 'update']);
         Route::delete('student-guardians/{relationship}', [PreschoolStudentGuardianController::class, 'destroy']);
         Route::get('students/{student}/emergency-contacts', [PreschoolStudentGuardianController::class, 'emergencyContacts']);
+        // Health and medical records stay anchored to the student route so the
+        // admin dashboard, student profile, and teacher workflow all share the
+        // same health domain instead of introducing a separate module shell.
+        Route::prefix('students/{student}/health')->group(function () {
+            Route::get('summary', [PreschoolStudentHealthController::class, 'summary']);
+            Route::get('medical-profile', [PreschoolStudentHealthController::class, 'medicalProfile']);
+            Route::put('medical-profile', [PreschoolStudentHealthController::class, 'upsertMedicalProfile']);
+            Route::get('allergies', [PreschoolStudentHealthController::class, 'allergies']);
+            Route::post('allergies', [PreschoolStudentHealthController::class, 'storeAllergy']);
+            Route::put('allergies/{allergy}', [PreschoolStudentHealthController::class, 'updateAllergy']);
+            Route::delete('allergies/{allergy}', [PreschoolStudentHealthController::class, 'destroyAllergy']);
+            Route::get('vaccinations', [PreschoolStudentHealthController::class, 'vaccinations']);
+            Route::post('vaccinations', [PreschoolStudentHealthController::class, 'storeVaccination']);
+            Route::put('vaccinations/{vaccination}', [PreschoolStudentHealthController::class, 'updateVaccination']);
+            Route::delete('vaccinations/{vaccination}', [PreschoolStudentHealthController::class, 'destroyVaccination']);
+            Route::get('medications', [PreschoolStudentHealthController::class, 'medications']);
+            Route::post('medications', [PreschoolStudentHealthController::class, 'storeMedication']);
+            Route::put('medications/{medication}', [PreschoolStudentHealthController::class, 'updateMedication']);
+            Route::delete('medications/{medication}', [PreschoolStudentHealthController::class, 'destroyMedication']);
+            Route::get('incidents', [PreschoolStudentHealthController::class, 'incidents']);
+            Route::post('incidents', [PreschoolStudentHealthController::class, 'storeIncident']);
+            Route::put('incidents/{incident}', [PreschoolStudentHealthController::class, 'updateIncident']);
+            Route::delete('incidents/{incident}', [PreschoolStudentHealthController::class, 'destroyIncident']);
+            Route::get('emergency-contacts', [PreschoolStudentHealthController::class, 'healthContacts']);
+            Route::post('emergency-contacts', [PreschoolStudentHealthController::class, 'storeHealthContact']);
+            Route::put('emergency-contacts/{contact}', [PreschoolStudentHealthController::class, 'updateHealthContact']);
+            Route::delete('emergency-contacts/{contact}', [PreschoolStudentHealthController::class, 'destroyHealthContact']);
+        Route::get('check-logs', [PreschoolStudentHealthController::class, 'healthChecks']);
+        Route::post('check-logs', [PreschoolStudentHealthController::class, 'storeHealthCheck']);
+        Route::delete('check-logs/{check}', [PreschoolStudentHealthController::class, 'destroyHealthCheck']);
+        });
+
+        // Health alerts have their own lifecycle routes so the dashboard,
+        // student profile, and teacher workflow can share one canonical alert
+        // stack without exposing the underlying alert model directly in views.
+        Route::get('health/alerts', [PreschoolHealthAlertController::class, 'alerts']);
+        Route::get('health/dashboard-summary', [PreschoolHealthAlertController::class, 'dashboardSummary']);
+        Route::get('health/alerts/{alert}', [PreschoolHealthAlertController::class, 'show']);
+        Route::post('health/alerts/{alert}/acknowledge', [PreschoolHealthAlertController::class, 'acknowledge']);
+        Route::post('health/alerts/{alert}/assign', [PreschoolHealthAlertController::class, 'assign']);
+        Route::post('health/alerts/{alert}/status', [PreschoolHealthAlertController::class, 'status']);
+        Route::post('health/alerts/{alert}/resolve', [PreschoolHealthAlertController::class, 'resolve']);
+        Route::post('health/alerts/{alert}/close', [PreschoolHealthAlertController::class, 'close']);
+        Route::get('students/{student}/health/alerts', [PreschoolHealthAlertController::class, 'studentAlerts']);
+        Route::get('students/{student}/health/audit-logs', [PreschoolStudentHealthAuditController::class, 'index']);
 
         Route::get('attendance', [PreschoolAttendanceController::class, 'index']);
         Route::post('attendance', [PreschoolAttendanceController::class, 'store']);
@@ -287,8 +335,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('attendance/{id}/review', [PreschoolAttendanceController::class, 'review']);
         Route::post('attendance/{id}/flag', [PreschoolAttendanceController::class, 'flag']);
 
-        // Enrollment routes form a complete admission workflow: draft → submitted
-        // → under_review → approved/waitlisted/rejected → enrolled. Static segments
+        // Enrollment routes form a complete admission workflow: draft â†’ submitted
+        // â†’ under_review â†’ approved/waitlisted/rejected â†’ enrolled. Static segments
         // (summary, {application}/submit, etc.) sit before the model binding so
         // they are never resolved as application IDs.
         Route::get('enrollments', [PreschoolEnrollmentController::class, 'index']);
@@ -404,7 +452,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::delete('payments/{id}', [PreschoolPaymentController::class, 'destroy']);
 
         // Classroom resources are readable by all preschool staff and writable
-        // by admins only — the controller enforces both access tiers.
+        // by admins only â€” the controller enforces both access tiers.
         Route::get('classroom-resources', [PreschoolClassroomResourceController::class, 'index']);
         Route::post('classroom-resources', [PreschoolClassroomResourceController::class, 'store']);
         Route::get('classroom-resources/{id}', [PreschoolClassroomResourceController::class, 'show']);
@@ -625,6 +673,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('forms/{form}/publish', [AssessmentFormTemplateController::class, 'publish']);
         Route::post('forms/{form}/duplicate', [AssessmentFormTemplateController::class, 'duplicate']);
         Route::post('forms/{form}/archive', [AssessmentFormTemplateController::class, 'archive']);
+        Route::post('forms/{form}/restore', [AssessmentFormTemplateController::class, 'restore']);
+        Route::get('forms/{form}/versions', [AssessmentFormTemplateController::class, 'versions']);
 
         // Form sections
         Route::get('forms/{form}/sections', [AssessmentFormSectionController::class, 'index']);
@@ -678,7 +728,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
     /*
     |--------------------------------------------------------------------------
-    | DSAM — Dynamic Student Assessment Management
+    | DSAM â€” Dynamic Student Assessment Management
     |--------------------------------------------------------------------------
     */
 
@@ -750,3 +800,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
+
+
+
+

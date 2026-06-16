@@ -36,6 +36,10 @@ class AssessmentFormSectionController extends Controller
             return $response;
         }
 
+        if ($response = $this->ensureEditable($form)) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'title'       => ['required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
@@ -61,6 +65,10 @@ class AssessmentFormSectionController extends Controller
     public function update(Request $request, AssessmentFormTemplate $form, AssessmentFormSection $section): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        if ($response = $this->ensureEditable($form)) {
             return $response;
         }
 
@@ -90,6 +98,10 @@ class AssessmentFormSectionController extends Controller
             return $response;
         }
 
+        if ($response = $this->ensureEditable($form)) {
+            return $response;
+        }
+
         $section->delete();
 
         return response()->json(['success' => true, 'message' => 'Section deleted.', 'data' => null]);
@@ -98,6 +110,10 @@ class AssessmentFormSectionController extends Controller
     public function reorder(Request $request, AssessmentFormTemplate $form): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        if ($response = $this->ensureEditable($form)) {
             return $response;
         }
 
@@ -120,5 +136,26 @@ class AssessmentFormSectionController extends Controller
             return null;
         }
         return response()->json(['success' => false, 'message' => 'Forbidden.', 'data' => null], Response::HTTP_FORBIDDEN);
+    }
+
+    private function ensureEditable(AssessmentFormTemplate $form): ?JsonResponse
+    {
+        if ($form->status === 'published') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Published forms cannot be edited. Duplicate or create a draft copy first.',
+                'data' => null,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if ($form->status === 'archived') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Archived forms cannot be edited. Restore the draft first.',
+                'data' => null,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return null;
     }
 }

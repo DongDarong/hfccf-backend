@@ -16,9 +16,11 @@ class AssessmentLifecycleService
         $template->loadMissing([
             'sections.questions.options',
             'sections.questions.matrixRows',
+            'sections.questions.questionType',
             'scoringRules',
             'riskLevels',
             'printTemplates',
+            'reviewedBy',
         ]);
 
         return [
@@ -31,10 +33,26 @@ class AssessmentLifecycleService
                 'status'     => $template->status,
                 'settings'   => $template->settings,
                 'version'    => $template->current_version,
+                'version_notes' => $template->version_notes,
+                'review_notes'  => $template->review_notes,
+                'reviewed_by'   => $template->reviewed_by,
+                'reviewed_by_name' => trim(($template->reviewedBy?->first_name ?? '').' '.($template->reviewedBy?->last_name ?? '')) ?: null,
+                'reviewed_at'   => $template->reviewed_at?->toIso8601String(),
+                'created_by' => $template->created_by,
+                'updated_by' => $template->updated_by,
+                'published_at' => $template->published_at?->toIso8601String(),
+                'published_by' => $template->published_by,
+                'archived_at' => $template->archived_at?->toIso8601String(),
+                'archived_by' => $template->archived_by,
+                'duplicated_from_template_id' => $template->duplicated_from_template_id,
+                'duplicated_from_version' => $template->duplicated_from_version,
+                'restored_from_template_id' => $template->restored_from_template_id,
+                'restored_from_version' => $template->restored_from_version,
             ],
             'sections' => $template->sections->map(fn ($section) => [
                 'id'          => $section->id,
                 'template_id' => $section->template_id,
+                'code'        => $section->code,
                 'title'       => $section->title,
                 'description' => $section->description,
                 'sort_order'  => $section->sort_order,
@@ -44,7 +62,10 @@ class AssessmentLifecycleService
                     'template_id'        => $question->template_id,
                     'section_id'         => $question->section_id,
                     'question_type_id'    => $question->question_type_id,
+                    'question_type_key'   => $question->questionType?->key,
+                    'question_type_label' => $question->questionType?->label,
                     'label'              => $question->label,
+                    'code'               => $question->code,
                     'help_text'          => $question->help_text,
                     'placeholder'        => $question->placeholder,
                     'sort_order'         => $question->sort_order,
@@ -129,7 +150,11 @@ class AssessmentLifecycleService
             'is_current'     => true,
         ]);
 
-        $template->update(['status' => 'published']);
+        $template->update([
+            'status' => 'published',
+            'published_at' => $version->published_at,
+            'published_by' => $version->published_by,
+        ]);
         $this->recordAudit(
             entityType: AssessmentFormTemplate::class,
             entityId: $template->id,

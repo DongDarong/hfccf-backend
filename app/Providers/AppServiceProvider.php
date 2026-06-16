@@ -2,6 +2,14 @@
 
 namespace App\Providers;
 
+use App\Models\PreschoolStudentAllergy;
+use App\Models\PreschoolStudentHealthCheckLog;
+use App\Models\PreschoolStudentHealthContact;
+use App\Models\PreschoolStudentHealthIncident;
+use App\Models\PreschoolStudentMedicalProfile;
+use App\Models\PreschoolStudentMedicationRecord;
+use App\Models\PreschoolStudentVaccinationRecord;
+use App\Observers\PreschoolStudentHealthObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -66,5 +74,13 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(10)->by('reset:ip:'.$request->ip()),
             ];
         });
+
+        PreschoolStudentMedicalProfile::observe(PreschoolStudentHealthObserver::class);
+        PreschoolStudentAllergy::observe(PreschoolStudentHealthObserver::class);
+        PreschoolStudentVaccinationRecord::observe(PreschoolStudentHealthObserver::class);
+        PreschoolStudentMedicationRecord::observe(PreschoolStudentHealthObserver::class);
+        PreschoolStudentHealthIncident::observe(PreschoolStudentHealthObserver::class);
+        PreschoolStudentHealthContact::observe(PreschoolStudentHealthObserver::class);
+        PreschoolStudentHealthCheckLog::observe(PreschoolStudentHealthObserver::class);
     }
 }

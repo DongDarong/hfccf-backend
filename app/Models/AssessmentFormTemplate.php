@@ -24,8 +24,20 @@ class AssessmentFormTemplate extends Model
         'status',
         'is_locked',
         'settings',
+        'version_notes',
+        'review_notes',
+        'reviewed_by',
+        'reviewed_at',
+        'duplicated_from_template_id',
+        'duplicated_from_version',
+        'restored_from_template_id',
+        'restored_from_version',
         'created_by',
         'updated_by',
+        'published_at',
+        'published_by',
+        'archived_at',
+        'archived_by',
     ];
 
     protected function casts(): array
@@ -33,6 +45,9 @@ class AssessmentFormTemplate extends Model
         return [
             'is_locked' => 'boolean',
             'settings' => 'array',
+            'reviewed_at' => 'datetime',
+            'published_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -81,6 +96,36 @@ class AssessmentFormTemplate extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by', 'id');
+    }
+
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by', 'id');
+    }
+
+    public function duplicatedFromTemplate(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'duplicated_from_template_id', 'id');
+    }
+
+    public function restoredFromTemplate(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'restored_from_template_id', 'id');
+    }
+
+    public function publishedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'published_by', 'id');
+    }
+
+    public function archivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by', 'id');
     }
 
     public function getCurrentVersionAttribute(): ?int
