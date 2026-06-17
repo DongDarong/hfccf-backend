@@ -691,14 +691,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
 
         // Form templates
         Route::get('forms', [AssessmentFormTemplateController::class, 'index']);
+        Route::get('forms/review-queue', [AssessmentFormTemplateController::class, 'reviewQueue']);
         Route::post('forms', [AssessmentFormTemplateController::class, 'store']);
         Route::get('forms/{form}', [AssessmentFormTemplateController::class, 'show']);
         Route::put('forms/{form}', [AssessmentFormTemplateController::class, 'update']);
         Route::delete('forms/{form}', [AssessmentFormTemplateController::class, 'destroy']);
+        Route::post('forms/{form}/submit-review', [AssessmentFormTemplateController::class, 'submitReview']);
+        Route::post('forms/{form}/start-review', [AssessmentFormTemplateController::class, 'startReview']);
+        Route::post('forms/{form}/approve', [AssessmentFormTemplateController::class, 'approve']);
+        Route::post('forms/{form}/reject', [AssessmentFormTemplateController::class, 'reject']);
         Route::post('forms/{form}/publish', [AssessmentFormTemplateController::class, 'publish']);
         Route::post('forms/{form}/duplicate', [AssessmentFormTemplateController::class, 'duplicate']);
         Route::post('forms/{form}/archive', [AssessmentFormTemplateController::class, 'archive']);
         Route::post('forms/{form}/restore', [AssessmentFormTemplateController::class, 'restore']);
+        Route::get('forms/{form}/review-history', [AssessmentFormTemplateController::class, 'reviewHistory']);
         Route::get('forms/{form}/versions', [AssessmentFormTemplateController::class, 'versions']);
 
         // Form sections
@@ -825,4 +831,3 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
-

@@ -192,6 +192,93 @@ class AssessmentFormPersistenceTest extends TestCase
             ->assertJsonPath('data.review_notes', 'Restored and ready for edits');
     }
 
+    public function test_admin_can_submit_review_move_through_queue_approve_and_publish_form_template(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'afp-140', 'preschool.form140@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $template = $this->postJson('/api/assessment/forms', $this->buildTemplatePayload())
+            ->assertCreated();
+        $templateId = $template->json('data.id');
+
+        $submit = $this->postJson("/api/assessment/forms/{$templateId}/submit-review", [
+            'review_notes' => 'Ready for preschool review queue',
+        ]);
+
+        $submit
+            ->assertOk()
+            ->assertJsonPath('data.review_status', 'submitted')
+            ->assertJsonPath('data.submitted_by.id', $admin->id);
+
+        $queue = $this->getJson('/api/assessment/forms/review-queue')
+            ->assertOk()
+            ->assertJsonPath('data.summary.pending_review', 1);
+
+        $this->assertSame($templateId, $queue->json('data.items.0.id'));
+        $this->assertSame('submitted', $queue->json('data.items.0.review_status'));
+
+        $this->postJson("/api/assessment/forms/{$templateId}/start-review")
+            ->assertOk()
+            ->assertJsonPath('data.review_status', 'in_review')
+            ->assertJsonPath('data.review_started_by.id', $admin->id);
+
+        $history = $this->getJson("/api/assessment/forms/{$templateId}/review-history")
+            ->assertOk();
+        $this->assertNotEmpty($history->json('data'));
+
+        $this->postJson("/api/assessment/forms/{$templateId}/approve", [
+            'review_notes' => 'Approved for publication',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.review_status', 'approved')
+            ->assertJsonPath('data.reviewed_by.id', $admin->id);
+
+        $this->postJson("/api/assessment/forms/{$templateId}/publish", [
+            'publish_notes' => 'Publish after review approval',
+            'version_notes' => 'Reviewed and approved',
+            'review_notes' => 'Approved for publication',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'published')
+            ->assertJsonPath('data.review_status', 'approved');
+
+        $this->assertDatabaseHas('assessment_audit_logs', [
+            'entity_type' => \App\Models\AssessmentFormTemplate::class,
+            'entity_id' => $templateId,
+            'action' => 'form.review.approved',
+        ]);
+    }
+
+    public function test_admin_can_reject_review_and_keep_template_editable(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'afp-150', 'preschool.form150@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $template = $this->postJson('/api/assessment/forms', $this->buildTemplatePayload())
+            ->assertCreated();
+        $templateId = $template->json('data.id');
+
+        $this->postJson("/api/assessment/forms/{$templateId}/submit-review", [
+            'review_notes' => 'Needs some corrections',
+        ])->assertOk();
+
+        $this->postJson("/api/assessment/forms/{$templateId}/reject", [
+            'rejection_reason' => 'Please correct the question order and scoring.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.review_status', 'rejected');
+
+        $this->putJson("/api/assessment/forms/{$templateId}", [
+            'name' => 'Preschool Development Checklist Revised',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Preschool Development Checklist Revised');
+
+        $this->postJson("/api/assessment/forms/{$templateId}/publish")
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+    }
+
     public function test_publish_requires_at_least_one_section_and_question(): void
     {
         $admin = $this->makeUserWithRole('adminpreschool', 'afp-110', 'preschool.form110@hfccf.org');
@@ -256,6 +343,9 @@ class AssessmentFormPersistenceTest extends TestCase
         Sanctum::actingAs($teacher);
 
         $this->postJson('/api/assessment/forms', $this->buildTemplatePayload())
+            ->assertForbidden();
+
+        $this->getJson('/api/assessment/forms/review-queue')
             ->assertForbidden();
     }
 

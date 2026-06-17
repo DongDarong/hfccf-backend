@@ -22,10 +22,15 @@ class AssessmentFormTemplate extends Model
         'category',
         'module',
         'status',
+        'review_status',
         'is_locked',
         'settings',
         'version_notes',
         'review_notes',
+        'submitted_by',
+        'submitted_at',
+        'review_started_by',
+        'review_started_at',
         'reviewed_by',
         'reviewed_at',
         'duplicated_from_template_id',
@@ -45,6 +50,8 @@ class AssessmentFormTemplate extends Model
         return [
             'is_locked' => 'boolean',
             'settings' => 'array',
+            'submitted_at' => 'datetime',
+            'review_started_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'published_at' => 'datetime',
             'archived_at' => 'datetime',
@@ -96,6 +103,16 @@ class AssessmentFormTemplate extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+
+    public function submittedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by', 'id');
+    }
+
+    public function reviewStartedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'review_started_by', 'id');
     }
 
     public function updater(): BelongsTo

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Assessment;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Assessment\AssessmentAuditLogResource;
 use App\Http\Resources\Assessment\AssessmentFormTemplateResource;
+use App\Models\AssessmentAuditLog;
 use App\Models\AssessmentFormTemplate;
 use App\Models\AssessmentFormVersion;
 use App\Models\AssessmentQuestionType;
@@ -145,10 +147,15 @@ class AssessmentFormTemplateController extends Controller
             'category'   => $validated['category'] ?? 'preschool_assessment',
             'module'     => 'preschool',
             'status'     => 'draft',
+            'review_status' => 'draft',
             'created_by' => $request->user()->id,
             'settings'   => $validated['settings'] ?? null,
             'version_notes' => $validated['version_notes'] ?? $validated['publish_notes'] ?? null,
             'review_notes' => $validated['review_notes'] ?? null,
+            'submitted_by' => null,
+            'submitted_at' => null,
+            'review_started_by' => null,
+            'review_started_at' => null,
             'duplicated_from_template_id' => $validated['duplicated_from_template_id'] ?? null,
             'duplicated_from_version' => $validated['duplicated_from_version'] ?? null,
             'restored_from_template_id' => $validated['restored_from_template_id'] ?? null,
@@ -165,6 +172,8 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($template->fresh([
                 'publishedBy',
                 'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
                 'reviewedBy',
                 'duplicatedFromTemplate',
                 'restoredFromTemplate',
@@ -186,6 +195,8 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->load([
                 'publishedBy',
                 'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
                 'reviewedBy',
                 'duplicatedFromTemplate',
                 'restoredFromTemplate',
@@ -283,6 +294,13 @@ class AssessmentFormTemplateController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        if (in_array($form->review_status, ['submitted', 'in_review', 'approved'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forms under review must be returned to draft before editing.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         if (! empty($validated['sections'])) {
             $this->service->syncTemplateTree($form, $validated['sections'], $request->user());
         }
@@ -343,6 +361,13 @@ class AssessmentFormTemplateController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        if (in_array($form->review_status, ['submitted', 'in_review', 'rejected'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forms must be approved before publishing.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         if (! $form->sections()->exists()) {
             return response()->json([
                 'success' => false,
@@ -375,6 +400,8 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->fresh([
                 'publishedBy',
                 'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
                 'reviewedBy',
                 'duplicatedFromTemplate',
                 'restoredFromTemplate',
@@ -409,6 +436,8 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($copy->load([
                 'publishedBy',
                 'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
                 'reviewedBy',
                 'duplicatedFromTemplate',
                 'restoredFromTemplate',
@@ -433,6 +462,8 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->load([
                 'publishedBy',
                 'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
                 'reviewedBy',
                 'duplicatedFromTemplate',
                 'restoredFromTemplate',
@@ -469,6 +500,8 @@ class AssessmentFormTemplateController extends Controller
             'data'    => new AssessmentFormTemplateResource($form->load([
                 'publishedBy',
                 'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
                 'reviewedBy',
                 'duplicatedFromTemplate',
                 'restoredFromTemplate',
@@ -476,6 +509,383 @@ class AssessmentFormTemplateController extends Controller
                 'sections.questions.questionType',
                 'versions',
             ])),
+        ]);
+    }
+
+    public function reviewQueue(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $validated = $request->validate([
+            'page'           => ['sometimes', 'integer', 'min:1'],
+            'per_page'       => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'search'         => ['sometimes', 'nullable', 'string', 'max:255'],
+            'status'         => ['sometimes', 'nullable', 'string', 'max:32'],
+            'review_status'  => ['sometimes', 'nullable', 'string', 'max:32'],
+            'sort_by'        => ['sometimes', 'nullable', 'string', 'max:32'],
+            'sort_direction' => ['sometimes', 'nullable', 'string', 'in:asc,desc'],
+        ]);
+
+        $page = (int) ($validated['page'] ?? 1);
+        $perPage = (int) ($validated['per_page'] ?? 20);
+        $search = trim((string) ($validated['search'] ?? ''));
+        $status = trim((string) ($validated['status'] ?? ''));
+        $reviewStatus = trim((string) ($validated['review_status'] ?? ''));
+        $sortBy = in_array($validated['sort_by'] ?? '', ['name', 'review_status', 'status', 'updated_at', 'submitted_at'], true)
+            ? $validated['sort_by']
+            : 'updated_at';
+        $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        $query = AssessmentFormTemplate::query()
+            ->with([
+                'creator',
+                'updater',
+                'submittedBy',
+                'reviewStartedBy',
+                'reviewedBy',
+                'publishedBy',
+                'archivedBy',
+                'sections.questions.options',
+                'versions',
+            ])
+            ->where('module', 'preschool')
+            ->where('status', '!=', 'archived');
+
+        if ($search !== '') {
+            $like = '%'.$search.'%';
+            $query->where(function (Builder $builder) use ($like): void {
+                $builder->where('name', 'like', $like)
+                    ->orWhere('code', 'like', $like);
+            });
+        }
+
+        if ($status !== '') {
+            $query->where('status', $status);
+        }
+
+        if ($reviewStatus !== '') {
+            $query->where('review_status', $reviewStatus);
+        }
+
+        $summaryBase = clone $query;
+        $summary = [
+            'pending_review' => (clone $summaryBase)->where('review_status', 'submitted')->count(),
+            'in_review' => (clone $summaryBase)->where('review_status', 'in_review')->count(),
+            'approved' => (clone $summaryBase)->where('review_status', 'approved')->count(),
+            'rejected' => (clone $summaryBase)->where('review_status', 'rejected')->count(),
+        ];
+
+        $paginator = $query->orderBy($sortBy, $sortDirection)->paginate($perPage, ['*'], 'page', $page);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'items' => AssessmentFormTemplateResource::collection($paginator->items())->resolve($request),
+                'summary' => $summary,
+            ],
+            'meta' => $this->paginationShape($paginator),
+        ]);
+    }
+
+    public function submitReview(Request $request, AssessmentFormTemplate $form): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        if ($form->status === 'published' || $form->status === 'archived') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only draft forms can be submitted for review.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! in_array($form->review_status, [null, '', 'draft', 'rejected'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This form is already in the review workflow.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $validated = $request->validate([
+            'review_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        $oldValue = [
+            'review_status' => $form->review_status,
+            'submitted_by' => $form->submitted_by,
+            'submitted_at' => optional($form->submitted_at)->toIso8601String(),
+        ];
+
+        $form->update([
+            'review_status' => 'submitted',
+            'submitted_by' => $request->user()->id,
+            'submitted_at' => now(),
+            'review_notes' => $validated['review_notes'] ?? $form->review_notes,
+            'review_started_by' => null,
+            'review_started_at' => null,
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+            'updated_by' => $request->user()->id,
+        ]);
+
+        app(\App\Services\AssessmentLifecycleService::class)->recordAudit(
+            entityType: AssessmentFormTemplate::class,
+            entityId: $form->id,
+            action: 'form.review.submitted',
+            entityLabel: $form->name,
+            oldValue: $oldValue,
+            newValue: [
+                'review_status' => 'submitted',
+                'submitted_by' => $request->user()->id,
+                'submitted_at' => now()->toIso8601String(),
+            ],
+            meta: ['review_notes' => $validated['review_notes'] ?? null],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Form submitted for review.',
+            'data' => new AssessmentFormTemplateResource($form->fresh([
+                'publishedBy',
+                'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
+                'sections.questions.options',
+                'sections.questions.questionType',
+                'versions',
+            ])),
+        ]);
+    }
+
+    public function startReview(Request $request, AssessmentFormTemplate $form): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        if ($form->status === 'archived') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Archived forms cannot be reviewed.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if ($form->review_status !== 'submitted') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only submitted forms can be moved into review.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $form->update([
+            'review_status' => 'in_review',
+            'review_started_by' => $request->user()->id,
+            'review_started_at' => now(),
+            'updated_by' => $request->user()->id,
+        ]);
+
+        app(\App\Services\AssessmentLifecycleService::class)->recordAudit(
+            entityType: AssessmentFormTemplate::class,
+            entityId: $form->id,
+            action: 'form.review.started',
+            entityLabel: $form->name,
+            oldValue: ['review_status' => 'submitted'],
+            newValue: [
+                'review_status' => 'in_review',
+                'review_started_by' => $request->user()->id,
+                'review_started_at' => now()->toIso8601String(),
+            ],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Form moved into review.',
+            'data' => new AssessmentFormTemplateResource($form->fresh([
+                'publishedBy',
+                'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
+                'sections.questions.options',
+                'sections.questions.questionType',
+                'versions',
+            ])),
+        ]);
+    }
+
+    public function approve(Request $request, AssessmentFormTemplate $form): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        if ($form->status === 'archived' || $form->status === 'published') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Archived or published forms cannot be approved.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! in_array($form->review_status, ['submitted', 'in_review', 'approved'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only submitted or in-review forms can be approved.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $validated = $request->validate([
+            'review_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        $oldReviewStatus = $form->review_status;
+        $form->update([
+            'review_status' => 'approved',
+            'review_notes' => $validated['review_notes'] ?? $form->review_notes,
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
+            'updated_by' => $request->user()->id,
+        ]);
+
+        app(\App\Services\AssessmentLifecycleService::class)->recordAudit(
+            entityType: AssessmentFormTemplate::class,
+            entityId: $form->id,
+            action: 'form.review.approved',
+            entityLabel: $form->name,
+            oldValue: ['review_status' => $oldReviewStatus],
+            newValue: [
+                'review_status' => 'approved',
+                'reviewed_by' => $request->user()->id,
+                'reviewed_at' => now()->toIso8601String(),
+            ],
+            meta: ['review_notes' => $validated['review_notes'] ?? null],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Form approved.',
+            'data' => new AssessmentFormTemplateResource($form->fresh([
+                'publishedBy',
+                'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
+                'sections.questions.options',
+                'sections.questions.questionType',
+                'versions',
+            ])),
+        ]);
+    }
+
+    public function reject(Request $request, AssessmentFormTemplate $form): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        if ($form->status === 'archived' || $form->status === 'published') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Archived or published forms cannot be rejected.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! in_array($form->review_status, ['submitted', 'in_review', 'rejected'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only submitted or in-review forms can be rejected.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'max:2000'],
+            'review_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        $oldReviewStatus = $form->review_status;
+        $form->update([
+            'review_status' => 'rejected',
+            'review_notes' => $validated['review_notes'] ?? $validated['rejection_reason'],
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
+            'updated_by' => $request->user()->id,
+        ]);
+
+        app(\App\Services\AssessmentLifecycleService::class)->recordAudit(
+            entityType: AssessmentFormTemplate::class,
+            entityId: $form->id,
+            action: 'form.review.rejected',
+            entityLabel: $form->name,
+            oldValue: ['review_status' => $oldReviewStatus],
+            newValue: [
+                'review_status' => 'rejected',
+                'reviewed_by' => $request->user()->id,
+                'reviewed_at' => now()->toIso8601String(),
+            ],
+            meta: [
+                'review_notes' => $validated['review_notes'] ?? null,
+                'rejection_reason' => $validated['rejection_reason'],
+            ],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Form rejected.',
+            'data' => new AssessmentFormTemplateResource($form->fresh([
+                'publishedBy',
+                'archivedBy',
+                'submittedBy',
+                'reviewStartedBy',
+                'reviewedBy',
+                'duplicatedFromTemplate',
+                'restoredFromTemplate',
+                'sections.questions.options',
+                'sections.questions.questionType',
+                'versions',
+            ])),
+        ]);
+    }
+
+    public function reviewHistory(Request $request, AssessmentFormTemplate $form): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $validated = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $paginator = AssessmentAuditLog::query()
+            ->with('user')
+            ->where('entity_type', AssessmentFormTemplate::class)
+            ->where('entity_id', $form->id)
+            ->whereIn('action', [
+                'form.review.submitted',
+                'form.review.started',
+                'form.review.approved',
+                'form.review.rejected',
+                'form.published',
+                'form.versioned',
+                'form.archived',
+            ])
+            ->latest()
+            ->paginate((int) ($validated['per_page'] ?? 20), ['*'], 'page', (int) ($validated['page'] ?? 1));
+
+        return response()->json([
+            'success' => true,
+            'data' => AssessmentAuditLogResource::collection($paginator->items())->resolve($request),
+            'meta' => $this->paginationShape($paginator),
         ]);
     }
 
