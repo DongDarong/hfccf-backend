@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolReceiptController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
 use App\Http\Controllers\Api\Preschool\PreschoolSettingsBackboneController;
+use App\Http\Controllers\Api\Preschool\PreschoolSettingsDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolScheduleController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
@@ -431,6 +432,21 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('governance-cases/{case}/reopen', [PreschoolGovernanceCaseController::class, 'reopen']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
+        Route::get('settings/dashboard', [PreschoolSettingsDashboardController::class, 'show']);
+        Route::get('settings/academic-years', [PreschoolAcademicLifecycleController::class, 'index']);
+        Route::post('settings/academic-years', [PreschoolAcademicLifecycleController::class, 'storeAcademicYear']);
+        Route::get('settings/academic-years/{academicYear}', [PreschoolAcademicLifecycleController::class, 'showAcademicYear']);
+        Route::put('settings/academic-years/{academicYear}', [PreschoolAcademicLifecycleController::class, 'updateAcademicYear']);
+        Route::post('settings/academic-years/{academicYear}/activate', [PreschoolAcademicLifecycleController::class, 'activateAcademicYear']);
+        Route::post('settings/academic-years/{academicYear}/close', [PreschoolAcademicLifecycleController::class, 'closeAcademicYear']);
+        Route::post('settings/academic-years/{academicYear}/archive', [PreschoolAcademicLifecycleController::class, 'archiveAcademicYear']);
+        Route::get('settings/terms', [PreschoolAcademicLifecycleController::class, 'index']);
+        Route::post('settings/terms', [PreschoolAcademicLifecycleController::class, 'storeTerm']);
+        Route::get('settings/terms/{term}', [PreschoolAcademicLifecycleController::class, 'showTerm']);
+        Route::put('settings/terms/{term}', [PreschoolAcademicLifecycleController::class, 'updateTerm']);
+        Route::post('settings/terms/{term}/activate', [PreschoolAcademicLifecycleController::class, 'activateTerm']);
+        Route::post('settings/terms/{term}/close', [PreschoolAcademicLifecycleController::class, 'closeTerm']);
+        Route::post('settings/terms/{term}/archive', [PreschoolAcademicLifecycleController::class, 'archiveTerm']);
         // Academic lifecycle records stay admin-only so the year/term backbone
         // can drive attendance, schedules, assignments, and reports without
         // turning settings into a monolithic write path.

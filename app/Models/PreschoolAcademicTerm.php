@@ -18,12 +18,15 @@ class PreschoolAcademicTerm extends Model
         'academic_year_id',
         'code',
         'name',
+        'description',
         'start_date',
         'end_date',
         'status',
         'is_current',
         'sort_order',
         'notes',
+        'created_by',
+        'updated_by',
     ];
 
     protected function casts(): array
