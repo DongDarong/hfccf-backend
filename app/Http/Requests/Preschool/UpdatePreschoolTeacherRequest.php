@@ -46,7 +46,8 @@ class UpdatePreschoolTeacherRequest extends FormRequest
             'status' => ['sometimes', 'nullable', Rule::in(['active', 'pending', 'inactive', 'suspended'])],
             'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_avatar' => ['sometimes', 'boolean'],
-            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
+            'password' => ['prohibited'],
+            'password_confirmation' => ['prohibited'],
         ];
     }
 }

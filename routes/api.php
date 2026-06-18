@@ -128,7 +128,7 @@ Route::prefix('auth')->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])->group(function (): void {
 
         Route::get('me', [AuthController::class, 'me']);
         Route::patch('me', [AuthController::class, 'updateMe']);
@@ -145,7 +145,7 @@ Route::prefix('auth')->group(function (): void {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])->group(function (): void {
 
     /*
     |--------------------------------------------------------------------------
@@ -174,6 +174,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::put('users/{user}', [UserController::class, 'update']);
 
         Route::delete('users/{user}', [UserController::class, 'destroy']);
+    });
+
+    Route::middleware(['permission:users:reset'])->group(function (): void {
+        Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
     });
 
     /*
@@ -491,7 +495,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('scholarship')->group(function (): void {
+    Route::prefix('scholarship')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [ScholarshipDashboardController::class, 'index']);
         Route::get('reviewer/dashboard', [ScholarshipDashboardController::class, 'reviewerDashboard']);
         Route::get('reviewer/my-applications', [ScholarshipApplicationController::class, 'reviewerApplications']);
@@ -522,7 +526,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('english')->group(function (): void {
+    Route::prefix('english')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [EnglishDashboardController::class, 'index']);
         Route::get('teacher/dashboard', [EnglishTeacherController::class, 'dashboard']);
         Route::get('teacher/classes', [EnglishTeacherController::class, 'classes']);
@@ -564,7 +568,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('sport')->group(function (): void {
+    Route::prefix('sport')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [SportDashboardController::class, 'index']);
         Route::get('coach/dashboard', [SportDashboardController::class, 'coach']);
 
@@ -685,7 +689,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('assessment')->group(function (): void {
+    Route::prefix('assessment')->middleware(['password.change.completed'])->group(function (): void {
         // Question types (read-only reference data)
         Route::get('question-types', [AssessmentQuestionTypeController::class, 'index']);
 
@@ -763,7 +767,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('dsam')->group(function (): void {
+    Route::prefix('dsam')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [DsamDashboardController::class, 'index']);
 
         // Lookup

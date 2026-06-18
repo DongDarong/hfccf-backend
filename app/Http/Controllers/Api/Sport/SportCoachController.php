@@ -161,10 +161,6 @@ class SportCoachController extends SportController
             $coach->email = strtolower($data['email']);
         }
 
-        if (! empty($data['password'] ?? null)) {
-            $coach->password = $data['password'];
-        }
-
         if ($request->hasFile('avatar')) {
             $this->deleteSportFile($coach->avatar);
             $coach->avatar = $this->storeSportFile($request->file('avatar'), 'sport/coaches');

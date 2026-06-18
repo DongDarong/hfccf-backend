@@ -51,6 +51,7 @@ class HfccfAuthSeeder extends Seeder
             ['code' => 'tasks:write', 'module' => 'tasks', 'name' => 'Manage tasks'],
             ['code' => 'training:write', 'module' => 'training', 'name' => 'Manage training'],
             ['code' => 'users:read', 'module' => 'users', 'name' => 'Read users'],
+            ['code' => 'users:reset', 'module' => 'users', 'name' => 'Reset user passwords'],
             ['code' => 'users:write', 'module' => 'users', 'name' => 'Manage users'],
         ], ['code'], ['module', 'name']);
 
@@ -59,11 +60,13 @@ class HfccfAuthSeeder extends Seeder
 
             ['role_code' => 'adminenglish', 'permission_code' => 'dashboard:read'],
             ['role_code' => 'adminenglish', 'permission_code' => 'users:read'],
+            ['role_code' => 'adminenglish', 'permission_code' => 'users:reset'],
             ['role_code' => 'adminenglish', 'permission_code' => 'reports:read'],
             ['role_code' => 'adminenglish', 'permission_code' => 'programs:write'],
 
             ['role_code' => 'adminpreschool', 'permission_code' => 'dashboard:read'],
             ['role_code' => 'adminpreschool', 'permission_code' => 'users:read'],
+            ['role_code' => 'adminpreschool', 'permission_code' => 'users:reset'],
             ['role_code' => 'adminpreschool', 'permission_code' => 'users:write'],
             ['role_code' => 'adminpreschool', 'permission_code' => 'reports:read'],
             ['role_code' => 'adminpreschool', 'permission_code' => 'classes:write'],
@@ -74,12 +77,14 @@ class HfccfAuthSeeder extends Seeder
 
             ['role_code' => 'adminscholarship', 'permission_code' => 'dashboard:read'],
             ['role_code' => 'adminscholarship', 'permission_code' => 'users:read'],
+            ['role_code' => 'adminscholarship', 'permission_code' => 'users:reset'],
             ['role_code' => 'adminscholarship', 'permission_code' => 'users:write'],
             ['role_code' => 'adminscholarship', 'permission_code' => 'reports:read'],
             ['role_code' => 'adminscholarship', 'permission_code' => 'settings:read'],
 
             ['role_code' => 'adminsport', 'permission_code' => 'dashboard:read'],
             ['role_code' => 'adminsport', 'permission_code' => 'users:read'],
+            ['role_code' => 'adminsport', 'permission_code' => 'users:reset'],
             ['role_code' => 'adminsport', 'permission_code' => 'reports:read'],
             ['role_code' => 'adminsport', 'permission_code' => 'programs:write'],
 
@@ -279,4 +284,3 @@ class HfccfAuthSeeder extends Seeder
         DB::table('user_permissions')->insertOrIgnore($permissionRows);
     }
 }
-

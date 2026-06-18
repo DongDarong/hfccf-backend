@@ -195,10 +195,6 @@ class PreschoolTeacherController extends Controller
         if (array_key_exists('status', $data)) {
             $teacher->status = $data['status'] ?? $teacher->status;
         }
-        if (array_key_exists('password', $data) && $data['password']) {
-            $teacher->password = $data['password'];
-        }
-
         if ($replaceAvatar) {
             $this->deleteStoredAvatarIfNeeded($teacher->avatar);
             $teacher->avatar = $this->storeAvatarIfUploaded($request);

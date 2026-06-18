@@ -427,10 +427,6 @@ class EnglishTeacherController extends Controller
                 $teacher->email = strtolower((string) $data['email']);
             }
 
-            if (array_key_exists('password', $data) && $data['password']) {
-                $teacher->password = $data['password'];
-            }
-
             $teacher->role_code = $role->code;
             $teacher->department_code = $role->department_code ?? 'education';
             $teacher->save();

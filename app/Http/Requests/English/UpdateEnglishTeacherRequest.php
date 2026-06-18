@@ -35,7 +35,8 @@ class UpdateEnglishTeacherRequest extends FormRequest
             'email' => ['sometimes', 'required', 'email', 'max:191', 'unique:users,email,'.$teacherId.',id'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:32'],
             'status' => ['sometimes', 'nullable', Rule::in(['active', 'pending', 'inactive', 'suspended'])],
-            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
+            'password' => ['prohibited'],
+            'password_confirmation' => ['prohibited'],
             'avatar' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_avatar' => ['sometimes', 'boolean'],
         ];

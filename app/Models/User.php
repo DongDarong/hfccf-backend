@@ -32,6 +32,10 @@ use Laravel\Sanctum\HasApiTokens;
     'status',
     'avatar',
     'password',
+    'must_change_password',
+    'password_changed_at',
+    'last_password_reset_at',
+    'last_password_reset_by',
     'email_verified_at',
     'last_login_at',
     'remember_token',
@@ -58,6 +62,9 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'must_change_password' => 'boolean',
+            'password_changed_at' => 'datetime',
+            'last_password_reset_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -77,6 +84,11 @@ class User extends Authenticatable
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class, 'department_code', 'code');
+    }
+
+    public function lastPasswordResetBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'last_password_reset_by', 'id');
     }
 
     public function permissions(): BelongsToMany
