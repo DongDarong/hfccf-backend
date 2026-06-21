@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolPaymentSettingsController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportingController;
 use App\Http\Controllers\Api\Preschool\PreschoolSettingsDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolVaccinationCategoryController;
+use App\Http\Controllers\Api\Governance\EnterpriseGovernanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('preschool/settings')
@@ -95,4 +96,19 @@ Route::prefix('preschool/reports')
         Route::get('guardians/issues', [PreschoolReportingController::class, 'guardianIssues']);
 
         Route::get('export', [PreschoolReportingController::class, 'export']);
+    });
+
+Route::prefix('governance')
+    ->middleware(['auth:sanctum'])
+    ->group(function (): void {
+        Route::get('dashboard', [EnterpriseGovernanceController::class, 'dashboard']);
+        Route::get('audit-logs', [EnterpriseGovernanceController::class, 'auditLogs']);
+        Route::get('audit-logs/{id}', [EnterpriseGovernanceController::class, 'auditLog']);
+        Route::get('security-events', [EnterpriseGovernanceController::class, 'securityEvents']);
+        Route::get('security-events/{id}', [EnterpriseGovernanceController::class, 'securityEvent']);
+        Route::post('security-events/{id}/resolve', [EnterpriseGovernanceController::class, 'resolveSecurityEvent']);
+        Route::get('configuration-history', [EnterpriseGovernanceController::class, 'configurationHistory']);
+        Route::get('risk-dashboard', [EnterpriseGovernanceController::class, 'riskDashboard']);
+        Route::get('at-risk-students', [EnterpriseGovernanceController::class, 'atRiskStudents']);
+        Route::get('investigations', [EnterpriseGovernanceController::class, 'investigations']);
     });

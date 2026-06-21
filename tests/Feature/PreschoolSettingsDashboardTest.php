@@ -20,7 +20,14 @@ class PreschoolSettingsDashboardTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.dashboard.health.critical_alert_enabled', true)
             ->assertJsonPath('data.dashboard.health.severity_levels_count', 4)
-            ->assertJsonPath('data.dashboard.health.incident_categories_count', 6);
+            ->assertJsonPath('data.dashboard.health.incident_categories_count', 6)
+            ->assertJsonPath('data.dashboard.payments.fee_types_count', 6)
+            ->assertJsonPath('data.dashboard.payments.payment_methods_count', 5)
+            ->assertJsonPath('data.dashboard.payments.late_fee_enabled', true)
+            ->assertJsonPath('data.dashboard.preferences.minimum_enrollment_age_months', 24)
+            ->assertJsonPath('data.dashboard.preferences.student_code_prefix', 'PS')
+            ->assertJsonPath('data.dashboard.preferences.default_class_capacity', 18)
+            ->assertJsonPath('data.dashboard.preferences.enrollment_notification_enabled', true);
     }
 
     private function makeUser(string $roleCode): User
