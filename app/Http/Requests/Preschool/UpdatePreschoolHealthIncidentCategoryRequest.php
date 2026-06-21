@@ -2,10 +2,16 @@
 
 namespace App\Http\Requests\Preschool;
 
+use App\Support\PreschoolHealthConfigurationService;
 use Illuminate\Validation\Rule;
 
 class UpdatePreschoolHealthIncidentCategoryRequest extends StorePreschoolHealthIncidentCategoryRequest
 {
+    protected function prepareForValidation(): void
+    {
+        app(PreschoolHealthConfigurationService::class)->listSeverityLevels();
+    }
+
     public function rules(): array
     {
         $category = $this->route('category');

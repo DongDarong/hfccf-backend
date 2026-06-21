@@ -345,6 +345,10 @@ class PreschoolHealthConfigurationService
     public function getDashboardSummary(): array
     {
         $settings = $this->getSettings();
+        $this->ensureDefaultSeverityLevels();
+        $this->ensureDefaultIncidentCategories();
+        $this->ensureDefaultVaccinationCategories();
+        $this->ensureDefaultHealthCheckCategories();
 
         return [
             'critical_alert_enabled' => (bool) $settings->critical_alert_enabled,
