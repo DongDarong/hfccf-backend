@@ -12,6 +12,7 @@ use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentAssessment;
 use App\Models\User;
 use App\Http\Resources\Preschool\PreschoolGuardianCommunicationResource;
+use App\Support\PreschoolAttendanceConfigurationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
@@ -201,7 +202,9 @@ final class PreschoolGuardianCommunicationService
             ]);
         }
 
-        if (($attendance->status === 'absent' && $streaks['absent'] >= 3) || $streaks['absent'] >= 5) {
+        $absenceThreshold = app(PreschoolAttendanceConfigurationService::class)->getAbsenceAlertDays();
+
+        if ($attendance->status === 'absent' && $streaks['absent'] >= $absenceThreshold) {
             return $this->upsertCommunication([
                 'student_id' => $student->id,
                 'guardian_id' => $guardian?->id,

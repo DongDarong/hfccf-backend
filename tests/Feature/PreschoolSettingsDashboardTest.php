@@ -31,13 +31,19 @@ class PreschoolSettingsDashboardTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.dashboard.attendance.late_threshold_minutes', 15)
+            ->assertJsonPath('data.dashboard.attendance.absence_alert_days', 3)
+            ->assertJsonPath('data.dashboard.attendance.school_days_per_week', 5)
+            ->assertJsonPath('data.dashboard.attendance.calendar_events_count', 0)
+            ->assertJsonPath('data.dashboard.attendance.school_week.0', 'monday')
+            ->assertJsonPath('data.dashboard.attendance.school_week.4', 'friday')
             ->assertJsonStructure([
                 'success',
                 'message',
                 'data' => [
                     'dashboard' => [
                         'academic' => ['activeAcademicYear', 'activeTerm', 'academicStatus', 'isConfigured'],
-                        'attendance' => ['currentAttendanceRules', 'lastUpdated', 'isConfigured'],
+                        'attendance' => ['currentAttendanceRules', 'late_threshold_minutes', 'absence_alert_days', 'school_days_per_week', 'calendar_events_count', 'school_week', 'lastUpdated', 'isConfigured'],
                         'payments' => ['currency', 'invoicePrefix', 'receiptPrefix', 'isConfigured'],
                         'assessments' => ['activeGradingScale', 'assessmentCategories', 'assessmentCategoriesCount', 'isConfigured'],
                         'health' => ['alertSeverityLevels', 'healthCategories', 'isConfigured'],
@@ -59,6 +65,7 @@ class PreschoolSettingsDashboardTest extends TestCase
                 'data' => [
                     'dashboard' => [
                         'academic' => ['activeAcademicYear', 'activeAcademicYearDateRange', 'activeTerm', 'activeTermDateRange', 'academicStatus', 'isConfigured'],
+                        'attendance' => ['currentAttendanceRules', 'late_threshold_minutes', 'absence_alert_days', 'school_days_per_week', 'calendar_events_count', 'school_week', 'lastUpdated', 'isConfigured'],
                     ],
                 ],
             ]);

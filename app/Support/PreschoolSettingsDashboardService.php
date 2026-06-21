@@ -16,6 +16,9 @@ class PreschoolSettingsDashboardService
         $record = PreschoolSettingsBackbone::query()
             ->where('key', PreschoolSettingsBackboneService::BACKBONE_KEY)
             ->first();
+        $attendanceService = app(PreschoolAttendanceConfigurationService::class);
+        $attendanceSettings = $attendanceService->getSettings();
+        $attendanceSummary = $attendanceService->getAttendanceSummary();
 
         $academicLifecycle = app(PreschoolAcademicLifecycleService::class);
         $activeAcademicYear = $academicLifecycle->currentAcademicYear();
@@ -42,8 +45,17 @@ class PreschoolSettingsDashboardService
                 'isConfigured' => (bool) $activeAcademicYear,
             ],
             'attendance' => [
-                'currentAttendanceRules' => $this->resolveAttendanceRules($snapshot),
-                'lastUpdated' => $record?->updated_at?->toIso8601String(),
+                'currentAttendanceRules' => sprintf(
+                    'Late after %d minutes; half day after %d minutes',
+                    $attendanceService->getLateThreshold($attendanceSettings),
+                    $attendanceService->getHalfDayThreshold($attendanceSettings),
+                ),
+                'late_threshold_minutes' => $attendanceSummary['late_threshold_minutes'],
+                'absence_alert_days' => $attendanceSummary['absence_alert_days'],
+                'school_days_per_week' => $attendanceSummary['school_days_per_week'],
+                'calendar_events_count' => $attendanceSummary['calendar_events_count'],
+                'school_week' => $attendanceSummary['school_week'],
+                'lastUpdated' => $attendanceSettings->updated_at?->toIso8601String() ?? $record?->updated_at?->toIso8601String(),
                 'isConfigured' => true,
             ],
             'payments' => [
@@ -75,16 +87,6 @@ class PreschoolSettingsDashboardService
     private function resolveAcademicYear(PreschoolAcademicYear $academicYear): string
     {
         return trim((string) ($academicYear->label ?: $academicYear->code)) ?: 'Academic Year';
-    }
-
-    private function resolveAttendanceRules(array $snapshot): string
-    {
-        $markingWindow = trim((string) data_get($snapshot, 'attendance.markingWindow', '07:30 - 08:15'));
-        $absenceRule = trim((string) data_get($snapshot, 'attendance.absenceRule', 'window-and-threshold'));
-
-        return $markingWindow !== '' && $absenceRule !== ''
-            ? 'Window + threshold'
-            : 'Window + threshold';
     }
 
     private function resolvePaymentCurrency(array $snapshot): string
