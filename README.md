@@ -1,6 +1,6 @@
 # HFCCF Backend
 
-Laravel 13 API backend for the HFCCF admin system. The current backend supports authentication, RBAC, user management, Preschool, Scholarship, English, and Sport foundation APIs, along with forgot-password OTP flow, personal access tokens, and API rate limiting for the Vue frontend.
+Laravel 13 API backend for the HFCCF admin system. The current backend supports authentication, RBAC, user management, Preschool, Scholarship, English, and Sport foundation APIs, along with the Enterprise Governance & Audit Center, forgot-password OTP flow, personal access tokens, and API rate limiting for the Vue frontend.
 
 ## Stack
 
@@ -20,6 +20,7 @@ Laravel 13 API backend for the HFCCF admin system. The current backend supports 
 - Preschool module APIs for classes, students, teachers, attendance, and payments
 - Preschool academic lifecycle APIs for academic years, terms, and lifecycle state management
 - Preschool reporting and governance APIs for report periods, snapshots, exports, governance diff, integrity review, lifecycle audit, institutional reconstruction, and governance cases
+- Enterprise governance APIs for audit logs, security events, configuration history, operational risk, investigations, and exports
 - Preschool settings backbone APIs for the academic defaults used across the module
 - Scholarship module APIs for students, applications, reviews, and status workflow
 - English module APIs for classes, students, teachers, tasks, and submissions
@@ -38,6 +39,7 @@ The backend currently exposes these stabilized domain areas:
 - User management and profile updates
 - Preschool module
 - Preschool governance and lifecycle audit module
+- Enterprise Governance & Audit Center
 - Scholarship module
 - English module
 - Sport foundation, including event-driven match scores and tournament standings
