@@ -8,6 +8,9 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
+use App\Support\PreschoolAssessmentConfigurationService;
+use App\Models\PreschoolAcademicYear;
+use App\Models\PreschoolAssessmentCategory;
 use Tests\TestCase;
 
 class PreschoolSettingsDashboardTest extends TestCase
@@ -26,6 +29,23 @@ class PreschoolSettingsDashboardTest extends TestCase
         $admin = $this->makeUserWithRole('adminpreschool', 'usr_psd_100', 'preschool.settings100@hfccf.org');
         Sanctum::actingAs($admin);
 
+        $assessmentService = app(PreschoolAssessmentConfigurationService::class);
+        $assessmentService->updateSettings([
+            'passing_score' => 65,
+            'grading_scale_type' => 'letter',
+            'weighting_enabled' => true,
+        ], $admin);
+
+        PreschoolAssessmentCategory::query()->create([
+            'code' => 'quiz',
+            'name' => 'Quiz',
+            'description' => null,
+            'sort_order' => 1,
+            'is_active' => true,
+            'created_by' => $admin->id,
+            'updated_by' => $admin->id,
+        ]);
+
         $response = $this->getJson('/api/preschool/settings/dashboard');
 
         $response
@@ -37,6 +57,9 @@ class PreschoolSettingsDashboardTest extends TestCase
             ->assertJsonPath('data.dashboard.attendance.calendar_events_count', 0)
             ->assertJsonPath('data.dashboard.attendance.school_week.0', 'monday')
             ->assertJsonPath('data.dashboard.attendance.school_week.4', 'friday')
+            ->assertJsonPath('data.dashboard.assessments.passing_score', 65)
+            ->assertJsonPath('data.dashboard.assessments.weighting_enabled', true)
+            ->assertJsonPath('data.dashboard.assessments.assessment_categories_count', \App\Models\PreschoolAssessmentCategory::query()->where('is_active', true)->count())
             ->assertJsonStructure([
                 'success',
                 'message',
@@ -45,7 +68,7 @@ class PreschoolSettingsDashboardTest extends TestCase
                         'academic' => ['activeAcademicYear', 'activeTerm', 'academicStatus', 'isConfigured'],
                         'attendance' => ['currentAttendanceRules', 'late_threshold_minutes', 'absence_alert_days', 'school_days_per_week', 'calendar_events_count', 'school_week', 'lastUpdated', 'isConfigured'],
                         'payments' => ['currency', 'invoicePrefix', 'receiptPrefix', 'isConfigured'],
-                        'assessments' => ['activeGradingScale', 'assessmentCategories', 'assessmentCategoriesCount', 'isConfigured'],
+                        'assessments' => ['passing_score', 'weighting_enabled', 'grade_bands_count', 'assessment_categories', 'assessment_categories_count', 'report_periods_count', 'activeGradingScale', 'isConfigured'],
                         'health' => ['alertSeverityLevels', 'healthCategories', 'isConfigured'],
                         'preferences' => ['organizationName', 'language', 'brandingStatus', 'isConfigured'],
                     ],
@@ -66,6 +89,7 @@ class PreschoolSettingsDashboardTest extends TestCase
                     'dashboard' => [
                         'academic' => ['activeAcademicYear', 'activeAcademicYearDateRange', 'activeTerm', 'activeTermDateRange', 'academicStatus', 'isConfigured'],
                         'attendance' => ['currentAttendanceRules', 'late_threshold_minutes', 'absence_alert_days', 'school_days_per_week', 'calendar_events_count', 'school_week', 'lastUpdated', 'isConfigured'],
+                        'assessments' => ['passing_score', 'weighting_enabled', 'grade_bands_count', 'assessment_categories', 'assessment_categories_count', 'report_periods_count', 'activeGradingScale', 'isConfigured'],
                     ],
                 ],
             ]);

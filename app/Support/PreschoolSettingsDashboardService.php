@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\PreschoolAssessmentCategory;
 use App\Models\PreschoolSettingsBackbone;
 use App\Models\PreschoolAcademicTerm;
 use App\Models\PreschoolAcademicYear;
@@ -23,17 +22,11 @@ class PreschoolSettingsDashboardService
         $academicLifecycle = app(PreschoolAcademicLifecycleService::class);
         $activeAcademicYear = $academicLifecycle->currentAcademicYear();
         $activeTerm = $academicLifecycle->currentTerm($activeAcademicYear?->id);
-        $assessmentCategories = PreschoolAssessmentCategory::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->pluck('name')
-            ->filter()
-            ->values()
-            ->all();
-
-        if ($assessmentCategories === []) {
-            $assessmentCategories = ['Development', 'Behavior'];
-        }
+        $assessmentService = app(PreschoolAssessmentConfigurationService::class);
+        $assessmentSettings = $assessmentService->getSettings();
+        $gradingBands = $assessmentService->getGradingScale();
+        $assessmentCategories = $assessmentService->getAssessmentCategories();
+        $reportPeriods = $assessmentService->listReportPeriods();
 
         return [
             'academic' => [
@@ -65,9 +58,13 @@ class PreschoolSettingsDashboardService
                 'isConfigured' => true,
             ],
             'assessments' => [
+                'passing_score' => $assessmentSettings->passing_score,
+                'weighting_enabled' => (bool) $assessmentSettings->weighting_enabled,
+                'grade_bands_count' => $gradingBands->count(),
+                'assessment_categories' => $assessmentCategories->pluck('name')->values()->all(),
+                'assessment_categories_count' => $assessmentCategories->count(),
+                'report_periods_count' => $reportPeriods->count(),
                 'activeGradingScale' => $this->resolveAssessmentScale($snapshot),
-                'assessmentCategories' => $assessmentCategories,
-                'assessmentCategoriesCount' => count($assessmentCategories),
                 'isConfigured' => true,
             ],
             'health' => [

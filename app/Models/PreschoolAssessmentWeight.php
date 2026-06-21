@@ -2,22 +2,17 @@
 
 namespace App\Models;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\User;
 
-class PreschoolAssessmentCategory extends Model
+class PreschoolAssessmentWeight extends Model
 {
-    use SoftDeletes;
+    protected $table = 'preschool_assessment_weights';
 
     protected $fillable = [
-        'code',
-        'name',
-        'description',
-        'sort_order',
-        'is_active',
+        'category_id',
+        'percentage',
         'created_by',
         'updated_by',
     ];
@@ -25,14 +20,13 @@ class PreschoolAssessmentCategory extends Model
     protected function casts(): array
     {
         return [
-            'sort_order' => 'integer',
-            'is_active' => 'boolean',
+            'percentage' => 'decimal:2',
         ];
     }
 
-    public function assessments(): HasMany
+    public function category(): BelongsTo
     {
-        return $this->hasMany(PreschoolStudentAssessment::class, 'category_id');
+        return $this->belongsTo(PreschoolAssessmentCategory::class, 'category_id');
     }
 
     public function createdBy(): BelongsTo

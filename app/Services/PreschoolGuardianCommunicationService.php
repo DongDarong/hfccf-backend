@@ -12,6 +12,7 @@ use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentAssessment;
 use App\Models\User;
 use App\Http\Resources\Preschool\PreschoolGuardianCommunicationResource;
+use App\Support\PreschoolAssessmentConfigurationService;
 use App\Support\PreschoolAttendanceConfigurationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -529,14 +530,17 @@ final class PreschoolGuardianCommunicationService
 
     private function recentLowAssessmentCount(int $studentId): int
     {
+        $passingScore = app(PreschoolAssessmentConfigurationService::class)->getPassingScore();
+
         return PreschoolStudentAssessment::query()
             ->where('student_id', $studentId)
             ->where('status', 'finalized')
             ->orderByDesc('assessment_date')
             ->limit(3)
             ->get()
-            ->filter(static function (PreschoolStudentAssessment $assessment): bool {
-                return (float) ($assessment->score ?? 0) <= 60 || in_array(strtolower((string) $assessment->rating), ['at-risk', 'needs_improvement'], true);
+            ->filter(static function (PreschoolStudentAssessment $assessment) use ($passingScore): bool {
+                return (float) ($assessment->score ?? 0) <= $passingScore
+                    || in_array(strtolower((string) $assessment->rating), ['at-risk', 'needs_improvement'], true);
             })
             ->count();
     }
@@ -547,7 +551,7 @@ final class PreschoolGuardianCommunicationService
             return 'repeated_low_performance';
         }
 
-        if ($score <= 60) {
+        if ($score <= app(PreschoolAssessmentConfigurationService::class)->getPassingScore()) {
             return 'low_score_threshold';
         }
 

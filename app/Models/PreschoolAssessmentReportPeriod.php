@@ -7,42 +7,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\User;
 
-class PreschoolSchoolCalendarEvent extends Model
+class PreschoolAssessmentReportPeriod extends Model
 {
     use SoftDeletes;
 
-    public const TYPE_HOLIDAY = 'holiday';
-    public const TYPE_CLOSURE = 'closure';
-    public const TYPE_TEACHER_TRAINING = 'teacher_training';
-    public const TYPE_EXAMINATION = 'examination';
-    public const TYPE_SPECIAL_EVENT = 'special_event';
-
-    public const STATUS_ACTIVE = 'active';
-    public const STATUS_ARCHIVED = 'archived';
-
-    public const TYPES = [
-        self::TYPE_HOLIDAY,
-        self::TYPE_CLOSURE,
-        self::TYPE_TEACHER_TRAINING,
-        self::TYPE_EXAMINATION,
-        self::TYPE_SPECIAL_EVENT,
-    ];
-
-    public const STATUSES = [
-        self::STATUS_ACTIVE,
-        self::STATUS_ARCHIVED,
-    ];
-
-    protected $table = 'preschool_school_calendar_events';
+    protected $table = 'preschool_assessment_report_periods';
 
     protected $fillable = [
         'academic_year_id',
-        'title',
-        'description',
-        'type',
+        'term_id',
+        'name',
         'start_date',
         'end_date',
-        'status',
+        'is_active',
         'created_by',
         'updated_by',
     ];
@@ -52,13 +29,18 @@ class PreschoolSchoolCalendarEvent extends Model
         return [
             'start_date' => 'date',
             'end_date' => 'date',
-            'deleted_at' => 'datetime',
+            'is_active' => 'boolean',
         ];
     }
 
     public function academicYear(): BelongsTo
     {
         return $this->belongsTo(PreschoolAcademicYear::class, 'academic_year_id');
+    }
+
+    public function term(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolAcademicTerm::class, 'term_id');
     }
 
     public function createdBy(): BelongsTo

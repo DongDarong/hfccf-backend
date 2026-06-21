@@ -25,11 +25,7 @@ final class PreschoolAssessmentService
      */
     public function listCategories(): Collection
     {
-        return PreschoolAssessmentCategory::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get();
+        return app(PreschoolAssessmentConfigurationService::class)->getAssessmentCategories();
     }
 
     public function listAssessments(User $user, PreschoolStudent $student, array $filters = []): LengthAwarePaginator

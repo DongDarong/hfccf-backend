@@ -11,6 +11,11 @@ use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategorySettingsController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentGradingScaleController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentReportPeriodController as PreschoolAssessmentSettingsReportPeriodController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentSettingsController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentWeightController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceSettingsController;
 use App\Http\Controllers\Api\Preschool\PreschoolHealthAlertController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthAuditController;
@@ -442,6 +447,28 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('settings/attendance/calendar-events/{event}', [PreschoolSchoolCalendarEventController::class, 'show']);
         Route::put('settings/attendance/calendar-events/{event}', [PreschoolSchoolCalendarEventController::class, 'update']);
         Route::get('settings/dashboard', [PreschoolSettingsDashboardController::class, 'show']);
+        Route::middleware(['permission:settings:read'])->group(function (): void {
+            Route::get('settings/assessments', [PreschoolAssessmentSettingsController::class, 'show']);
+            Route::put('settings/assessments', [PreschoolAssessmentSettingsController::class, 'update']);
+
+            Route::get('settings/assessments/grading-scale', [PreschoolAssessmentGradingScaleController::class, 'index']);
+            Route::post('settings/assessments/grading-scale', [PreschoolAssessmentGradingScaleController::class, 'store']);
+            Route::put('settings/assessments/grading-scale/{band}', [PreschoolAssessmentGradingScaleController::class, 'update']);
+            Route::delete('settings/assessments/grading-scale/{band}', [PreschoolAssessmentGradingScaleController::class, 'destroy']);
+
+            Route::get('settings/assessments/categories', [PreschoolAssessmentCategorySettingsController::class, 'index']);
+            Route::post('settings/assessments/categories', [PreschoolAssessmentCategorySettingsController::class, 'store']);
+            Route::put('settings/assessments/categories/{category}', [PreschoolAssessmentCategorySettingsController::class, 'update']);
+            Route::post('settings/assessments/categories/{category}/archive', [PreschoolAssessmentCategorySettingsController::class, 'archive']);
+
+            Route::get('settings/assessments/report-periods', [PreschoolAssessmentSettingsReportPeriodController::class, 'index']);
+            Route::post('settings/assessments/report-periods', [PreschoolAssessmentSettingsReportPeriodController::class, 'store']);
+            Route::put('settings/assessments/report-periods/{period}', [PreschoolAssessmentSettingsReportPeriodController::class, 'update']);
+            Route::post('settings/assessments/report-periods/{period}/archive', [PreschoolAssessmentSettingsReportPeriodController::class, 'archive']);
+
+            Route::get('settings/assessments/weights', [PreschoolAssessmentWeightController::class, 'index']);
+            Route::put('settings/assessments/weights', [PreschoolAssessmentWeightController::class, 'update']);
+        });
         Route::get('settings/academic-years', [PreschoolAcademicLifecycleController::class, 'index']);
         Route::post('settings/academic-years', [PreschoolAcademicLifecycleController::class, 'storeAcademicYear']);
         Route::get('settings/academic-years/{academicYear}', [PreschoolAcademicLifecycleController::class, 'showAcademicYear']);
