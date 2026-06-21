@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\PreschoolGuardianGovernanceIssue;
 use App\Models\User;
+use App\Services\PreschoolGuardianCommunicationService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,6 +14,7 @@ final class PreschoolGuardianGovernanceService
     public function __construct(
         private readonly PreschoolGuardianConsistencyService $consistency,
         private readonly PreschoolGuardianDuplicateService $duplicates,
+        private readonly PreschoolGuardianCommunicationService $communicationService,
     ) {}
 
     /**
@@ -175,6 +177,10 @@ final class PreschoolGuardianGovernanceService
             'recurrence_count' => $previousCount,
             'latest_snapshot' => $snapshot,
         ]);
+        $issueModel = PreschoolGuardianGovernanceIssue::query()->where('issue_key', $issueKey)->latest('id')->first();
+        if ($issueModel) {
+            $this->communicationService->syncGovernanceIssue($issueModel, auth()->user());
+        }
 
         return 'created';
     }
@@ -231,6 +237,10 @@ final class PreschoolGuardianGovernanceService
             'recurrence_count' => $previousCount,
             'latest_snapshot' => $snapshot,
         ]);
+        $issueModel = PreschoolGuardianGovernanceIssue::query()->where('issue_key', $issueKey)->latest('id')->first();
+        if ($issueModel) {
+            $this->communicationService->syncGovernanceIssue($issueModel, auth()->user());
+        }
 
         return 'created';
     }

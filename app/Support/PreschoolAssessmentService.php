@@ -9,6 +9,7 @@ use App\Models\PreschoolClass;
 use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentAssessment;
 use App\Models\User;
+use App\Services\PreschoolGuardianCommunicationService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -24,11 +25,7 @@ final class PreschoolAssessmentService
      */
     public function listCategories(): Collection
     {
-        return PreschoolAssessmentCategory::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get();
+        return app(PreschoolAssessmentConfigurationService::class)->getAssessmentCategories();
     }
 
     public function listAssessments(User $user, PreschoolStudent $student, array $filters = []): LengthAwarePaginator
@@ -168,6 +165,7 @@ final class PreschoolAssessmentService
         $assessment->finalized_by_user_id = $user->id;
         $assessment->save();
         $assessment->load(['student', 'preschoolClass', 'category', 'assessedBy', 'finalizedBy', 'academicYear', 'term']);
+        app(PreschoolGuardianCommunicationService::class)->syncAssessmentRisk($assessment, $user);
 
         return $assessment;
     }

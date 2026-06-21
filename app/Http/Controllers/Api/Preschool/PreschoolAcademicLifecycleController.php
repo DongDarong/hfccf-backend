@@ -26,15 +26,23 @@ class PreschoolAcademicLifecycleController extends Controller
             return $response;
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Preschool academic lifecycle retrieved successfully.',
-            'data' => [
-                'academicYears' => $service->academicYears()->map(fn (PreschoolAcademicYear $year) => $service->academicYearSnapshot($year->loadMissing('terms')))->values(),
-                'terms' => $service->terms()->map(fn (PreschoolAcademicTerm $term) => $service->termSnapshot($term))->values(),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_OK);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Preschool academic lifecycle retrieved successfully.',
+        ), Response::HTTP_OK);
+    }
+
+    public function showAcademicYear(Request $request, PreschoolAcademicYear $academicYear, PreschoolAcademicLifecycleService $service): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Academic year retrieved successfully.',
+            academicYear: $academicYear->loadMissing('terms'),
+        ), Response::HTTP_OK);
     }
 
     public function storeAcademicYear(Request $request, PreschoolAcademicLifecycleService $service): JsonResponse
@@ -54,14 +62,12 @@ class PreschoolAcademicLifecycleController extends Controller
             newState: $service->academicYearSnapshot($academicYear->loadMissing('terms')),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Academic year created successfully.',
-            'data' => [
-                'academicYear' => $service->academicYearSnapshot($academicYear->loadMissing('terms')),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_CREATED);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Academic year created successfully.',
+            academicYear: $academicYear->loadMissing('terms'),
+            status: Response::HTTP_CREATED,
+        ), Response::HTTP_CREATED);
     }
 
     public function updateAcademicYear(Request $request, PreschoolAcademicYear $academicYear, PreschoolAcademicLifecycleService $service): JsonResponse
@@ -82,14 +88,11 @@ class PreschoolAcademicLifecycleController extends Controller
             newState: $service->academicYearSnapshot($updated->loadMissing('terms')),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Academic year updated successfully.',
-            'data' => [
-                'academicYear' => $service->academicYearSnapshot($updated->loadMissing('terms')),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_OK);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Academic year updated successfully.',
+            academicYear: $updated->loadMissing('terms'),
+        ), Response::HTTP_OK);
     }
 
     public function activateAcademicYear(Request $request, PreschoolAcademicYear $academicYear, PreschoolAcademicLifecycleService $service): JsonResponse
@@ -109,14 +112,11 @@ class PreschoolAcademicLifecycleController extends Controller
             newState: $service->academicYearSnapshot($updated->loadMissing('terms')),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Academic year activated successfully.',
-            'data' => [
-                'academicYear' => $service->academicYearSnapshot($updated->loadMissing('terms')),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_OK);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Academic year activated successfully.',
+            academicYear: $updated->loadMissing('terms'),
+        ), Response::HTTP_OK);
     }
 
     public function closeAcademicYear(Request $request, PreschoolAcademicYear $academicYear, PreschoolAcademicLifecycleService $service): JsonResponse
@@ -136,14 +136,35 @@ class PreschoolAcademicLifecycleController extends Controller
             newState: $service->academicYearSnapshot($updated->loadMissing('terms')),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Academic year closed successfully.',
-            'data' => [
-                'academicYear' => $service->academicYearSnapshot($updated->loadMissing('terms')),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_OK);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Academic year closed successfully.',
+            academicYear: $updated->loadMissing('terms'),
+        ), Response::HTTP_OK);
+    }
+
+    public function archiveAcademicYear(Request $request, PreschoolAcademicYear $academicYear, PreschoolAcademicLifecycleService $service): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $previous = $service->academicYearSnapshot($academicYear->replicate()->loadMissing('terms'));
+        $updated = $service->archiveAcademicYear($academicYear);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_year.archived',
+            entityType: 'academic_year',
+            entityId: (string) $updated->id,
+            previousState: $previous,
+            newState: $service->academicYearSnapshot($updated->loadMissing('terms')),
+        );
+
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Academic year archived successfully.',
+            academicYear: $updated->loadMissing('terms'),
+        ), Response::HTTP_OK);
     }
 
     public function storeTerm(Request $request, PreschoolAcademicLifecycleService $service): JsonResponse
@@ -163,14 +184,25 @@ class PreschoolAcademicLifecycleController extends Controller
             newState: $service->termSnapshot($term),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Term created successfully.',
-            'data' => [
-                'term' => $service->termSnapshot($term),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_CREATED);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Term created successfully.',
+            term: $term,
+            status: Response::HTTP_CREATED,
+        ), Response::HTTP_CREATED);
+    }
+
+    public function showTerm(Request $request, PreschoolAcademicTerm $term, PreschoolAcademicLifecycleService $service): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Term retrieved successfully.',
+            term: $term->loadMissing('academicYear'),
+        ), Response::HTTP_OK);
     }
 
     public function updateTerm(Request $request, PreschoolAcademicTerm $term, PreschoolAcademicLifecycleService $service): JsonResponse
@@ -191,14 +223,11 @@ class PreschoolAcademicLifecycleController extends Controller
             newState: $service->termSnapshot($updated),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Term updated successfully.',
-            'data' => [
-                'term' => $service->termSnapshot($updated),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_OK);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Term updated successfully.',
+            term: $updated,
+        ), Response::HTTP_OK);
     }
 
     public function activateTerm(Request $request, PreschoolAcademicTerm $term, PreschoolAcademicLifecycleService $service): JsonResponse
@@ -218,14 +247,11 @@ class PreschoolAcademicLifecycleController extends Controller
             newState: $service->termSnapshot($updated),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Term activated successfully.',
-            'data' => [
-                'term' => $service->termSnapshot($updated),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_OK);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Term activated successfully.',
+            term: $updated,
+        ), Response::HTTP_OK);
     }
 
     public function closeTerm(Request $request, PreschoolAcademicTerm $term, PreschoolAcademicLifecycleService $service): JsonResponse
@@ -245,51 +271,94 @@ class PreschoolAcademicLifecycleController extends Controller
             newState: $service->termSnapshot($updated),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Term closed successfully.',
-            'data' => [
-                'term' => $service->termSnapshot($updated),
-                'currentContext' => $service->currentContext(),
-            ],
-        ], Response::HTTP_OK);
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Term closed successfully.',
+            term: $updated,
+        ), Response::HTTP_OK);
+    }
+
+    public function archiveTerm(Request $request, PreschoolAcademicTerm $term, PreschoolAcademicLifecycleService $service): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $previous = $service->termSnapshot($term->replicate()->loadMissing('academicYear'));
+        $updated = $service->archiveTerm($term);
+        $this->recordAudit(
+            request: $request,
+            actionType: 'academic_term.archived',
+            entityType: 'academic_term',
+            entityId: (string) $updated->id,
+            previousState: $previous,
+            newState: $service->termSnapshot($updated),
+        );
+
+        return response()->json($this->lifecycleResponse(
+            service: $service,
+            message: 'Term archived successfully.',
+            term: $updated,
+        ), Response::HTTP_OK);
     }
 
     private function academicYearRules(bool $isUpdate = false, ?PreschoolAcademicYear $academicYear = null): array
     {
         return [
             'code' => [
-                $isUpdate ? 'sometimes' : 'required',
+                'sometimes',
                 'string',
                 'max:50',
                 Rule::unique('preschool_academic_years', 'code')->ignore($academicYear?->id),
             ],
-            'label' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:191'],
-            'start_date' => ['sometimes', 'nullable', 'date'],
-            'end_date' => ['sometimes', 'nullable', 'date', 'after_or_equal:start_date'],
-            'status' => ['sometimes', 'nullable', Rule::in(['active', 'closed', 'archived'])],
+            'name' => ['required', 'string', 'max:191'],
+            'label' => ['sometimes', 'nullable', 'string', 'max:191'],
+            'description' => ['sometimes', 'nullable', 'string'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after:start_date'],
+            'status' => ['sometimes', 'nullable', Rule::in(['draft', 'active', 'closed', 'archived'])],
             'is_current' => ['sometimes', 'boolean'],
-            'notes' => ['sometimes', 'nullable', 'string'],
         ];
     }
 
     private function termRules(bool $isUpdate = false, ?PreschoolAcademicTerm $term = null): array
     {
         return [
-            'academic_year_id' => [$isUpdate ? 'sometimes' : 'required', 'integer', 'exists:preschool_academic_years,id'],
+            'academic_year_id' => ['required', 'integer', 'exists:preschool_academic_years,id'],
             'code' => [
-                $isUpdate ? 'sometimes' : 'required',
+                'sometimes',
                 'string',
                 'max:50',
                 Rule::unique('preschool_terms', 'code')->ignore($term?->id),
             ],
-            'name' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:191'],
-            'start_date' => ['sometimes', 'nullable', 'date'],
-            'end_date' => ['sometimes', 'nullable', 'date', 'after_or_equal:start_date'],
-            'status' => ['sometimes', 'nullable', Rule::in(['active', 'closed', 'archived'])],
+            'name' => ['required', 'string', 'max:191'],
+            'description' => ['sometimes', 'nullable', 'string'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after:start_date'],
+            'status' => ['sometimes', 'nullable', Rule::in(['draft', 'active', 'closed', 'archived'])],
             'is_current' => ['sometimes', 'boolean'],
             'sort_order' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'notes' => ['sometimes', 'nullable', 'string'],
+        ];
+    }
+
+    /**
+     * Keep every lifecycle mutation response consistent so frontend pages can
+     * refresh both lists and the active year/term context from one payload.
+     *
+     * @param  array{service: PreschoolAcademicLifecycleService, message: string, academicYear?: ?PreschoolAcademicYear, term?: ?PreschoolAcademicTerm, status?: int}  $arguments
+     */
+    private function lifecycleResponse(PreschoolAcademicLifecycleService $service, string $message, ?PreschoolAcademicYear $academicYear = null, ?PreschoolAcademicTerm $term = null, int $status = Response::HTTP_OK): array
+    {
+        return [
+            'success' => true,
+            'message' => $message,
+            'data' => array_filter([
+                'academicYears' => $service->academicYears()->map(fn (PreschoolAcademicYear $year) => $service->academicYearSnapshot($year->loadMissing('terms')))->values(),
+                'terms' => $service->terms()->map(fn (PreschoolAcademicTerm $item) => $service->termSnapshot($item))->values(),
+                'academicYear' => $academicYear ? $service->academicYearSnapshot($academicYear->loadMissing('terms')) : null,
+                'term' => $term ? $service->termSnapshot($term->loadMissing('academicYear')) : null,
+                'currentContext' => $service->currentContext(),
+            ], static fn ($value) => $value !== null),
         ];
     }
 

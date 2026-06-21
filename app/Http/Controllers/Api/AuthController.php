@@ -80,6 +80,7 @@ class AuthController extends Controller
             'message' => 'Login successful.',
             'data' => [
                 'token' => $tokenResult->plainTextToken,
+                'requires_password_change' => (bool) $user->must_change_password,
                 'user' => UserResource::make($user)->resolve($request),
             ],
         ], Response::HTTP_OK);
@@ -198,6 +199,10 @@ class AuthController extends Controller
 
         $otp->user->forceFill([
             'password' => $validated['password'],
+            'must_change_password' => false,
+            'password_changed_at' => now(),
+            'last_password_reset_at' => null,
+            'last_password_reset_by' => null,
         ])->save();
 
         // Revoke all existing tokens after a password reset for safety.
@@ -314,6 +319,8 @@ class AuthController extends Controller
 
         $user->forceFill([
             'password' => $data['password'],
+            'must_change_password' => false,
+            'password_changed_at' => now(),
         ])->save();
 
         $currentToken = $user->currentAccessToken();

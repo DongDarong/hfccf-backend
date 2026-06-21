@@ -11,6 +11,12 @@ use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategorySettingsController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentGradingScaleController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentReportPeriodController as PreschoolAssessmentSettingsReportPeriodController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentSettingsController;
+use App\Http\Controllers\Api\Preschool\PreschoolAssessmentWeightController;
+use App\Http\Controllers\Api\Preschool\PreschoolAttendanceSettingsController;
 use App\Http\Controllers\Api\Preschool\PreschoolHealthAlertController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthController;
@@ -22,6 +28,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomResourceController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
+use App\Http\Controllers\Api\Preschool\PreschoolGuardianCommunicationController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
@@ -33,9 +40,13 @@ use App\Http\Controllers\Api\Preschool\PreschoolGovernanceDiffController;
 use App\Http\Controllers\Api\Preschool\PreschoolGovernanceCaseController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
+use App\Http\Controllers\Api\Preschool\PreschoolInvoiceController;
+use App\Http\Controllers\Api\Preschool\PreschoolReceiptController;
 use App\Http\Controllers\Api\Preschool\PreschoolProgressSummaryController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportPeriodController;
 use App\Http\Controllers\Api\Preschool\PreschoolSettingsBackboneController;
+use App\Http\Controllers\Api\Preschool\PreschoolSettingsDashboardController;
+use App\Http\Controllers\Api\Preschool\PreschoolSchoolCalendarEventController;
 use App\Http\Controllers\Api\Preschool\PreschoolScheduleController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
@@ -125,7 +136,7 @@ Route::prefix('auth')->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])->group(function (): void {
 
         Route::get('me', [AuthController::class, 'me']);
         Route::patch('me', [AuthController::class, 'updateMe']);
@@ -142,7 +153,7 @@ Route::prefix('auth')->group(function (): void {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])->group(function (): void {
 
     /*
     |--------------------------------------------------------------------------
@@ -171,6 +182,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::put('users/{user}', [UserController::class, 'update']);
 
         Route::delete('users/{user}', [UserController::class, 'destroy']);
+    });
+
+    Route::middleware(['permission:users:reset'])->group(function (): void {
+        Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
     });
 
     /*
@@ -256,6 +271,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('guardians/governance/issues/{issue}/assign', [PreschoolGuardianGovernanceController::class, 'assign']);
         Route::post('guardians/governance/issues/{issue}/resolve', [PreschoolGuardianGovernanceController::class, 'resolve']);
         Route::post('guardians/governance/issues/{issue}/dismiss', [PreschoolGuardianGovernanceController::class, 'dismiss']);
+        Route::get('guardian-communications', [PreschoolGuardianCommunicationController::class, 'index']);
+        Route::get('students/{student}/guardian-communications', [PreschoolGuardianCommunicationController::class, 'studentTimeline']);
+        Route::get('guardians/{guardian}/communications', [PreschoolGuardianCommunicationController::class, 'guardianTimeline']);
+        Route::post('students/{student}/guardian-communications', [PreschoolGuardianCommunicationController::class, 'store']);
+        Route::post('guardian-communications/{communication}/sent', [PreschoolGuardianCommunicationController::class, 'markSent']);
+        Route::post('guardian-communications/{communication}/acknowledge', [PreschoolGuardianCommunicationController::class, 'acknowledge']);
+        Route::post('guardian-communications/{communication}/cancel', [PreschoolGuardianCommunicationController::class, 'cancel']);
         Route::get('guardians/{guardian}', [PreschoolGuardianController::class, 'show']);
         Route::patch('guardians/{guardian}', [PreschoolGuardianController::class, 'update']);
         Route::delete('guardians/{guardian}', [PreschoolGuardianController::class, 'destroy']);
@@ -417,6 +439,50 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('governance-cases/{case}/reopen', [PreschoolGovernanceCaseController::class, 'reopen']);
         Route::get('settings/backbone', [PreschoolSettingsBackboneController::class, 'show']);
         Route::patch('settings/backbone', [PreschoolSettingsBackboneController::class, 'update']);
+        Route::get('settings/attendance', [PreschoolAttendanceSettingsController::class, 'show']);
+        Route::put('settings/attendance', [PreschoolAttendanceSettingsController::class, 'update']);
+        Route::get('settings/attendance/calendar-events', [PreschoolSchoolCalendarEventController::class, 'index']);
+        Route::post('settings/attendance/calendar-events', [PreschoolSchoolCalendarEventController::class, 'store']);
+        Route::post('settings/attendance/calendar-events/{event}/archive', [PreschoolSchoolCalendarEventController::class, 'archive']);
+        Route::get('settings/attendance/calendar-events/{event}', [PreschoolSchoolCalendarEventController::class, 'show']);
+        Route::put('settings/attendance/calendar-events/{event}', [PreschoolSchoolCalendarEventController::class, 'update']);
+        Route::get('settings/dashboard', [PreschoolSettingsDashboardController::class, 'show']);
+        Route::middleware(['permission:settings:read'])->group(function (): void {
+            Route::get('settings/assessments', [PreschoolAssessmentSettingsController::class, 'show']);
+            Route::put('settings/assessments', [PreschoolAssessmentSettingsController::class, 'update']);
+
+            Route::get('settings/assessments/grading-scale', [PreschoolAssessmentGradingScaleController::class, 'index']);
+            Route::post('settings/assessments/grading-scale', [PreschoolAssessmentGradingScaleController::class, 'store']);
+            Route::put('settings/assessments/grading-scale/{band}', [PreschoolAssessmentGradingScaleController::class, 'update']);
+            Route::delete('settings/assessments/grading-scale/{band}', [PreschoolAssessmentGradingScaleController::class, 'destroy']);
+
+            Route::get('settings/assessments/categories', [PreschoolAssessmentCategorySettingsController::class, 'index']);
+            Route::post('settings/assessments/categories', [PreschoolAssessmentCategorySettingsController::class, 'store']);
+            Route::put('settings/assessments/categories/{category}', [PreschoolAssessmentCategorySettingsController::class, 'update']);
+            Route::post('settings/assessments/categories/{category}/archive', [PreschoolAssessmentCategorySettingsController::class, 'archive']);
+
+            Route::get('settings/assessments/report-periods', [PreschoolAssessmentSettingsReportPeriodController::class, 'index']);
+            Route::post('settings/assessments/report-periods', [PreschoolAssessmentSettingsReportPeriodController::class, 'store']);
+            Route::put('settings/assessments/report-periods/{period}', [PreschoolAssessmentSettingsReportPeriodController::class, 'update']);
+            Route::post('settings/assessments/report-periods/{period}/archive', [PreschoolAssessmentSettingsReportPeriodController::class, 'archive']);
+
+            Route::get('settings/assessments/weights', [PreschoolAssessmentWeightController::class, 'index']);
+            Route::put('settings/assessments/weights', [PreschoolAssessmentWeightController::class, 'update']);
+        });
+        Route::get('settings/academic-years', [PreschoolAcademicLifecycleController::class, 'index']);
+        Route::post('settings/academic-years', [PreschoolAcademicLifecycleController::class, 'storeAcademicYear']);
+        Route::get('settings/academic-years/{academicYear}', [PreschoolAcademicLifecycleController::class, 'showAcademicYear']);
+        Route::put('settings/academic-years/{academicYear}', [PreschoolAcademicLifecycleController::class, 'updateAcademicYear']);
+        Route::post('settings/academic-years/{academicYear}/activate', [PreschoolAcademicLifecycleController::class, 'activateAcademicYear']);
+        Route::post('settings/academic-years/{academicYear}/close', [PreschoolAcademicLifecycleController::class, 'closeAcademicYear']);
+        Route::post('settings/academic-years/{academicYear}/archive', [PreschoolAcademicLifecycleController::class, 'archiveAcademicYear']);
+        Route::get('settings/terms', [PreschoolAcademicLifecycleController::class, 'index']);
+        Route::post('settings/terms', [PreschoolAcademicLifecycleController::class, 'storeTerm']);
+        Route::get('settings/terms/{term}', [PreschoolAcademicLifecycleController::class, 'showTerm']);
+        Route::put('settings/terms/{term}', [PreschoolAcademicLifecycleController::class, 'updateTerm']);
+        Route::post('settings/terms/{term}/activate', [PreschoolAcademicLifecycleController::class, 'activateTerm']);
+        Route::post('settings/terms/{term}/close', [PreschoolAcademicLifecycleController::class, 'closeTerm']);
+        Route::post('settings/terms/{term}/archive', [PreschoolAcademicLifecycleController::class, 'archiveTerm']);
         // Academic lifecycle records stay admin-only so the year/term backbone
         // can drive attendance, schedules, assignments, and reports without
         // turning settings into a monolithic write path.
@@ -450,6 +516,21 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::get('payments/{id}', [PreschoolPaymentController::class, 'show']);
         Route::put('payments/{id}', [PreschoolPaymentController::class, 'update']);
         Route::delete('payments/{id}', [PreschoolPaymentController::class, 'destroy']);
+        Route::post('payments/{payment}/receipt', [PreschoolReceiptController::class, 'store']);
+
+        Route::get('invoices', [PreschoolInvoiceController::class, 'index']);
+        Route::post('invoices', [PreschoolInvoiceController::class, 'store']);
+        Route::get('invoices/{invoice}', [PreschoolInvoiceController::class, 'show']);
+        Route::put('invoices/{invoice}', [PreschoolInvoiceController::class, 'update']);
+        Route::delete('invoices/{invoice}', [PreschoolInvoiceController::class, 'destroy']);
+        Route::post('invoices/{invoice}/issue', [PreschoolInvoiceController::class, 'issue']);
+        Route::post('invoices/{invoice}/cancel', [PreschoolInvoiceController::class, 'cancel']);
+        Route::post('invoices/{invoice}/overdue', [PreschoolInvoiceController::class, 'overdue']);
+        Route::get('invoices/{invoice}/print', [PreschoolInvoiceController::class, 'print']);
+        Route::get('students/{student}/invoices', [PreschoolInvoiceController::class, 'studentInvoices']);
+        Route::get('students/{student}/payment-summary', [PreschoolInvoiceController::class, 'studentPaymentSummary']);
+        Route::get('receipts/{receipt}', [PreschoolReceiptController::class, 'show']);
+        Route::get('receipts/{receipt}/print', [PreschoolReceiptController::class, 'print']);
 
         // Classroom resources are readable by all preschool staff and writable
         // by admins only â€” the controller enforces both access tiers.
@@ -466,7 +547,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('scholarship')->group(function (): void {
+    Route::prefix('scholarship')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [ScholarshipDashboardController::class, 'index']);
         Route::get('reviewer/dashboard', [ScholarshipDashboardController::class, 'reviewerDashboard']);
         Route::get('reviewer/my-applications', [ScholarshipApplicationController::class, 'reviewerApplications']);
@@ -497,7 +578,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('english')->group(function (): void {
+    Route::prefix('english')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [EnglishDashboardController::class, 'index']);
         Route::get('teacher/dashboard', [EnglishTeacherController::class, 'dashboard']);
         Route::get('teacher/classes', [EnglishTeacherController::class, 'classes']);
@@ -539,7 +620,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('sport')->group(function (): void {
+    Route::prefix('sport')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [SportDashboardController::class, 'index']);
         Route::get('coach/dashboard', [SportDashboardController::class, 'coach']);
 
@@ -660,20 +741,26 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('assessment')->group(function (): void {
+    Route::prefix('assessment')->middleware(['password.change.completed'])->group(function (): void {
         // Question types (read-only reference data)
         Route::get('question-types', [AssessmentQuestionTypeController::class, 'index']);
 
         // Form templates
         Route::get('forms', [AssessmentFormTemplateController::class, 'index']);
+        Route::get('forms/review-queue', [AssessmentFormTemplateController::class, 'reviewQueue']);
         Route::post('forms', [AssessmentFormTemplateController::class, 'store']);
         Route::get('forms/{form}', [AssessmentFormTemplateController::class, 'show']);
         Route::put('forms/{form}', [AssessmentFormTemplateController::class, 'update']);
         Route::delete('forms/{form}', [AssessmentFormTemplateController::class, 'destroy']);
+        Route::post('forms/{form}/submit-review', [AssessmentFormTemplateController::class, 'submitReview']);
+        Route::post('forms/{form}/start-review', [AssessmentFormTemplateController::class, 'startReview']);
+        Route::post('forms/{form}/approve', [AssessmentFormTemplateController::class, 'approve']);
+        Route::post('forms/{form}/reject', [AssessmentFormTemplateController::class, 'reject']);
         Route::post('forms/{form}/publish', [AssessmentFormTemplateController::class, 'publish']);
         Route::post('forms/{form}/duplicate', [AssessmentFormTemplateController::class, 'duplicate']);
         Route::post('forms/{form}/archive', [AssessmentFormTemplateController::class, 'archive']);
         Route::post('forms/{form}/restore', [AssessmentFormTemplateController::class, 'restore']);
+        Route::get('forms/{form}/review-history', [AssessmentFormTemplateController::class, 'reviewHistory']);
         Route::get('forms/{form}/versions', [AssessmentFormTemplateController::class, 'versions']);
 
         // Form sections
@@ -732,7 +819,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('dsam')->group(function (): void {
+    Route::prefix('dsam')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [DsamDashboardController::class, 'index']);
 
         // Lookup
@@ -800,7 +887,3 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
-
-
-
-

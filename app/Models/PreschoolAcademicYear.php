@@ -10,11 +10,14 @@ class PreschoolAcademicYear extends Model
     protected $fillable = [
         'code',
         'label',
+        'description',
         'start_date',
         'end_date',
         'status',
         'is_current',
         'notes',
+        'created_by',
+        'updated_by',
     ];
 
     protected function casts(): array

@@ -71,4 +71,9 @@ class PreschoolGuardian extends Model
     {
         return $this->hasOne(PreschoolGuardianPortalAccount::class, 'guardian_id');
     }
+
+    public function communications(): HasMany
+    {
+        return $this->hasMany(PreschoolGuardianCommunication::class, 'guardian_id');
+    }
 }

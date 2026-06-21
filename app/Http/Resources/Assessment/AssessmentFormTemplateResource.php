@@ -22,6 +22,17 @@ class AssessmentFormTemplateResource extends JsonResource
             'settings'        => $this->settings,
             'version_notes'   => $this->version_notes,
             'review_notes'    => $this->review_notes,
+            'review_status'   => $this->review_status,
+            'submitted_by'    => $this->whenLoaded('submittedBy', fn () => [
+                'id'   => $this->submittedBy->id,
+                'name' => trim($this->submittedBy->first_name.' '.$this->submittedBy->last_name),
+            ], $this->submitted_by),
+            'submitted_at'    => $this->submitted_at?->toIso8601String(),
+            'review_started_by' => $this->whenLoaded('reviewStartedBy', fn () => [
+                'id'   => $this->reviewStartedBy->id,
+                'name' => trim($this->reviewStartedBy->first_name.' '.$this->reviewStartedBy->last_name),
+            ], $this->review_started_by),
+            'review_started_at' => $this->review_started_at?->toIso8601String(),
             'reviewed_by'     => $this->whenLoaded('reviewedBy', fn () => [
                 'id'   => $this->reviewedBy->id,
                 'name' => trim($this->reviewedBy->first_name.' '.$this->reviewedBy->last_name),
@@ -37,6 +48,9 @@ class AssessmentFormTemplateResource extends JsonResource
             'is_draft'        => $this->status === 'draft',
             'is_published'    => $this->status === 'published',
             'is_archived'     => $this->status === 'archived',
+            'is_under_review' => in_array($this->review_status, ['submitted', 'in_review'], true),
+            'is_review_approved' => $this->review_status === 'approved',
+            'is_review_rejected' => $this->review_status === 'rejected',
             'published_by'    => $this->whenLoaded('publishedBy', fn () => [
                 'id'   => $this->publishedBy->id,
                 'name' => trim($this->publishedBy->first_name.' '.$this->publishedBy->last_name),
@@ -59,6 +73,17 @@ class AssessmentFormTemplateResource extends JsonResource
                 'publish_notes'  => $version->change_summary,
                 'version_notes'  => data_get($version->snapshot, 'template.version_notes'),
                 'review_notes'   => data_get($version->snapshot, 'template.review_notes'),
+                'review_status'  => data_get($version->snapshot, 'template.review_status'),
+                'submitted_by'   => [
+                    'id' => data_get($version->snapshot, 'template.submitted_by'),
+                    'name' => data_get($version->snapshot, 'template.submitted_by_name'),
+                ],
+                'submitted_at'   => data_get($version->snapshot, 'template.submitted_at'),
+                'review_started_by' => [
+                    'id' => data_get($version->snapshot, 'template.review_started_by'),
+                    'name' => data_get($version->snapshot, 'template.review_started_by_name'),
+                ],
+                'review_started_at' => data_get($version->snapshot, 'template.review_started_at'),
                 'reviewed_by'    => [
                     'id' => data_get($version->snapshot, 'template.reviewed_by'),
                     'name' => data_get($version->snapshot, 'template.reviewed_by_name'),

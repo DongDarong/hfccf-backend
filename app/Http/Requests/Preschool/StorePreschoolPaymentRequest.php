@@ -19,6 +19,7 @@ class StorePreschoolPaymentRequest extends FormRequest
         return [
             'student_id' => ['required', 'integer', 'exists:preschool_students,id'],
             'class_id' => ['required', 'integer', 'exists:preschool_classes,id'],
+            'invoice_id' => ['nullable', 'integer', 'exists:preschool_invoices,id'],
             'payment_reference' => ['nullable', 'string', 'max:100', 'unique:preschool_payments,payment_reference'],
             'amount' => ['required', 'numeric', 'min:0'],
             'currency' => ['sometimes', 'string', 'size:3'],

@@ -11,6 +11,7 @@ use App\Models\PreschoolEnrollmentApplication;
 use App\Models\PreschoolEnrollmentDocument;
 use App\Models\PreschoolLifecycleAuditLog;
 use App\Models\User;
+use App\Services\PreschoolGuardianCommunicationService;
 use App\Support\PreschoolEnrollmentService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -312,6 +313,7 @@ class PreschoolEnrollmentController extends Controller
 
         $this->enrollment->logDecision($application, 'approved', $prev, 'approved', $request->user(), $data['note'] ?? null);
         $this->writeAuditLog('preschool_enrollment.approved', $application, $request->user());
+        app(PreschoolGuardianCommunicationService::class)->syncEnrollmentDecision($application, $request->user(), 'approved');
 
         return $this->applicationResponse($request, $application, 'Application approved.');
     }
@@ -341,6 +343,7 @@ class PreschoolEnrollmentController extends Controller
 
         $this->enrollment->logDecision($application, 'rejected', $prev, 'rejected', $request->user(), $data['rejection_reason']);
         $this->writeAuditLog('preschool_enrollment.rejected', $application, $request->user());
+        app(PreschoolGuardianCommunicationService::class)->syncEnrollmentDecision($application, $request->user(), 'rejected');
 
         return $this->applicationResponse($request, $application, 'Application rejected.');
     }
@@ -370,6 +373,7 @@ class PreschoolEnrollmentController extends Controller
 
         $this->enrollment->logDecision($application, 'waitlisted', $prev, 'waitlisted', $request->user(), $data['waitlist_reason'] ?? null);
         $this->writeAuditLog('preschool_enrollment.waitlisted', $application, $request->user());
+        app(PreschoolGuardianCommunicationService::class)->syncEnrollmentDecision($application, $request->user(), 'waitlisted');
 
         return $this->applicationResponse($request, $application, 'Application placed on waitlist.');
     }
@@ -475,6 +479,7 @@ class PreschoolEnrollmentController extends Controller
 
         $this->enrollment->logDecision($application, 'enrolled', 'approved', 'enrolled', $request->user(), "Student #{$student->student_code} created.");
         $this->writeAuditLog('preschool_enrollment.enrolled', $application, $request->user(), ['student_id' => $student->id, 'student_code' => $student->student_code]);
+        app(PreschoolGuardianCommunicationService::class)->syncEnrollmentDecision($application, $request->user(), 'approved');
 
         // Load application relations for the resource response
         $application->load([

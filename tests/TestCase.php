@@ -51,6 +51,8 @@ abstract class TestCase extends BaseTestCase
      */
     protected function loginAndGetToken(User $user, string $password = 'password'): string
     {
+        $this->flushHeaders();
+
         $response = $this->postJson('/api/auth/login', [
             'email' => $user->email,
             'password' => $password,
@@ -66,7 +68,7 @@ abstract class TestCase extends BaseTestCase
     {
         $token = $this->loginAndGetToken($user, $password);
 
-        return $this->withHeaders(['Authorization' => 'Bearer '.$token]);
+        return $this->flushHeaders()->withToken($token);
     }
 
     /**

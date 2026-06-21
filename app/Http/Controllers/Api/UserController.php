@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\Users\ResetUserPasswordRequest;
 use App\Http\Requests\UpdateUserRequest;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\Auth\UserResource;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AdminPasswordResetService;
 use App\Support\ImageStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +17,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
 {
+    public function __construct(
+        private readonly AdminPasswordResetService $passwordResetService,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
@@ -217,10 +223,6 @@ class UserController extends Controller
         if (array_key_exists('status', $data)) {
             $model->status = $data['status'] ?? $model->status;
         }
-        if (array_key_exists('password', $data) && $data['password']) {
-            $model->password = $data['password'];
-        }
-
         if ($replaceAvatar) {
             $this->deleteStoredAvatarIfNeeded($model->avatar);
             $model->avatar = $this->storeAvatarIfUploaded($request);
@@ -239,6 +241,48 @@ class UserController extends Controller
             'message' => 'User updated successfully.',
             'data' => [
                 'user' => (new UserResource($model))->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function resetPassword(ResetUserPasswordRequest $request, string $user): JsonResponse
+    {
+        $actor = $request->user();
+
+        if (! $actor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+                'data' => null,
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $model = User::query()
+            ->with(['role', 'permissions' => fn ($query) => $query->orderBy('permissions.code')])
+            ->find($user);
+
+        if (! $model) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+                'data' => null,
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = $request->validated();
+        $updatedUser = $this->passwordResetService->reset(
+            $actor,
+            $model,
+            $data['password'],
+            $data['reason'],
+            $request,
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset successfully.',
+            'data' => [
+                'user' => (new UserResource($updatedUser))->resolve($request),
             ],
         ], Response::HTTP_OK);
     }

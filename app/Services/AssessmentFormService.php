@@ -117,6 +117,7 @@ class AssessmentFormService
             $newTemplate->code = $this->generateCopyCode($template->code ?? 'FORM');
             $newTemplate->name = $template->name . ' (Copy)';
             $newTemplate->status = 'draft';
+            $newTemplate->review_status = 'draft';
             $newTemplate->is_locked = false;
             $newTemplate->created_by = auth()->id();
             $newTemplate->updated_by = auth()->id();
@@ -124,6 +125,10 @@ class AssessmentFormService
             $newTemplate->published_by = null;
             $newTemplate->archived_at = null;
             $newTemplate->archived_by = null;
+            $newTemplate->submitted_by = null;
+            $newTemplate->submitted_at = null;
+            $newTemplate->review_started_by = null;
+            $newTemplate->review_started_at = null;
             $newTemplate->duplicated_from_template_id = $template->id;
             $newTemplate->duplicated_from_version = $template->current_version;
             $newTemplate->restored_from_template_id = null;
@@ -204,6 +209,7 @@ class AssessmentFormService
             $template->review_notes = $metadata['review_notes'] ?? $template->review_notes;
             $template->reviewed_by = auth()->id();
             $template->reviewed_at = now();
+            $template->review_status = 'approved';
             $template->save();
 
             $version = $this->lifecycle->publishTemplate(
@@ -211,11 +217,11 @@ class AssessmentFormService
                 $metadata['publish_notes'] ?? $metadata['change_summary'] ?? $metadata['version_notes'] ?? null
             );
             $template->update([
-                'status' => 'published',
-                'published_at' => $version->published_at,
-                'published_by' => $version->published_by,
-                'updated_by' => auth()->id(),
-            ]);
+            'status' => 'published',
+            'published_at' => $version->published_at,
+            'published_by' => $version->published_by,
+            'updated_by' => auth()->id(),
+        ]);
             $this->lifecycle->recordAudit(
                 entityType: AssessmentFormTemplate::class,
                 entityId: $template->id,
@@ -249,8 +255,13 @@ class AssessmentFormService
     {
         $template->update([
             'status' => 'draft',
+            'review_status' => 'draft',
             'archived_at' => null,
             'archived_by' => null,
+            'submitted_by' => null,
+            'submitted_at' => null,
+            'review_started_by' => null,
+            'review_started_at' => null,
             'updated_by' => $actor?->id ?? auth()->id(),
             'restored_from_template_id' => $metadata['restored_from_template_id'] ?? $template->id,
             'restored_from_version' => $metadata['restored_from_version'] ?? $template->current_version,

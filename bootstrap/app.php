@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureGuardianPortalAccess;
+use App\Http\Middleware\EnsurePasswordChangeCompleted;
 use App\Http\Middleware\EnsureUserHasPermission;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -13,6 +14,38 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+
+if (($_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?? null) === 'testing') {
+    $testingStoragePath = rtrim(sys_get_temp_dir(), '\\/').DIRECTORY_SEPARATOR.'hfccf-backend-testing'.DIRECTORY_SEPARATOR.'storage';
+
+    $_SERVER['LARAVEL_STORAGE_PATH'] = $testingStoragePath;
+    $_ENV['LARAVEL_STORAGE_PATH'] = $testingStoragePath;
+    putenv('LARAVEL_STORAGE_PATH='.$testingStoragePath);
+
+    foreach ([
+        $testingStoragePath,
+        $testingStoragePath.DIRECTORY_SEPARATOR.'app',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'private',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'public',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'assessment-prints',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'assessment-prints'.DIRECTORY_SEPARATOR.'tmp',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'logs',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'cache',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'cache'.DIRECTORY_SEPARATOR.'data',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'sessions',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'views',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'testing',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'testing'.DIRECTORY_SEPARATOR.'disks',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'testing'.DIRECTORY_SEPARATOR.'disks'.DIRECTORY_SEPARATOR.'local',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'testing'.DIRECTORY_SEPARATOR.'disks'.DIRECTORY_SEPARATOR.'public',
+        $testingStoragePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'testing'.DIRECTORY_SEPARATOR.'disks'.DIRECTORY_SEPARATOR.'r2',
+    ] as $directory) {
+        if (! is_dir($directory)) {
+            @mkdir($directory, 0777, true);
+        }
+    }
+}
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -27,6 +60,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'guardian.portal' => EnsureGuardianPortalAccess::class,
+            'password.change.completed' => EnsurePasswordChangeCompleted::class,
             'permission' => EnsureUserHasPermission::class,
             'throttle' => ThrottleRequests::class,
         ]);

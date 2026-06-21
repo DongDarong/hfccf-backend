@@ -2,26 +2,28 @@
 
 namespace App\Http\Controllers\Api\Preschool;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\Preschool\StorePreschoolPaymentRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolPaymentRequest;
 use App\Http\Resources\Preschool\PreschoolPaymentResource;
+use App\Models\PreschoolInvoice;
 use App\Models\PreschoolPayment;
-use App\Models\User;
+use App\Services\PreschoolBillingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class PreschoolPaymentController extends Controller
+class PreschoolPaymentController extends PreschoolBillingController
 {
+    public function __construct(private readonly PreschoolBillingService $billing) {}
+
     public function index(Request $request): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {
             return $response;
         }
 
-        $query = PreschoolPayment::query()->with(['student', 'preschoolClass']);
+        $query = PreschoolPayment::query()->with(['student', 'preschoolClass', 'invoice', 'receipts']);
         $this->applyFilters($request, $query);
 
         $paginator = $query
@@ -46,9 +48,24 @@ class PreschoolPaymentController extends Controller
         }
 
         $data = $request->validated();
+        if (! empty($data['invoice_id'])) {
+            $invoice = PreschoolInvoice::query()->find($data['invoice_id']);
+            if ($invoice) {
+                if ($invoice->status === 'cancelled') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cancelled invoices cannot receive payments.',
+                        'data' => null,
+                    ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $data['student_id'] = $invoice->student_id;
+                $data['class_id'] = $invoice->class_id;
+            }
+        }
         $payment = PreschoolPayment::query()->create([
             'student_id' => $data['student_id'],
             'class_id' => $data['class_id'],
+            'invoice_id' => $data['invoice_id'] ?? null,
             'payment_reference' => $data['payment_reference'] ?? $this->nextPaymentReference(),
             'amount' => $data['amount'],
             'currency' => $data['currency'] ?? 'USD',
@@ -59,7 +76,10 @@ class PreschoolPaymentController extends Controller
             'note' => $data['note'] ?? null,
         ]);
 
-        $payment->load(['student', 'preschoolClass']);
+        $payment->load(['student', 'preschoolClass', 'invoice', 'receipts']);
+        if ($payment->invoice_id) {
+            $this->billing->syncPaymentInvoiceBalances($payment);
+        }
 
         return response()->json([
             'success' => true,
@@ -76,7 +96,7 @@ class PreschoolPaymentController extends Controller
             return $response;
         }
 
-        $payment = PreschoolPayment::query()->with(['student', 'preschoolClass'])->find($id);
+        $payment = PreschoolPayment::query()->with(['student', 'preschoolClass', 'invoice', 'receipts'])->find($id);
 
         if (! $payment) {
             return response()->json([
@@ -101,7 +121,7 @@ class PreschoolPaymentController extends Controller
             return $response;
         }
 
-        $payment = PreschoolPayment::query()->find($id);
+        $payment = PreschoolPayment::query()->with(['invoice'])->find($id);
         if (! $payment) {
             return response()->json([
                 'success' => false,
@@ -111,14 +131,31 @@ class PreschoolPaymentController extends Controller
         }
 
         $data = $request->validated();
-        foreach (['student_id', 'class_id', 'payment_reference', 'amount', 'currency', 'payment_method', 'payment_status', 'paid_at', 'due_date', 'note'] as $field) {
+        if (! empty($data['invoice_id'])) {
+            $invoice = PreschoolInvoice::query()->find($data['invoice_id']);
+            if ($invoice) {
+                if ($invoice->status === 'cancelled') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cancelled invoices cannot receive payments.',
+                        'data' => null,
+                    ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $data['student_id'] = $invoice->student_id;
+                $data['class_id'] = $invoice->class_id;
+            }
+        }
+        $previousInvoiceId = $payment->invoice_id;
+
+        foreach (['student_id', 'class_id', 'invoice_id', 'payment_reference', 'amount', 'currency', 'payment_method', 'payment_status', 'paid_at', 'due_date', 'note'] as $field) {
             if (array_key_exists($field, $data)) {
                 $payment->{$field} = $data[$field];
             }
         }
 
         $payment->save();
-        $payment->load(['student', 'preschoolClass']);
+        $payment->load(['student', 'preschoolClass', 'invoice', 'receipts']);
+        $this->billing->syncPaymentInvoiceBalances($payment, $previousInvoiceId);
 
         return response()->json([
             'success' => true,
@@ -145,7 +182,11 @@ class PreschoolPaymentController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
+        $previousInvoiceId = $payment->invoice_id;
         $payment->delete();
+        if ($previousInvoiceId) {
+            $this->billing->syncPaymentInvoiceBalances($payment, $previousInvoiceId);
+        }
 
         return response()->json([
             'success' => true,
@@ -202,44 +243,4 @@ class PreschoolPaymentController extends Controller
         return 'PAY-'.now()->format('Ymd').'-'.str_pad((string) $count, 4, '0', STR_PAD_LEFT);
     }
 
-    private function authorizeAdmin(?User $user): ?JsonResponse
-    {
-        if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.',
-                'data' => null,
-            ], Response::HTTP_UNAUTHORIZED);
-        }
-
-        if (in_array($user->role_code, ['superadmin', 'adminpreschool'], true)) {
-            return null;
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Forbidden.',
-            'data' => null,
-        ], Response::HTTP_FORBIDDEN);
-    }
-
-    private function page(Request $request): int
-    {
-        return max((int) $request->query('page', 1), 1);
-    }
-
-    private function perPage(Request $request): int
-    {
-        return min(max((int) $request->query('per_page', 10), 1), 100);
-    }
-
-    private function paginationShape($paginator): array
-    {
-        return [
-            'page' => $paginator->currentPage(),
-            'perPage' => $paginator->perPage(),
-            'total' => $paginator->total(),
-            'totalPages' => $paginator->lastPage(),
-        ];
-    }
 }
