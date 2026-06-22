@@ -8,6 +8,13 @@ use App\Models\CambodiaProvince;
 use App\Models\CambodiaVillage;
 use RuntimeException;
 
+/**
+ * Cambodia administrative master data importer.
+ *
+ * This shared system dataset is consumed by Preschool, English, Sport,
+ * Scholarship, and future modules through backend APIs only.
+ * Official source: Cambodia administrative location CSV dataset.
+ */
 class CambodiaLocationImporter
 {
     private const PROVINCE_FILE = 'Cambodia Province List 2025.csv';
@@ -20,21 +27,10 @@ class CambodiaLocationImporter
 
     public function resolveSourcePath(string $filename): string
     {
-        $frontendRoot = dirname(base_path()).DIRECTORY_SEPARATOR.'hfccf-frontend';
-        $legacyFrontendRoot = 'D:\\Thesis2026\\hfccf-project\\hfccf-frontend';
+        $path = database_path('data/cambodia/'.$filename);
 
-        $candidates = [
-            base_path('database/data/cambodia/'.$filename),
-            $frontendRoot.DIRECTORY_SEPARATOR.$filename,
-            $frontendRoot.DIRECTORY_SEPARATOR.'database/data/cambodia/'.$filename,
-            $legacyFrontendRoot.DIRECTORY_SEPARATOR.$filename,
-            $legacyFrontendRoot.DIRECTORY_SEPARATOR.'database/data/cambodia/'.$filename,
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (is_file($candidate)) {
-                return $candidate;
-            }
+        if (is_file($path)) {
+            return $path;
         }
 
         throw new RuntimeException('Unable to locate Cambodia location CSV: '.$filename);

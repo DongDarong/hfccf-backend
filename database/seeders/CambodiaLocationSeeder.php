@@ -5,6 +5,9 @@ namespace Database\Seeders;
 use App\Support\CambodiaLocationImporter;
 use Illuminate\Database\Seeder;
 
+/**
+ * Seeds the shared Cambodia administrative master data used across the system.
+ */
 class CambodiaLocationSeeder extends Seeder
 {
     public function run(CambodiaLocationImporter $importer): void

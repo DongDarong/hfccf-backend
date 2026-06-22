@@ -20,12 +20,14 @@ class CambodiaLocationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_importer_resolves_frontend_csv_paths(): void
+    public function test_importer_resolves_backend_csv_paths(): void
     {
         $importer = app(CambodiaLocationImporter::class);
         $path = $importer->resolveSourcePath('Cambodia Province List 2025.csv');
+        $normalizedPath = str_replace('\\', '/', $path);
 
-        $this->assertStringContainsString('hfccf-frontend', $path);
+        $this->assertStringContainsString('database/data/cambodia', $normalizedPath);
+        $this->assertStringNotContainsString('hfccf-frontend', $path);
         $this->assertFileExists($path);
     }
 
