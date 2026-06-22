@@ -7,6 +7,7 @@ use App\Models\CambodiaCommune;
 use App\Models\CambodiaDistrict;
 use App\Models\CambodiaProvince;
 use App\Models\CambodiaVillage;
+use App\Support\CambodiaLocationLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -81,32 +82,17 @@ class CambodiaLocationController extends Controller
 
     private function findProvinceByCode(string $code): ?CambodiaProvince
     {
-        $normalized = trim($code);
-
-        return CambodiaProvince::query()
-            ->where('code', $normalized)
-            ->orWhereRaw("ltrim(code, '0') = ?", [ltrim($normalized, '0')])
-            ->first();
+        return CambodiaLocationLookup::findByCodeOrNumericCode(CambodiaProvince::class, $code);
     }
 
     private function findDistrictByCode(string $code): ?CambodiaDistrict
     {
-        $normalized = trim($code);
-
-        return CambodiaDistrict::query()
-            ->where('code', $normalized)
-            ->orWhereRaw("ltrim(code, '0') = ?", [ltrim($normalized, '0')])
-            ->first();
+        return CambodiaLocationLookup::findByCodeOrNumericCode(CambodiaDistrict::class, $code);
     }
 
     private function findCommuneByCode(string $code): ?CambodiaCommune
     {
-        $normalized = trim($code);
-
-        return CambodiaCommune::query()
-            ->where('code', $normalized)
-            ->orWhereRaw("ltrim(code, '0') = ?", [ltrim($normalized, '0')])
-            ->first();
+        return CambodiaLocationLookup::findByCodeOrNumericCode(CambodiaCommune::class, $code);
     }
 
     private function formatLocations($items): array

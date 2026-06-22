@@ -59,6 +59,13 @@ class CambodiaLocationTest extends TestCase
         $districtResponse->assertJsonCount($province->districts()->count(), 'data');
         $districtResponse->assertJsonFragment(['code' => '0102', 'name_kh' => $district->name_kh]);
 
+        $provinceTwo = CambodiaProvince::query()->where('code', '02')->firstOrFail();
+        $districtResponseZeroPadded = $this->getJson('/api/locations/districts?province_code=02')->assertOk();
+        $districtResponseZeroPadded->assertJsonCount($provinceTwo->districts()->count(), 'data');
+
+        $districtResponseNumeric = $this->getJson('/api/locations/districts?province_code=2')->assertOk();
+        $districtResponseNumeric->assertJsonCount($provinceTwo->districts()->count(), 'data');
+
         $communeResponse = $this->getJson('/api/locations/communes?district_code=102')->assertOk();
         $communeResponse->assertJsonCount($district->communes()->count(), 'data');
         $communeResponse->assertJsonFragment(['code' => '010201', 'name_kh' => $commune->name_kh]);
