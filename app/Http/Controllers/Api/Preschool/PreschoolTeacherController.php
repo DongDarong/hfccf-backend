@@ -343,8 +343,7 @@ class PreschoolTeacherController extends Controller
         return User::query()
             ->with(['department', 'role', 'permissions' => fn ($query) => $query->orderBy('permissions.code')])
             ->whereNull('deleted_at')
-            ->where('role_code', 'teacher-preschool')
-            ->where('department_code', 'education');
+            ->where('role_code', 'teacher-preschool');
     }
 
     private function studentQueryForUser(User $user): Builder

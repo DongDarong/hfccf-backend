@@ -248,6 +248,37 @@ class PreschoolApiTest extends TestCase
         ]);
     }
 
+    public function test_preschool_teacher_listing_includes_role_assigned_teachers_even_if_department_drifted(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_526', 'preschool.admin526@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $teacher = User::query()->create([
+            'id' => 'usr_5261',
+            'first_name' => 'Vannak',
+            'last_name' => 'Lim',
+            'username' => 'Vannak Lim Drifted',
+            'email' => 'teacher.preschool526@hfccf.org',
+            'phone' => '+855 12 526 526',
+            'role_code' => 'teacher-preschool',
+            'department_code' => 'sports',
+            'status' => 'active',
+            'password' => 'secret-pass',
+        ]);
+
+        $this->syncPermissions($teacher, Role::query()->findOrFail('teacher-preschool'));
+
+        $response = $this->getJson('/api/preschool/teachers?page=1&per_page=10');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonFragment([
+                'email' => 'teacher.preschool526@hfccf.org',
+                'role' => 'teacher-preschool',
+            ]);
+    }
+
     public function test_adminpreschool_can_record_attendance(): void
     {
         $admin = $this->makeUserWithRole('adminpreschool', 'usr_530', 'preschool.admin530@hfccf.org');

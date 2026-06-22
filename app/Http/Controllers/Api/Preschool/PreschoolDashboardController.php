@@ -65,7 +65,6 @@ class PreschoolDashboardController extends Controller
             'teachers' => User::query()
                 ->whereNull('deleted_at')
                 ->where('role_code', 'teacher-preschool')
-                ->where('department_code', 'education')
                 ->count(),
             'attendanceToday' => (clone $attendanceQuery)->whereDate('attendance_date', $today)->count(),
             'pendingPayments' => (clone $paymentQuery)->where('payment_status', 'pending')->count(),
