@@ -97,7 +97,7 @@ class PreschoolStudentHealthAuditController extends Controller
             ->exists();
     }
 
-    private function unauthorized(): JsonResponse
+    protected function unauthorized(): JsonResponse
     {
         return response()->json([
             'success' => false,
@@ -106,7 +106,7 @@ class PreschoolStudentHealthAuditController extends Controller
         ], Response::HTTP_UNAUTHORIZED);
     }
 
-    private function forbidden(): JsonResponse
+    protected function forbidden(): JsonResponse
     {
         return response()->json([
             'success' => false,

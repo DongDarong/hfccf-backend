@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\English\EnglishSubmissionController;
 use App\Http\Controllers\Api\English\EnglishTaskController;
 use App\Http\Controllers\Api\English\EnglishTeacherController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\Locations\CambodiaLocationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategorySettingsController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentGradingScaleController;
@@ -145,6 +146,19 @@ Route::prefix('auth')->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout']);
     });
 
+});
+
+/*
+|--------------------------------------------------------------------------
+| Shared Location Reference Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth:sanctum'])->prefix('locations')->group(function (): void {
+    Route::get('provinces', [CambodiaLocationController::class, 'provinces']);
+    Route::get('districts', [CambodiaLocationController::class, 'districts']);
+    Route::get('communes', [CambodiaLocationController::class, 'communes']);
+    Route::get('villages', [CambodiaLocationController::class, 'villages']);
 });
 
 /*
