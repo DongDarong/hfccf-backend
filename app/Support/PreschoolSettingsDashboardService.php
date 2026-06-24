@@ -2,9 +2,9 @@
 
 namespace App\Support;
 
-use App\Models\PreschoolSettingsBackbone;
 use App\Models\PreschoolAcademicTerm;
 use App\Models\PreschoolAcademicYear;
+use App\Models\PreschoolSettingsBackbone;
 
 class PreschoolSettingsDashboardService
 {
