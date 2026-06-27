@@ -119,6 +119,92 @@ class PreschoolReportApiTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
+    public function test_centralized_report_dashboard_and_definitions_are_available_to_admins(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'psr-120', 'preschool.report120@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        [$academicYearId, $termId] = $this->createAcademicYearAndTerm('AY-REPORT-120', 'TERM-REPORT-120');
+
+        $this->getJson('/api/preschool/reports/definitions')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonFragment(['key' => 'enrollment']);
+
+        $this->getJson('/api/preschool/reports/dashboard?academicYearId='.$academicYearId.'&termId='.$termId)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.dashboard.report', 'dashboard')
+            ->assertJsonPath('data.dashboard.section', 'operations')
+            ->assertJsonStructure([
+                'data' => [
+                    'dashboard' => [
+                        'summary',
+                        'cards',
+                        'trend',
+                        'modules',
+                        'risk',
+                        'filters',
+                    ],
+                ],
+            ]);
+
+        $this->getJson('/api/preschool/reports/enrollments?academicYearId='.$academicYearId.'&termId='.$termId)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.report', 'enrollments');
+    }
+
+    public function test_teachers_can_read_limited_reports_but_cannot_export_or_read_payment_reports(): void
+    {
+        $teacher = $this->makeUserWithRole('teacher-preschool', 'psr-121', 'preschool.report121@hfccf.org');
+        Sanctum::actingAs($teacher);
+
+        $this->getJson('/api/preschool/reports/attendance')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->getJson('/api/preschool/reports/payments')
+            ->assertForbidden()
+            ->assertJsonPath('success', false);
+
+        $this->getJson('/api/preschool/reports/export?section=attendance&format=csv')
+            ->assertForbidden()
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_admin_export_creates_governance_and_audit_records(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'psr-122', 'preschool.report122@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        [$academicYearId, $termId] = $this->createAcademicYearAndTerm('AY-REPORT-122', 'TERM-REPORT-122');
+
+        $response = $this->getJson('/api/preschool/reports/export?section=attendance&format=excel&academicYearId='.$academicYearId.'&termId='.$termId)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.export.section', 'attendance')
+            ->assertJsonPath('data.export.format', 'excel')
+            ->assertJsonPath('data.export.encoding', 'base64');
+
+        $exportRecordId = $response->json('data.exportRecordId');
+
+        $this->assertDatabaseHas('preschool_report_export_records', [
+            'id' => $exportRecordId,
+            'actor_user_id' => $admin->id,
+            'export_type' => 'attendance_report',
+            'export_format' => 'excel',
+            'term_id' => $termId,
+        ]);
+
+        $this->assertDatabaseHas('preschool_lifecycle_audit_logs', [
+            'actor_user_id' => $admin->id,
+            'action_type' => 'report_export.created',
+            'entity_type' => 'preschool_report_export',
+            'entity_id' => (string) $exportRecordId,
+        ]);
+    }
+
     private function makeUserWithRole(string $roleCode, string $id, string $email): User
     {
         $role = Role::query()->with('permissions')->findOrFail($roleCode);
@@ -249,5 +335,41 @@ class PreschoolReportApiTest extends TestCase
         return (int) DB::table('preschool_assessment_categories')
             ->where('code', $code)
             ->value('id');
+    }
+
+    /**
+     * @return array{0:int,1:int}
+     */
+    private function createAcademicYearAndTerm(string $yearCode, string $termCode): array
+    {
+        $academicYearId = DB::table('preschool_academic_years')->insertGetId([
+            'code' => $yearCode,
+            'label' => '2026 - 2027',
+            'description' => null,
+            'start_date' => '2026-07-01',
+            'end_date' => '2027-04-30',
+            'status' => 'active',
+            'is_current' => true,
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $termId = DB::table('preschool_terms')->insertGetId([
+            'academic_year_id' => $academicYearId,
+            'code' => $termCode,
+            'name' => 'Term 1',
+            'description' => null,
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-12-31',
+            'status' => 'active',
+            'is_current' => true,
+            'sort_order' => 1,
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return [$academicYearId, $termId];
     }
 }

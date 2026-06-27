@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolExportGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGovernanceDiffController;
 use App\Http\Controllers\Api\Preschool\PreschoolGovernanceCaseController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
+use App\Http\Controllers\Api\Preschool\PreschoolReportingController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolInvoiceController;
 use App\Http\Controllers\Api\Preschool\PreschoolReceiptController;
@@ -513,6 +514,31 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('students/{student}/reports/{period}', [PreschoolStudentReportController::class, 'show']);
         Route::get('classes/{class}/reports', [PreschoolClassroomReportController::class, 'index']);
         Route::get('classes/{class}/reports/{period}', [PreschoolClassroomReportController::class, 'show']);
+
+        Route::prefix('reports')->group(function (): void {
+            Route::get('definitions', [PreschoolReportingController::class, 'definitions']);
+            Route::get('dashboard', [PreschoolReportingController::class, 'dashboard']);
+            Route::get('attendance', [PreschoolReportingController::class, 'attendance']);
+            Route::get('attendance/trend', [PreschoolReportingController::class, 'attendanceTrend']);
+            Route::get('attendance/class', [PreschoolReportingController::class, 'attendanceClass']);
+            Route::get('attendance/student', [PreschoolReportingController::class, 'attendanceStudent']);
+            Route::get('assessments', [PreschoolReportingController::class, 'assessments']);
+            Route::get('assessments/performance', [PreschoolReportingController::class, 'assessmentPerformance']);
+            Route::get('assessments/completion', [PreschoolReportingController::class, 'assessmentCompletion']);
+            Route::get('health', [PreschoolReportingController::class, 'health']);
+            Route::get('health/incidents', [PreschoolReportingController::class, 'healthIncidents']);
+            Route::get('health/vaccinations', [PreschoolReportingController::class, 'healthVaccinations']);
+            Route::get('payments', [PreschoolReportingController::class, 'payments']);
+            Route::get('payments/revenue', [PreschoolReportingController::class, 'paymentRevenue']);
+            Route::get('payments/outstanding', [PreschoolReportingController::class, 'paymentOutstanding']);
+            Route::get('enrollments', [PreschoolReportingController::class, 'enrollments']);
+            Route::get('enrollments/trends', [PreschoolReportingController::class, 'enrollmentTrends']);
+            Route::get('guardians', [PreschoolReportingController::class, 'guardians']);
+            Route::get('guardians/issues', [PreschoolReportingController::class, 'guardianIssues']);
+            Route::get('classroom', [PreschoolReportingController::class, 'classroom']);
+            Route::get('compliance', [PreschoolReportingController::class, 'compliance']);
+            Route::get('export', [PreschoolReportingController::class, 'export']);
+        });
 
         // Weekly schedules stay isolated from attendance and reporting because
         // timetable conflicts need their own validation and read-only views.
