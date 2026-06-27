@@ -6,6 +6,14 @@ use Illuminate\Support\Collection;
 
 class PreschoolAnalyticsService
 {
+    public const HEALTHY = 'healthy';
+
+    public const WARNING = 'warning';
+
+    public const CRITICAL = 'critical';
+
+    public const NEUTRAL = 'neutral';
+
     public function percentage(int|float|null $numerator, int|float|null $denominator, int $precision = 2): ?float
     {
         $numerator = $this->normalizeNumber($numerator);
@@ -28,6 +36,84 @@ class PreschoolAnalyticsService
         }
 
         return round((($current - $previous) / $previous) * 100, $precision);
+    }
+
+    /**
+     * @return array{current: float|int|null, previous: float|int|null, delta: float|int|null, percent: float|null, trend: string, comparison: string}
+     */
+    public function comparison(
+        int|float|null $current,
+        int|float|null $previous,
+        string $comparison,
+        int $precision = 2,
+    ): array {
+        if ($current === null || $previous === null) {
+            return [
+                'current' => $current,
+                'previous' => $previous,
+                'delta' => null,
+                'percent' => null,
+                'trend' => 'neutral',
+                'comparison' => $comparison,
+            ];
+        }
+
+        $currentValue = $this->normalizeNumber($current);
+        $previousValue = $this->normalizeNumber($previous);
+        $delta = round($currentValue - $previousValue, $precision);
+
+        return [
+            'current' => $this->compactNumber($currentValue),
+            'previous' => $this->compactNumber($previousValue),
+            'delta' => $this->compactNumber($delta),
+            'percent' => $this->growth($currentValue, $previousValue, $precision),
+            'trend' => $delta > 0 ? 'up' : ($delta < 0 ? 'down' : 'neutral'),
+            'comparison' => $comparison,
+        ];
+    }
+
+    public function healthStatus(
+        int|float|null $value,
+        int|float $warningThreshold,
+        int|float $criticalThreshold,
+        bool $higherIsWorse = true,
+    ): string {
+        if ($value === null) {
+            return self::NEUTRAL;
+        }
+
+        $value = $this->normalizeNumber($value);
+        if ($higherIsWorse) {
+            if ($value >= $criticalThreshold) {
+                return self::CRITICAL;
+            }
+
+            return $value >= $warningThreshold ? self::WARNING : self::HEALTHY;
+        }
+
+        if ($value < $criticalThreshold) {
+            return self::CRITICAL;
+        }
+
+        return $value < $warningThreshold ? self::WARNING : self::HEALTHY;
+    }
+
+    /**
+     * @param  array<int, string>  $statuses
+     */
+    public function worstHealthStatus(array $statuses): string
+    {
+        $rank = [
+            self::NEUTRAL => 0,
+            self::HEALTHY => 1,
+            self::WARNING => 2,
+            self::CRITICAL => 3,
+        ];
+
+        return collect($statuses)
+            ->filter(fn (string $status): bool => isset($rank[$status]))
+            ->sortByDesc(fn (string $status): int => $rank[$status])
+            ->first() ?? self::NEUTRAL;
     }
 
     /**
@@ -104,5 +190,10 @@ class PreschoolAnalyticsService
         }
 
         return (float) $value;
+    }
+
+    private function compactNumber(float $value): float|int
+    {
+        return floor($value) === $value ? (int) $value : $value;
     }
 }

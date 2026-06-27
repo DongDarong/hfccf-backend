@@ -339,7 +339,7 @@ class PreschoolReportingService
         ];
     }
 
-    private function attendanceReport(User $user, array $filters): array
+    private function attendanceReport(User $user, array $filters, bool $includeMetadata = true): array
     {
         $query = $this->attendanceQuery($user, $filters);
         $records = $query->with(['student', 'preschoolClass'])->get();
@@ -396,10 +396,10 @@ class PreschoolReportingService
             'classBreakdown' => $classBreakdown,
             'rows' => $rows,
             'table' => $rows,
-        ]);
+        ], $includeMetadata);
     }
 
-    private function assessmentReport(User $user, array $filters): array
+    private function assessmentReport(User $user, array $filters, bool $includeMetadata = true): array
     {
         $query = $this->assessmentQuery($user, $filters);
         $assessments = $query->with(['student', 'preschoolClass', 'category'])->get();
@@ -466,16 +466,20 @@ class PreschoolReportingService
             'classBreakdown' => $classBreakdown,
             'table' => $rows,
             'rows' => $rows,
-        ]);
+        ], $includeMetadata);
     }
 
-    private function healthReport(User $user, array $filters): array
+    private function healthReport(User $user, array $filters, bool $includeMetadata = true): array
     {
         $query = $this->healthQuery($user, $filters);
         $alerts = $query->with(['student'])->get();
         $total = $alerts->count();
         $open = $alerts->whereIn('status', ['open', 'acknowledged'])->count();
         $critical = $alerts->where('severity', 'critical')->count();
+        $openCritical = $alerts
+            ->whereIn('status', ['open', 'acknowledged'])
+            ->where('severity', 'critical')
+            ->count();
         $high = $alerts->where('severity', 'high')->count();
         $severityDistribution = $alerts->groupBy('severity')->map(fn (Collection $group, string $severity): array => [
             'label' => ucfirst($severity ?: 'unknown'),
@@ -490,6 +494,7 @@ class PreschoolReportingService
                 'activeAlerts' => $open,
                 'incidents' => $total,
                 'criticalAlerts' => $critical,
+                'openCriticalAlerts' => $openCritical,
                 'highAlerts' => $high,
                 'allergies' => PreschoolStudentAllergy::query()->count(),
                 'medications' => PreschoolStudentMedicationRecord::query()->count(),
@@ -504,10 +509,10 @@ class PreschoolReportingService
             'alerts' => $severityDistribution,
             'incidents' => $rows,
             'rows' => $rows,
-        ]);
+        ], $includeMetadata);
     }
 
-    private function billingReport(User $user, array $filters): array
+    private function billingReport(User $user, array $filters, bool $includeMetadata = true): array
     {
         $query = $this->billingQuery($user, $filters);
         $invoices = $query->with(['student', 'preschoolClass'])->get();
@@ -517,6 +522,7 @@ class PreschoolReportingService
         $issued = $total;
         $receipts = PreschoolReceipt::query()->count();
         $revenue = $invoices->sum(fn (PreschoolInvoice $invoice): float => (float) $invoice->paid_amount);
+        $outstandingBalance = $invoices->sum(fn (PreschoolInvoice $invoice): float => (float) $invoice->balance_due);
 
         $trend = $this->trendByMonth($invoices, fn (PreschoolInvoice $invoice): string => (string) $invoice->issue_date?->format('Y-m'));
         $rows = $trend;
@@ -528,6 +534,7 @@ class PreschoolReportingService
                 'invoicesOverdue' => $overdue,
                 'receiptsGenerated' => $receipts,
                 'revenue' => round($revenue, 2),
+                'outstandingBalance' => round($outstandingBalance, 2),
             ],
             'cards' => $this->summaryCards([
                 ['label' => 'Revenue', 'value' => round($revenue, 2), 'caption' => 'Paid amount'],
@@ -539,10 +546,10 @@ class PreschoolReportingService
             'outstanding' => $this->statusRows($invoices, 'status', 'overdue'),
             'overdue' => $this->statusRows($invoices, 'status', 'overdue'),
             'rows' => $rows,
-        ]);
+        ], $includeMetadata);
     }
 
-    private function enrollmentReport(User $user, array $filters): array
+    private function enrollmentReport(User $user, array $filters, bool $includeMetadata = true): array
     {
         $query = $this->enrollmentQuery($user, $filters);
         $applications = $query->with(['requestedAcademicYear', 'requestedTerm', 'preferredClass'])->get();
@@ -572,10 +579,10 @@ class PreschoolReportingService
             'trend' => $trend,
             'admissions' => $rows,
             'rows' => $rows,
-        ]);
+        ], $includeMetadata);
     }
 
-    private function guardianReport(User $user, array $filters): array
+    private function guardianReport(User $user, array $filters, bool $includeMetadata = true): array
     {
         $query = $this->guardianQuery($user, $filters);
         $issues = $query->with(['student', 'guardian'])->get();
@@ -609,7 +616,7 @@ class PreschoolReportingService
             'issues' => $rows,
             'communications' => $this->trendByMonth(PreschoolGuardianCommunication::query()->get(), fn (PreschoolGuardianCommunication $item): string => (string) $item->created_at?->format('Y-m')),
             'rows' => $rows,
-        ]);
+        ], $includeMetadata);
     }
 
     private function classroomReport(User $user, array $filters): array
@@ -643,16 +650,67 @@ class PreschoolReportingService
 
     private function operationsReport(User $user, array $filters): array
     {
-        $attendance = $this->attendanceReport($user, $filters);
-        $assessments = $this->assessmentReport($user, $filters);
-        $health = $this->healthReport($user, $filters);
-        $billing = $this->billingReport($user, $filters);
-        $enrollment = $this->enrollmentReport($user, $filters);
-        $guardians = $this->guardianReport($user, $filters);
+        // Child reports are internal aggregates here; only the final dashboard needs filter metadata.
+        $attendance = $this->attendanceReport($user, $filters, false);
+        $assessments = $this->assessmentReport($user, $filters, false);
+        $health = $this->healthReport($user, $filters, false);
+        $billing = $this->billingReport($user, $filters, false);
+        $enrollment = $this->enrollmentReport($user, $filters, false);
+        $guardians = $this->guardianReport($user, $filters, false);
+
+        $comparisonFilters = Arr::except($filters, ['dateFrom', 'dateTo', 'reportPeriodId', 'status']);
+        $today = today();
+        $yesterday = $today->copy()->subDay();
+        $monthStart = $today->copy()->startOfMonth();
+
+        $todayAttendance = $this->attendanceQuery($user, array_merge($comparisonFilters, [
+            'dateFrom' => $today->toDateString(),
+            'dateTo' => $today->toDateString(),
+        ]))->get();
+        $yesterdayAttendance = $this->attendanceQuery($user, array_merge($comparisonFilters, [
+            'dateFrom' => $yesterday->toDateString(),
+            'dateTo' => $yesterday->toDateString(),
+        ]))->get();
+
+        $attendanceToday = $this->analytics->percentage(
+            $todayAttendance->where('status', 'present')->count(),
+            $todayAttendance->count(),
+        );
+        $attendanceYesterday = $this->analytics->percentage(
+            $yesterdayAttendance->where('status', 'present')->count(),
+            $yesterdayAttendance->count(),
+        );
+        $attendanceExceptionsToday = $todayAttendance->whereIn('status', ['absent', 'late'])->count();
+
+        $activeStudents = PreschoolStudent::query()->whereNull('deleted_at')->where('status', 'active')->count();
+        $activeStudentsAtMonthStart = PreschoolStudent::query()
+            ->whereNull('deleted_at')
+            ->where('status', 'active')
+            ->where('created_at', '<', $monthStart)
+            ->count();
+
+        $previousOpenHealthAlerts = $this->healthQuery($user, $comparisonFilters)
+            ->where('created_at', '<=', $yesterday->copy()->endOfDay())
+            ->where(function ($query) use ($yesterday): void {
+                $query->whereNull('resolved_at')->orWhere('resolved_at', '>', $yesterday->copy()->endOfDay());
+            })
+            ->where(function ($query) use ($yesterday): void {
+                $query->whereNull('closed_at')->orWhere('closed_at', '>', $yesterday->copy()->endOfDay());
+            })
+            ->count();
+
+        $previousPendingEnrollments = $this->enrollmentQuery($user, $comparisonFilters)
+            ->whereIn('status', ['submitted', 'under_review'])
+            ->where('application_date', '<', $monthStart->toDateString())
+            ->count();
+
+        $previousOutstandingBalance = (float) $this->billingQuery($user, $comparisonFilters)
+            ->where('issue_date', '<', $monthStart->toDateString())
+            ->sum('balance_due');
 
         $summary = [
             'totalStudents' => PreschoolStudent::query()->whereNull('deleted_at')->count(),
-            'activeStudents' => PreschoolStudent::query()->whereNull('deleted_at')->where('status', 'active')->count(),
+            'activeStudents' => $activeStudents,
             'newEnrollments' => $enrollment['summary']['applicationsSubmitted'] ?? 0,
             'attendanceRate' => $attendance['summary']['attendanceRate'] ?? 0,
             'assessmentCompletion' => $assessments['summary']['completionRate'] ?? 0,
@@ -660,16 +718,71 @@ class PreschoolReportingService
             'openHealthAlerts' => $health['summary']['activeAlerts'] ?? 0,
             'openGuardianIssues' => $guardians['summary']['activeIssues'] ?? 0,
             'overdueInvoices' => $billing['summary']['invoicesOverdue'] ?? 0,
+            'outstandingBalance' => $billing['summary']['outstandingBalance'] ?? 0,
+        ];
+
+        $analytics = [
+            'activeStudents' => $this->analytics->comparison($activeStudents, $activeStudentsAtMonthStart, 'start_of_month'),
+            'attendanceToday' => $this->analytics->comparison($attendanceToday, $attendanceYesterday, 'previous_day'),
+            'openHealthAlerts' => $this->analytics->comparison($summary['openHealthAlerts'], $previousOpenHealthAlerts, 'previous_day'),
+            'pendingEnrollments' => $this->analytics->comparison($summary['newEnrollments'], $previousPendingEnrollments, 'start_of_month'),
+            'outstandingPayments' => $this->analytics->comparison($summary['outstandingBalance'], round($previousOutstandingBalance, 2), 'start_of_month'),
+        ];
+
+        $executiveHealth = [
+            'enrollment' => [
+                'status' => $this->analytics->healthStatus($summary['newEnrollments'], 1, PHP_INT_MAX),
+                'value' => $summary['newEnrollments'],
+            ],
+            'attendance' => [
+                'status' => $attendanceToday === null
+                    ? PreschoolAnalyticsService::NEUTRAL
+                    : $this->analytics->worstHealthStatus([
+                        $this->analytics->healthStatus($attendanceToday, 90, 80, false),
+                        $this->analytics->healthStatus($attendanceExceptionsToday, 1, PHP_INT_MAX),
+                    ]),
+                'value' => $attendanceToday,
+                'exceptions' => $attendanceExceptionsToday,
+            ],
+            'billing' => [
+                'status' => $this->analytics->healthStatus($summary['outstandingBalance'], 0.01, PHP_INT_MAX),
+                'value' => $summary['outstandingBalance'],
+            ],
+            'assessment' => [
+                'status' => $this->analytics->healthStatus($summary['assessmentCompletion'], 85, 70, false),
+                'value' => $summary['assessmentCompletion'],
+            ],
+            'health' => [
+                'status' => $this->analytics->worstHealthStatus([
+                    $this->analytics->healthStatus($summary['openHealthAlerts'], 1, 4),
+                    $this->analytics->healthStatus($health['summary']['openCriticalAlerts'] ?? 0, 1, 1),
+                ]),
+                'value' => $summary['openHealthAlerts'],
+                'critical' => $health['summary']['openCriticalAlerts'] ?? 0,
+            ],
+            'guardians' => [
+                'status' => $this->analytics->healthStatus($summary['openGuardianIssues'], 1, 3),
+                'value' => $summary['openGuardianIssues'],
+            ],
         ];
 
         return $this->buildReportPayload('operations', $user, $filters, [
             'summary' => $summary,
             'kpis' => [
                 'attendanceRate' => $summary['attendanceRate'],
+                'activeStudents' => $summary['activeStudents'],
+                'attendanceToday' => $attendanceToday,
                 'revenue' => $summary['revenue'],
                 'openHealthAlerts' => $summary['openHealthAlerts'],
+                'criticalHealthAlerts' => $health['summary']['openCriticalAlerts'] ?? 0,
                 'assessmentCompletion' => $summary['assessmentCompletion'],
+                'pendingEnrollments' => $summary['newEnrollments'],
+                'outstandingBalances' => $summary['outstandingBalance'],
+                'overdueInvoices' => $summary['overdueInvoices'],
+                'openGuardianIssues' => $summary['openGuardianIssues'],
             ],
+            'analytics' => $analytics,
+            'executiveHealth' => $executiveHealth,
             'modules' => [
                 'attendance' => [
                     'attendance_rate' => $attendance['summary']['attendanceRate'] ?? 0,
@@ -753,10 +866,16 @@ class PreschoolReportingService
         ]);
     }
 
-    private function buildReportPayload(string $section, User $user, array $filters, array $payload): array
+    private function buildReportPayload(
+        string $section,
+        User $user,
+        array $filters,
+        array $payload,
+        bool $includeMetadata = true,
+    ): array
     {
         $definition = $this->definition($section);
-        $filterOptions = $this->reportFilters($user, $section, $filters);
+        $filterOptions = $includeMetadata ? $this->reportFilters($user, $section, $filters) : [];
         $generatedAt = now()->toISOString();
 
         return array_merge([
