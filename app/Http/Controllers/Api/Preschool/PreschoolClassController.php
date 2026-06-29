@@ -7,9 +7,11 @@ use App\Http\Requests\Preschool\StorePreschoolClassRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolClassRequest;
 use App\Http\Resources\Preschool\PreschoolClassResource;
 use App\Models\PreschoolClass;
+use App\Models\PreschoolClassLevel;
 use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolClassTeacherAssignment;
 use App\Models\User;
+use App\Support\PreschoolClassCodeService;
 use App\Support\PreschoolAcademicLifecycleService;
 use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Database\Eloquent\Builder;
@@ -31,6 +33,7 @@ class PreschoolClassController extends Controller
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'status' => ['sometimes', 'nullable', 'string', 'max:32'],
             'level' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'class_level_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_class_levels,id'],
             'teacher_user_id' => ['sometimes', 'nullable', 'string', 'max:16'],
             'sort_by' => ['sometimes', 'nullable', 'string', 'max:32'],
             'sort_direction' => ['sometimes', 'nullable', 'string', 'in:asc,desc'],
@@ -41,13 +44,14 @@ class PreschoolClassController extends Controller
         $search = trim((string) ($validated['search'] ?? ''));
         $status = trim((string) ($validated['status'] ?? ''));
         $level = trim((string) ($validated['level'] ?? ''));
+        $classLevelId = trim((string) ($validated['class_level_id'] ?? ''));
         $teacherUserId = trim((string) ($validated['teacher_user_id'] ?? ''));
         $sortBy = (string) ($validated['sort_by'] ?? 'created_at');
         $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc'
             ? 'asc'
             : 'desc';
 
-        $query = PreschoolClass::query()->with(['teacher', 'students', 'teacherAssignments']);
+        $query = PreschoolClass::query()->with(['teacher', 'classLevel', 'students', 'teacherAssignments']);
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -57,7 +61,12 @@ class PreschoolClassController extends Controller
                     ->orWhere('teacher_display_name', 'like', $like)
                     ->orWhere('level', 'like', $like)
                     ->orWhere('room', 'like', $like)
-                    ->orWhere('status', 'like', $like);
+                    ->orWhere('status', 'like', $like)
+                    ->orWhereHas('classLevel', function (Builder $classLevelQuery) use ($like): void {
+                        $classLevelQuery->where('name_en', 'like', $like)
+                            ->orWhere('name_kh', 'like', $like)
+                            ->orWhere('code', 'like', $like);
+                    });
             });
         }
 
@@ -65,7 +74,9 @@ class PreschoolClassController extends Controller
             $query->where('status', $status);
         }
 
-        if ($level !== '') {
+        if ($classLevelId !== '') {
+            $query->where('class_level_id', $classLevelId);
+        } elseif ($level !== '') {
             $query->where('level', $level);
         }
 
@@ -77,6 +88,7 @@ class PreschoolClassController extends Controller
             'code' => 'code',
             'name' => 'name',
             'level' => 'level',
+            'class_level_id' => 'class_level_id',
             'status' => 'status',
             'students_count' => 'students_count',
             default => 'created_at',
@@ -104,27 +116,38 @@ class PreschoolClassController extends Controller
         }
 
         $data = $request->validated();
+        $classLevel = PreschoolClassLevel::query()->findOrFail($data['class_level_id']);
+
         if (($data['teacher_user_id'] ?? null) !== null || ! empty($data['student_ids'] ?? [])) {
             if ($response = app(PreschoolLifecycleGuardService::class)->assignmentWriteLock($request->user(), $data)) {
                 return $response;
             }
         }
-        $class = PreschoolClass::query()->create([
-            'code' => $data['code'],
-            'name' => $data['name'],
-            'teacher_user_id' => $data['teacher_user_id'] ?? null,
-            'teacher_display_name' => $this->resolveTeacherDisplayName($data['teacher_user_id'] ?? null, $data['teacher_display_name'] ?? null),
-            'level' => $data['level'],
-            'schedule' => $data['schedule'] ?? null,
-            'students_count' => (int) ($data['students_count'] ?? 0),
-            'status' => $data['status'],
-            'room' => $data['room'] ?? null,
-            'notes' => $data['notes'] ?? null,
-        ]);
 
-        $this->syncTeacherAssignmentHistory($class, $class->teacher_user_id, $class->teacher_display_name);
-        $this->syncClassStudents($class, $data['student_ids'] ?? []);
-        $class->load(['teacher', 'students', 'teacherAssignments']);
+        $class = app(PreschoolClassCodeService::class)->createWithRetry(
+            $classLevel,
+            function (string $code) use ($classLevel, $data) {
+                $class = PreschoolClass::query()->create([
+                    'code' => $code,
+                    'name' => $data['name'],
+                    'teacher_user_id' => $data['teacher_user_id'] ?? null,
+                    'teacher_display_name' => $this->resolveTeacherDisplayName($data['teacher_user_id'] ?? null, $data['teacher_display_name'] ?? null),
+                    'class_level_id' => $classLevel->id,
+                    'level' => $classLevel->name_en,
+                    'schedule' => $data['schedule'] ?? null,
+                    'students_count' => (int) ($data['students_count'] ?? 0),
+                    'status' => $data['status'],
+                    'room' => $data['room'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                ]);
+
+                $this->syncTeacherAssignmentHistory($class, $class->teacher_user_id, $class->teacher_display_name);
+                $this->syncClassStudents($class, $data['student_ids'] ?? []);
+
+                return $class;
+            }
+        );
+        $class->load(['teacher', 'classLevel', 'students', 'teacherAssignments']);
 
         return response()->json([
             'success' => true,
@@ -141,7 +164,7 @@ class PreschoolClassController extends Controller
             return $response;
         }
 
-        $class = PreschoolClass::query()->with(['teacher', 'students', 'teacherAssignments'])->find($id);
+        $class = PreschoolClass::query()->with(['teacher', 'classLevel', 'students', 'teacherAssignments'])->find($id);
 
         if (! $class) {
             return response()->json([
@@ -189,6 +212,12 @@ class PreschoolClassController extends Controller
             }
         }
 
+        if (array_key_exists('class_level_id', $data)) {
+            $classLevel = PreschoolClassLevel::query()->findOrFail($data['class_level_id']);
+            $class->class_level_id = $classLevel->id;
+            $class->level = $classLevel->name_en;
+        }
+
         if (array_key_exists('teacher_user_id', $data)) {
             $class->teacher_user_id = $data['teacher_user_id'];
             if (! array_key_exists('teacher_display_name', $data)) {
@@ -207,7 +236,7 @@ class PreschoolClassController extends Controller
         $class->save();
         $this->syncTeacherAssignmentHistory($class, $class->teacher_user_id, $class->teacher_display_name);
         $this->syncClassStudents($class, $data['student_ids'] ?? null);
-        $class->load(['teacher', 'students', 'teacherAssignments']);
+        $class->load(['teacher', 'classLevel', 'students', 'teacherAssignments']);
 
         return response()->json([
             'success' => true,
@@ -253,10 +282,6 @@ class PreschoolClassController extends Controller
         $academicContext = $this->academicContext();
 
         if ($studentIds === null) {
-            // Assignment state is preserved on the pivot table, so we only
-            // recalculate the active count when the caller is not changing the
-            // student roster. This keeps inactive assignments available for
-            // history views without changing current enrollment behavior.
             $class->students_count = PreschoolClassStudent::query()
                 ->where('class_id', $class->id)
                 ->where('status', 'active')
@@ -279,8 +304,6 @@ class PreschoolClassController extends Controller
                 'student_id' => $studentId,
             ]);
 
-            // Re-activating an existing assignment should keep a clean audit
-            // trail in the pivot row instead of deleting and recreating links.
             if (! $assignment->exists || ($assignment->status ?? null) !== 'active') {
                 $assignment->enrolled_at = now();
             }
