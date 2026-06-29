@@ -48,6 +48,10 @@ return new class extends Migration
             return;
         }
 
+        if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            return;
+        }
+
         if (Schema::hasColumn('preschool_report_export_records', 'actor_user_id')) {
             DB::statement('ALTER TABLE preschool_report_export_records MODIFY actor_user_id VARCHAR(16) NULL');
         }

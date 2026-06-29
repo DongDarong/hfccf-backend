@@ -15,7 +15,9 @@ use App\Services\PreschoolGuardianCommunicationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class PreschoolAttendanceController extends Controller
 {
@@ -71,7 +73,7 @@ class PreschoolAttendanceController extends Controller
         ]);
 
         $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term']);
-        app(PreschoolGuardianCommunicationService::class)->syncAttendanceFollowUp($attendance, $request->user());
+        $this->syncAttendanceFollowUpSafely($attendance, $request->user(), 'store');
 
         return response()->json([
             'success' => true,
@@ -113,7 +115,7 @@ class PreschoolAttendanceController extends Controller
 
         $attendance->save();
         $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term']);
-        app(PreschoolGuardianCommunicationService::class)->syncAttendanceFollowUp($attendance, $request->user());
+        $this->syncAttendanceFollowUpSafely($attendance, $request->user(), 'update');
 
         return response()->json([
             'success' => true,
@@ -232,5 +234,25 @@ class PreschoolAttendanceController extends Controller
             'total' => $paginator->total(),
             'totalPages' => $paginator->lastPage(),
         ];
+    }
+
+    private function syncAttendanceFollowUpSafely(PreschoolAttendanceRecord $attendance, User $actor, string $action): void
+    {
+        try {
+            app(PreschoolGuardianCommunicationService::class)->syncAttendanceFollowUp($attendance, $actor);
+        } catch (Throwable $throwable) {
+            report($throwable);
+
+            Log::error('Failed to sync preschool attendance follow-up.', [
+                'action' => $action,
+                'attendance_id' => $attendance->id,
+                'student_id' => $attendance->student_id,
+                'class_id' => $attendance->class_id,
+                'status' => $attendance->status,
+                'actor_user_id' => $actor->id,
+                'exception' => $throwable::class,
+                'message' => $throwable->getMessage(),
+            ]);
+        }
     }
 }
