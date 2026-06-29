@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolEnrollmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
+use App\Http\Controllers\Api\Preschool\PreschoolClassLevelController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomResourceController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
@@ -241,6 +242,12 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('teacher/my-students', [PreschoolTeacherController::class, 'myStudents']);
         Route::get('teacher/my-classes', [PreschoolTeacherController::class, 'myClasses']);
         Route::get('teacher/attendance', [PreschoolTeacherController::class, 'myAttendance']);
+
+        Route::get('class-levels', [PreschoolClassLevelController::class, 'index']);
+        Route::post('class-levels', [PreschoolClassLevelController::class, 'store']);
+        Route::put('class-levels/{classLevel}', [PreschoolClassLevelController::class, 'update']);
+        Route::patch('class-levels/{classLevel}/deactivate', [PreschoolClassLevelController::class, 'deactivate']);
+        Route::patch('class-levels/{classLevel}/restore', [PreschoolClassLevelController::class, 'restore']);
 
         Route::get('classes', [PreschoolClassController::class, 'index']);
         Route::post('classes', [PreschoolClassController::class, 'store']);
@@ -927,3 +934,5 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
+
+

@@ -35,8 +35,6 @@ class PreschoolClassResource extends JsonResource
                         'studentCode' => $student->student_code,
                         'fullName' => trim($student->first_name.' '.$student->last_name),
                         'status' => $student->pivot->status ?? 'active',
-                        // Pivot timestamps may be hydrated as strings after class
-                        // assignment updates, so normalize them before responding.
                         'enrolledAt' => self::toIsoString($student->pivot->enrolled_at),
                         'academicYear' => $student->pivot->academic_year,
                         'termLabel' => $student->pivot->term_label,
@@ -97,17 +95,28 @@ class PreschoolClassResource extends JsonResource
                 ->all();
         }, []);
 
+        $classLevel = $this->whenLoaded('classLevel', function () {
+            return [
+                'id' => $this->classLevel?->id,
+                'nameEn' => $this->classLevel?->name_en,
+                'nameKh' => $this->classLevel?->name_kh,
+                'code' => $this->classLevel?->code,
+                'sortOrder' => $this->classLevel?->sort_order,
+                'isActive' => (bool) $this->classLevel?->is_active,
+                'status' => $this->classLevel?->is_active ? 'active' : 'inactive',
+            ];
+        });
+
         return [
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
             'teacherUserId' => $this->teacher_user_id,
             'teacherDisplayName' => $this->teacher_display_name ?: ($this->relationLoaded('teacher') ? $this->teacher?->name : null),
-            'level' => $this->level,
+            'classLevelId' => $this->class_level_id,
+            'classLevel' => $classLevel,
+            'level' => $this->level ?: ($this->classLevel?->name_en ?? null),
             'schedule' => $this->schedule,
-            // The visible student count should reflect only active assignments
-            // while the studentAssignments payload keeps inactive history rows
-            // available for the new assignment workflow page.
             'studentsCount' => $this->students_count ?? $this->students()->wherePivot('status', 'active')->count(),
             'studentAssignments' => $allStudentAssignments,
             'activeStudentAssignments' => $activeStudentAssignments,

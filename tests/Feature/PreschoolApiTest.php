@@ -29,7 +29,7 @@ class PreschoolApiTest extends TestCase
         $teacher = $this->makeUserWithRole('teacher-preschool', 'usr_501', 'teacher.preschool500@hfccf.org');
 
         $create = $this->postJson('/api/preschool/classes', [
-            'code' => 'PS-CLASS-001',
+            'code' => 'PS-NUR-001',
             'name' => 'Morning Stars',
             'teacher_user_id' => $teacher->id,
             'teacher_display_name' => trim($teacher->first_name.' '.$teacher->last_name),
@@ -44,14 +44,14 @@ class PreschoolApiTest extends TestCase
         $create
             ->assertCreated()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.class.code', 'PS-CLASS-001')
+            ->assertJsonPath('data.class.code', 'PS-NUR-001')
             ->assertJsonPath('data.class.teacherUserId', $teacher->id);
 
         $classId = $create->json('data.class.id');
 
         $this->assertDatabaseHas('preschool_classes', [
             'id' => $classId,
-            'code' => 'PS-CLASS-001',
+            'code' => 'PS-NUR-001',
             'teacher_user_id' => $teacher->id,
         ]);
 
@@ -493,3 +493,4 @@ class PreschoolApiTest extends TestCase
         ]);
     }
 }
+

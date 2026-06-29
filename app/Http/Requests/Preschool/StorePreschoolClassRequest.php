@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Preschool;
 
+use App\Models\PreschoolClassLevel;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,9 +10,13 @@ class StorePreschoolClassRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
+        $classLevel = $this->resolveClassLevel();
+
         $this->merge([
             'teacher_display_name' => $this->input('teacher_display_name', $this->input('teacher')),
             'students_count' => $this->input('students_count', $this->input('students')),
+            'class_level_id' => $this->input('class_level_id', $this->input('classLevelId', $classLevel?->id)),
+            'level' => $this->input('level', $classLevel?->name_en),
         ]);
     }
 
@@ -27,14 +32,56 @@ class StorePreschoolClassRequest extends FormRequest
         return $user !== null && in_array($user->role_code, ['superadmin', 'adminpreschool'], true);
     }
 
+    private function resolveClassLevel(): ?PreschoolClassLevel
+    {
+        $classLevelId = trim((string) $this->input('class_level_id', $this->input('classLevelId', '')));
+        if ($classLevelId !== '') {
+            return PreschoolClassLevel::query()->find($classLevelId);
+        }
+
+        $legacyLevel = strtolower(trim((string) $this->input('level', '')));
+        if ($legacyLevel === '') {
+            return null;
+        }
+
+        $legacyMap = [
+            'nursery' => 'NUR',
+            'kindergarten a' => 'KGA',
+            'kindergarten 1' => 'KGA',
+            'kindergarten b' => 'KGB',
+            'kindergarten 2' => 'KGB',
+            'prep' => 'PRE',
+        ];
+
+        $code = $legacyMap[$legacyLevel] ?? null;
+        if ($code !== null) {
+            $classLevel = PreschoolClassLevel::query()->where('code', $code)->first();
+            if ($classLevel) {
+                return $classLevel;
+            }
+        }
+
+        return PreschoolClassLevel::query()
+            ->whereRaw('LOWER(name_en) = ?', [$legacyLevel])
+            ->orWhereRaw('LOWER(code) = ?', [str_replace(' ', '', $legacyLevel)])
+            ->first();
+    }
+
     public function rules(): array
     {
         return [
-            'code' => ['required', 'string', 'max:50', 'unique:preschool_classes,code'],
+            'code' => ['sometimes', 'nullable', 'string', 'max:50'],
             'name' => ['required', 'string', 'max:191'],
             'teacher_user_id' => ['nullable', 'string', 'exists:users,id'],
             'teacher_display_name' => ['nullable', 'string', 'max:191'],
-            'level' => ['required', 'string', 'max:100'],
+            'class_level_id' => [
+                'required',
+                'exists:preschool_class_levels,id',
+                Rule::exists('preschool_class_levels', 'id')->where(static function ($query) {
+                    $query->where('is_active', true);
+                }),
+            ],
+            'level' => ['sometimes', 'nullable', 'string', 'max:100'],
             'schedule' => ['nullable', 'string', 'max:191'],
             'students_count' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', Rule::in(['active', 'pending', 'closed', 'archived'])],

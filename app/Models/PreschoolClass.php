@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string      $name
  * @property string|null $teacher_user_id
  * @property string|null $teacher_display_name
+ * @property int|null    $class_level_id
  * @property string|null $level
  * @property string|null $schedule
  * @property int         $students_count
@@ -42,6 +43,7 @@ class PreschoolClass extends Model
         'name',
         'teacher_user_id',
         'teacher_display_name',
+        'class_level_id',
         'level',
         'schedule',
         'students_count',
@@ -57,6 +59,7 @@ class PreschoolClass extends Model
     protected function casts(): array
     {
         return [
+            'class_level_id' => 'integer',
             'students_count' => 'integer',
             'tuition_fee'    => 'decimal:2',
         ];
@@ -65,6 +68,11 @@ class PreschoolClass extends Model
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_user_id', 'id');
+    }
+
+    public function classLevel(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolClassLevel::class, 'class_level_id', 'id');
     }
 
     public function students(): BelongsToMany
