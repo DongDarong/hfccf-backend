@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolAssessmentGradingScaleController
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentReportPeriodController as PreschoolAssessmentSettingsReportPeriodController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentSettingsController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentWeightController;
+use App\Http\Controllers\Api\Preschool\PreschoolAttendanceAlertController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceSettingsController;
 use App\Http\Controllers\Api\Preschool\PreschoolHealthAlertController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthAuditController;
@@ -293,6 +294,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('guardians/governance/issues/{issue}/assign', [PreschoolGuardianGovernanceController::class, 'assign']);
         Route::post('guardians/governance/issues/{issue}/resolve', [PreschoolGuardianGovernanceController::class, 'resolve']);
         Route::post('guardians/governance/issues/{issue}/dismiss', [PreschoolGuardianGovernanceController::class, 'dismiss']);
+        Route::get('attendance-alerts', [PreschoolAttendanceAlertController::class, 'index']);
         Route::get('guardian-communications', [PreschoolGuardianCommunicationController::class, 'index']);
         Route::get('students/{student}/guardian-communications', [PreschoolGuardianCommunicationController::class, 'studentTimeline']);
         Route::get('guardians/{guardian}/communications', [PreschoolGuardianCommunicationController::class, 'guardianTimeline']);
