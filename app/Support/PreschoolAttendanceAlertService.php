@@ -75,6 +75,39 @@ final class PreschoolAttendanceAlertService
         ];
     }
 
+    public function summary(?User $viewer, array $filters = []): array
+    {
+        return $this->listAttendanceAlerts($viewer, $filters)['summary'] ?? [
+            'total' => 0,
+            'open' => 0,
+            'acknowledged' => 0,
+            'overdue' => 0,
+            'byClass' => [],
+            'bySeverity' => [],
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function recentAlerts(?User $viewer, array $filters = [], int $limit = 5): array
+    {
+        $filters['page'] = 1;
+        $filters['per_page'] = max(1, min($limit, 20));
+
+        return $this->listAttendanceAlerts($viewer, $filters)['items'] ?? [];
+    }
+
+    /**
+     * @return array{summary: array<string, mixed>, items: array<int, array<string, mixed>>, pagination: array<string, mixed>}
+     */
+    public function studentAlerts(?User $viewer, int|string $studentId, array $filters = []): array
+    {
+        $filters['student_id'] = $studentId;
+
+        return $this->listAttendanceAlerts($viewer, $filters);
+    }
+
     private function applyFilters(Builder $query, array $filters): void
     {
         if (($studentId = trim((string) ($filters['student_id'] ?? ''))) !== '') {
