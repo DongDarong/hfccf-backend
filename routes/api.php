@@ -18,12 +18,14 @@ use App\Http\Controllers\Api\Preschool\PreschoolAssessmentReportPeriodController
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentSettingsController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentWeightController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceAlertController;
+use App\Http\Controllers\Api\Preschool\PreschoolAnalyticsController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceSettingsController;
 use App\Http\Controllers\Api\Preschool\PreschoolHealthAlertController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthController;
 use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolAttendanceSessionController;
 use App\Http\Controllers\Api\Preschool\PreschoolEnrollmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassLevelController;
@@ -369,6 +371,24 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('students/{student}/health/alerts', [PreschoolHealthAlertController::class, 'studentAlerts']);
         Route::get('students/{student}/health/audit-logs', [PreschoolStudentHealthAuditController::class, 'index']);
 
+        Route::get('attendance-sessions', [PreschoolAttendanceSessionController::class, 'index']);
+        Route::get('attendance-sessions/today', [PreschoolAttendanceSessionController::class, 'today']);
+        Route::get('attendance-sessions/missing', [PreschoolAttendanceSessionController::class, 'missing']);
+        Route::post('attendance-sessions', [PreschoolAttendanceSessionController::class, 'store']);
+        Route::post('attendance-sessions/generate', [PreschoolAttendanceSessionController::class, 'generate']);
+        Route::get('attendance-sessions/{attendanceSession}', [PreschoolAttendanceSessionController::class, 'show']);
+        Route::post('attendance-sessions/{attendanceSession}/records', [PreschoolAttendanceSessionController::class, 'storeRecords']);
+        Route::patch('attendance-sessions/{attendanceSession}/open', [PreschoolAttendanceSessionController::class, 'open']);
+        Route::patch('attendance-sessions/{attendanceSession}/complete', [PreschoolAttendanceSessionController::class, 'complete']);
+        Route::patch('attendance-sessions/{attendanceSession}/close', [PreschoolAttendanceSessionController::class, 'close']);
+        Route::patch('attendance-sessions/{attendanceSession}/lock', [PreschoolAttendanceSessionController::class, 'lock']);
+        Route::patch('attendance-sessions/{attendanceSession}/reopen', [PreschoolAttendanceSessionController::class, 'reopen']);
+        Route::patch('attendance-sessions/{attendanceSession}/cancel', [PreschoolAttendanceSessionController::class, 'cancel']);
+
+        Route::get('schedules/{schedule}/sessions', [PreschoolScheduleController::class, 'sessions']);
+        Route::get('schedules/{schedule}/today-session', [PreschoolScheduleController::class, 'todaySession']);
+        Route::get('schedules/{schedule}/history', [PreschoolScheduleController::class, 'history']);
+
         Route::get('attendance', [PreschoolAttendanceController::class, 'index']);
         Route::post('attendance', [PreschoolAttendanceController::class, 'store']);
         Route::put('attendance/{id}', [PreschoolAttendanceController::class, 'update']);
@@ -547,6 +567,20 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
             Route::get('classroom', [PreschoolReportingController::class, 'classroom']);
             Route::get('compliance', [PreschoolReportingController::class, 'compliance']);
             Route::get('export', [PreschoolReportingController::class, 'export']);
+        });
+
+        Route::prefix('analytics')->group(function (): void {
+            Route::get('dashboard', [PreschoolAnalyticsController::class, 'dashboard']);
+            Route::get('attendance', [PreschoolAnalyticsController::class, 'attendance']);
+            Route::get('sessions', [PreschoolAnalyticsController::class, 'sessions']);
+            Route::get('schedules', [PreschoolAnalyticsController::class, 'schedules']);
+            Route::get('alerts', [PreschoolAnalyticsController::class, 'alerts']);
+            Route::get('students', [PreschoolAnalyticsController::class, 'students']);
+            Route::get('teachers', [PreschoolAnalyticsController::class, 'teachers']);
+            Route::get('guardian-contacts', [PreschoolAnalyticsController::class, 'guardianContacts']);
+            Route::get('reports/attendance', [PreschoolAnalyticsController::class, 'reportAttendance']);
+            Route::get('reports/sessions', [PreschoolAnalyticsController::class, 'reportSessions']);
+            Route::get('reports/schedules', [PreschoolAnalyticsController::class, 'reportSchedules']);
         });
 
         // Weekly schedules stay isolated from attendance and reporting because
@@ -936,5 +970,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
+
+
 
 
