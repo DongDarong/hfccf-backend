@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolExportGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGovernanceDiffController;
 use App\Http\Controllers\Api\Preschool\PreschoolGovernanceCaseController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportSnapshotController;
+use App\Http\Controllers\Api\Preschool\PreschoolOperationsController;
 use App\Http\Controllers\Api\Preschool\PreschoolReportingController;
 use App\Http\Controllers\Api\Preschool\PreschoolPaymentController;
 use App\Http\Controllers\Api\Preschool\PreschoolInvoiceController;
@@ -544,6 +545,9 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('classes/{class}/reports', [PreschoolClassroomReportController::class, 'index']);
         Route::get('classes/{class}/reports/{period}', [PreschoolClassroomReportController::class, 'show']);
 
+        Route::prefix('operations')->group(function (): void {
+            Route::get('dashboard', [PreschoolOperationsController::class, 'dashboard']);
+        });
         Route::prefix('reports')->group(function (): void {
             Route::get('definitions', [PreschoolReportingController::class, 'definitions']);
             Route::get('dashboard', [PreschoolReportingController::class, 'dashboard']);

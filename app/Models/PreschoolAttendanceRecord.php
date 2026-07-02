@@ -10,6 +10,7 @@ class PreschoolAttendanceRecord extends Model
     protected $fillable = [
         'class_id',
         'student_id',
+        'attendance_session_id',
         'recorded_by_user_id',
         'attendance_date',
         'status',
@@ -33,6 +34,11 @@ class PreschoolAttendanceRecord extends Model
     public function student(): BelongsTo
     {
         return $this->belongsTo(PreschoolStudent::class, 'student_id');
+    }
+
+    public function attendanceSession(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolAttendanceSession::class, 'attendance_session_id');
     }
 
     public function recordedBy(): BelongsTo

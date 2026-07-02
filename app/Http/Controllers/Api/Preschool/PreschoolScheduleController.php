@@ -5,14 +5,17 @@ namespace App\Http\Controllers\Api\Preschool;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Preschool\StorePreschoolScheduleRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolScheduleRequest;
+use App\Http\Resources\Preschool\PreschoolAttendanceSessionResource;
 use App\Http\Resources\Preschool\PreschoolScheduleEntryResource;
 use App\Models\PreschoolScheduleEntry;
 use App\Models\User;
 use App\Support\PreschoolLifecycleGuardService;
+use App\Support\PreschoolScheduleSessionHistoryService;
 use App\Support\PreschoolScheduleService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class PreschoolScheduleController extends Controller
@@ -151,6 +154,77 @@ class PreschoolScheduleController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function sessions(Request $request, PreschoolScheduleEntry $schedule, PreschoolScheduleSessionHistoryService $service): JsonResponse
+    {
+        if ($response = $this->authorizeViewer($request->user())) {
+            return $response;
+        }
+
+        $validated = $request->validate([
+            'date_from' => ['sometimes', 'nullable', 'date'],
+            'date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:date_from'],
+            'status' => ['sometimes', 'nullable', Rule::in(array_merge(['closed'], \App\Models\PreschoolAttendanceSession::STATUSES))],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $paginator = $service->paginateScheduleSessions($request->user(), $schedule, $validated);
+        $summary = $service->summary($request->user(), $schedule, $validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool schedule sessions retrieved successfully.',
+            'data' => [
+                'items' => PreschoolAttendanceSessionResource::collection($paginator->getCollection())->resolve($request),
+                'pagination' => $this->paginationShape($paginator),
+                'summary' => $summary,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function todaySession(Request $request, PreschoolScheduleEntry $schedule, PreschoolScheduleSessionHistoryService $service): JsonResponse
+    {
+        if ($response = $this->authorizeViewer($request->user())) {
+            return $response;
+        }
+
+        $session = $service->todaySession($request->user(), $schedule);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool schedule today session retrieved successfully.',
+            'data' => [
+                'session' => $session
+                    ? PreschoolAttendanceSessionResource::make($session)->resolve($request)
+                    : null,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function history(Request $request, PreschoolScheduleEntry $schedule, PreschoolScheduleSessionHistoryService $service): JsonResponse
+    {
+        if ($response = $this->authorizeViewer($request->user())) {
+            return $response;
+        }
+
+        $history = $service->history($request->user(), $schedule);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool schedule history retrieved successfully.',
+            'data' => [
+                'schedule' => $history['schedule'],
+                'todaySession' => $history['todaySession']
+                    ? PreschoolAttendanceSessionResource::make($history['todaySession'])->resolve($request)
+                    : null,
+                'recentSessions' => PreschoolAttendanceSessionResource::collection($history['recentSessions'] ?? [])->resolve($request),
+                'summary' => $history['summary'],
+                'alerts' => $history['alerts'],
+                'guardianContacts' => $history['guardianContacts'],
+            ],
+        ], Response::HTTP_OK);
+    }
+
     private function authorizeAdmin(?User $user): ?JsonResponse
     {
         if (! $user) {
@@ -162,6 +236,27 @@ class PreschoolScheduleController extends Controller
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminpreschool'], true)) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Forbidden.',
+            'data' => null,
+        ], Response::HTTP_FORBIDDEN);
+    }
+
+    private function authorizeViewer(?User $user): ?JsonResponse
+    {
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+                'data' => null,
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (in_array($user->role_code, ['superadmin', 'adminpreschool', 'teacher-preschool'], true)) {
             return null;
         }
 

@@ -313,7 +313,7 @@ class PreschoolTeacherController extends Controller
         $page = max((int) $request->query('page', 1), 1);
         $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
 
-        $query = PreschoolAttendanceRecord::query()->with(['student', 'preschoolClass', 'recordedBy']);
+        $query = PreschoolAttendanceRecord::query()->with(['student', 'preschoolClass', 'recordedBy', 'attendanceSession.schedule']);
 
         if ($user->role_code === 'teacher-preschool') {
             $teacherClassIds = PreschoolClass::query()
@@ -464,3 +464,4 @@ class PreschoolTeacherController extends Controller
         ];
     }
 }
+
