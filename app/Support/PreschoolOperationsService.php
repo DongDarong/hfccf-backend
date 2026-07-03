@@ -3,7 +3,9 @@
 namespace App\Support;
 
 use App\Models\User;
+use App\Services\PreschoolAutomationTaskService;
 use App\Services\PreschoolGuardianCommunicationService;
+use App\Services\PreschoolNotificationService;
 use App\Support\PreschoolReporting\PreschoolReportingService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -16,6 +18,8 @@ final class PreschoolOperationsService
         private readonly PreschoolAttendanceSessionService $attendanceSessionService,
         private readonly PreschoolAttendanceAlertService $attendanceAlertService,
         private readonly PreschoolGuardianCommunicationService $guardianCommunicationService,
+        private readonly PreschoolNotificationService $notificationService,
+        private readonly PreschoolAutomationTaskService $automationTaskService,
     ) {
     }
 
@@ -53,6 +57,16 @@ final class PreschoolOperationsService
         $attendanceAlertSummary = $this->attendanceAlertService->summary($user, $reportFilters);
         $recentAlerts = $this->attendanceAlertService->recentAlerts($user, $reportFilters, 5);
         $recentCommunications = $this->guardianCommunicationService->listCommunications($user, array_merge($reportFilters, [
+            'page' => 1,
+            'per_page' => 5,
+        ]));
+        $notificationSummary = $this->notificationService->summary($user, $reportFilters);
+        $recentNotifications = $this->notificationService->listNotifications($user, array_merge($reportFilters, [
+            'page' => 1,
+            'per_page' => 5,
+        ]));
+        $taskSummary = $this->automationTaskService->summary($user, $reportFilters);
+        $recentTasks = $this->automationTaskService->listTasks($user, array_merge($reportFilters, [
             'page' => 1,
             'per_page' => 5,
         ]));
@@ -111,6 +125,14 @@ final class PreschoolOperationsService
                 'rows' => $health['rows'] ?? [],
                 'alerts' => $health['alerts'] ?? [],
             ],
+            'notifications' => [
+                'summary' => $notificationSummary,
+                'items' => $recentNotifications['items'] ?? [],
+            ],
+            'automationTasks' => [
+                'summary' => $taskSummary,
+                'items' => $recentTasks['items'] ?? [],
+            ],
             'payments' => [
                 'summary' => $payments['summary'] ?? [],
                 'cards' => $payments['cards'] ?? [],
@@ -146,11 +168,17 @@ final class PreschoolOperationsService
                 'overdueInvoices' => $reportDashboard['risk']['overdueInvoices'] ?? 0,
                 'missingSessions' => $sessionSummary['missing'] ?? 0,
                 'openAttendanceAlerts' => $attendanceAlertSummary['open'] ?? 0,
+                'unreadNotifications' => $notificationSummary['unread'] ?? 0,
+                'openAutomationTasks' => $taskSummary['open'] ?? 0,
+                'overdueAutomationTasks' => $taskSummary['overdue'] ?? 0,
+                'criticalNotifications' => $notificationSummary['critical'] ?? 0,
             ],
             'timeline' => $this->buildTimeline(
                 $reportDashboard['recentAttendance'] ?? [],
                 $recentAlerts,
                 $this->mapCommunications($recentCommunicationsItems),
+                $recentNotifications['items'] ?? [],
+                $recentTasks['items'] ?? [],
                 $this->mapSessions($todaySessions->take(5)),
             ),
             'quickActions' => $this->quickActions(),
@@ -230,7 +258,7 @@ final class PreschoolOperationsService
         })->values()->all();
     }
 
-    private function buildTimeline(array $recentAttendance, array $recentAlerts, array $recentCommunications, array $recentSessions): array
+    private function buildTimeline(array $recentAttendance, array $recentAlerts, array $recentCommunications, array $recentNotifications, array $recentTasks, array $recentSessions): array
     {
         $timeline = [];
 
@@ -259,6 +287,26 @@ final class PreschoolOperationsService
                 'type' => 'guardian_communication',
                 'label' => $item['subject'] ?? 'Communication',
                 'text' => $item['message'] ?? '',
+                'status' => $item['status'] ?? null,
+                'createdAt' => $item['createdAt'] ?? null,
+            ];
+        }
+
+        foreach ($recentNotifications as $item) {
+            $timeline[] = [
+                'type' => 'notification',
+                'label' => $item['title'] ?? 'Notification',
+                'text' => $item['body'] ?? '',
+                'status' => $item['status'] ?? null,
+                'createdAt' => $item['createdAt'] ?? null,
+            ];
+        }
+
+        foreach ($recentTasks as $item) {
+            $timeline[] = [
+                'type' => 'automation_task',
+                'label' => $item['title'] ?? 'Task',
+                'text' => $item['description'] ?? '',
                 'status' => $item['status'] ?? null,
                 'createdAt' => $item['createdAt'] ?? null,
             ];
