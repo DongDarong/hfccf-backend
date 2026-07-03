@@ -10,8 +10,11 @@ use App\Models\PreschoolStudentMedicalProfile;
 use App\Models\PreschoolStudentMedicationRecord;
 use App\Models\PreschoolStudentVaccinationRecord;
 use App\Observers\PreschoolStudentHealthObserver;
+use App\Support\DatabaseSafetyGuard;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -82,5 +85,17 @@ class AppServiceProvider extends ServiceProvider
         PreschoolStudentHealthIncident::observe(PreschoolStudentHealthObserver::class);
         PreschoolStudentHealthContact::observe(PreschoolStudentHealthObserver::class);
         PreschoolStudentHealthCheckLog::observe(PreschoolStudentHealthObserver::class);
+
+        Event::listen(CommandStarting::class, function (CommandStarting $event): void {
+            $connection = (string) config('database.default');
+            $database = (string) config("database.connections.{$connection}.database", '');
+
+            DatabaseSafetyGuard::assertCommandCanRun(
+                $event->command,
+                (string) config('app.env'),
+                $connection,
+                $database
+            );
+        });
     }
 }
