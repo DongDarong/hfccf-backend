@@ -19,7 +19,7 @@ class UserPermission extends Pivot
         'created_at',
     ];
 
-    protected const UPDATED_AT = null;
+    public const UPDATED_AT = null;
 
     public function user(): BelongsTo
     {
