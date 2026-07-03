@@ -543,8 +543,7 @@ final class PreschoolAnalyticsService
     private function scheduleEntries(User $user, array $filters): Builder
     {
         $query = PreschoolScheduleEntry::query()
-            ->with(['preschoolClass.teacher', 'teacher', 'academicYear', 'term'])
-            ->whereNull('deleted_at');
+            ->with(['preschoolClass.teacher', 'teacher', 'academicYear', 'term']);
 
         $this->applyClassScope($query, $user, $filters, 'class_id');
 

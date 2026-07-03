@@ -193,6 +193,125 @@ class PreschoolAttendanceController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function summary(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        $query = PreschoolAttendanceRecord::query();
+        $this->applyAttendanceFilters($request, $query);
+
+        $records = $query->get();
+        $statusCounts = $records->groupBy('status')->map->count();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool attendance summary retrieved successfully.',
+            'data' => [
+                'summary' => [
+                    'totalRecords' => $records->count(),
+                    'present' => (int) ($statusCounts->get('present', 0)),
+                    'absent' => (int) ($statusCounts->get('absent', 0)),
+                    'late' => (int) ($statusCounts->get('late', 0)),
+                    'excused' => (int) ($statusCounts->get('excused', 0)),
+                    'uniqueStudents' => $records->pluck('student_id')->filter()->unique()->count(),
+                    'uniqueClasses' => $records->pluck('class_id')->filter()->unique()->count(),
+                    'linkedSessions' => $records->whereNotNull('attendance_session_id')->count(),
+                    'legacyUnlinkedRecords' => $records->whereNull('attendance_session_id')->count(),
+                    'statusCounts' => [
+                        'present' => (int) ($statusCounts->get('present', 0)),
+                        'absent' => (int) ($statusCounts->get('absent', 0)),
+                        'late' => (int) ($statusCounts->get('late', 0)),
+                        'excused' => (int) ($statusCounts->get('excused', 0)),
+                    ],
+                ],
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function missing(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        $query = PreschoolAttendanceRecord::query()
+            ->with(['student', 'preschoolClass', 'recordedBy', 'attendanceSession.schedule']);
+        $this->applyAttendanceFilters($request, $query);
+        $query->whereNull('attendance_session_id');
+
+        $paginator = $query
+            ->orderByDesc('attendance_date')
+            ->orderByDesc('id')
+            ->paginate($this->perPage($request), ['*'], 'page', $this->page($request));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool attendance records without sessions retrieved successfully.',
+            'data' => [
+                'items' => PreschoolAttendanceResource::collection($paginator->getCollection())->resolve($request),
+                'pagination' => $this->paginationShape($paginator),
+                'count' => $paginator->total(),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function classSummary(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        $query = PreschoolAttendanceRecord::query()->with(['preschoolClass.teacher']);
+        $this->applyAttendanceFilters($request, $query);
+        $records = $query->get();
+
+        $items = $records
+            ->groupBy('class_id')
+            ->map(static function ($group, $classId): array {
+                $first = $group->first();
+                $statusCounts = $group->groupBy('status')->map->count();
+                $class = $first?->preschoolClass;
+
+                return [
+                    'classId' => (int) $classId,
+                    'classCode' => $class?->code,
+                    'className' => $class?->name,
+                    'teacherName' => trim(($class?->teacher?->first_name ?? '').' '.($class?->teacher?->last_name ?? '')),
+                    'totalRecords' => $group->count(),
+                    'present' => (int) ($statusCounts->get('present', 0)),
+                    'absent' => (int) ($statusCounts->get('absent', 0)),
+                    'late' => (int) ($statusCounts->get('late', 0)),
+                    'excused' => (int) ($statusCounts->get('excused', 0)),
+                    'linkedSessions' => $group->whereNotNull('attendance_session_id')->count(),
+                    'legacyUnlinkedRecords' => $group->whereNull('attendance_session_id')->count(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $summary = [
+            'totalRecords' => $records->count(),
+            'classes' => count($items),
+            'present' => $records->where('status', 'present')->count(),
+            'absent' => $records->where('status', 'absent')->count(),
+            'late' => $records->where('status', 'late')->count(),
+            'excused' => $records->where('status', 'excused')->count(),
+            'linkedSessions' => $records->whereNotNull('attendance_session_id')->count(),
+            'legacyUnlinkedRecords' => $records->whereNull('attendance_session_id')->count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool attendance class summary retrieved successfully.',
+            'data' => [
+                'summary' => $summary,
+                'items' => $items,
+            ],
+        ], Response::HTTP_OK);
+    }
+
     private function applyAttendanceFilters(Request $request, Builder $query): void
     {
         $search = trim((string) $request->query('search', ''));
