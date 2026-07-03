@@ -548,6 +548,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::prefix('operations')->group(function (): void {
             Route::get('dashboard', [PreschoolOperationsController::class, 'dashboard']);
         });
+        require __DIR__.'/api/preschool_notifications.php';
         Route::prefix('reports')->group(function (): void {
             Route::get('definitions', [PreschoolReportingController::class, 'definitions']);
             Route::get('dashboard', [PreschoolReportingController::class, 'dashboard']);
