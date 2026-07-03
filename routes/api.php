@@ -39,6 +39,9 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
 use App\Http\Controllers\Api\Preschool\PreschoolInstitutionalGovernanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolWorkflowApprovalController;
+use App\Http\Controllers\Api\Preschool\PreschoolWorkflowController;
+use App\Http\Controllers\Api\Preschool\PreschoolWorkflowDefinitionController;
 use App\Http\Controllers\Api\Preschool\PreschoolLifecycleAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolExportGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGovernanceDiffController;
@@ -549,6 +552,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
             Route::get('dashboard', [PreschoolOperationsController::class, 'dashboard']);
         });
         require __DIR__.'/api/preschool_notifications.php';
+        require __DIR__.'/api/preschool_workflows.php';
         Route::prefix('reports')->group(function (): void {
             Route::get('definitions', [PreschoolReportingController::class, 'definitions']);
             Route::get('dashboard', [PreschoolReportingController::class, 'dashboard']);
