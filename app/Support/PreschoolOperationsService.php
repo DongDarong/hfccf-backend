@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\PreschoolAutomationTaskService;
 use App\Services\PreschoolGuardianCommunicationService;
 use App\Services\PreschoolNotificationService;
+use App\Services\PreschoolWorkflowService;
 use App\Support\PreschoolReporting\PreschoolReportingService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -20,6 +21,7 @@ final class PreschoolOperationsService
         private readonly PreschoolGuardianCommunicationService $guardianCommunicationService,
         private readonly PreschoolNotificationService $notificationService,
         private readonly PreschoolAutomationTaskService $automationTaskService,
+        private readonly PreschoolWorkflowService $workflowService,
     ) {
     }
 
@@ -70,6 +72,12 @@ final class PreschoolOperationsService
             'page' => 1,
             'per_page' => 5,
         ]));
+        $workflowBundle = $this->workflowService->listInstances($user, array_merge($reportFilters, [
+            'page' => 1,
+            'per_page' => 5,
+        ]));
+        $workflowSummary = $workflowBundle['summary'] ?? [];
+        $workflowItems = $workflowBundle['items'] ?? [];
 
         $recentCommunicationsItems = $recentCommunications->getCollection() ?? collect();
 
@@ -133,6 +141,19 @@ final class PreschoolOperationsService
                 'summary' => $taskSummary,
                 'items' => $recentTasks['items'] ?? [],
             ],
+            'workflows' => [
+                'summary' => [
+                    'total' => $workflowSummary['total'] ?? 0,
+                    'pendingWorkflows' => $workflowSummary['pendingWorkflows'] ?? 0,
+                    'pendingApprovals' => $workflowSummary['pendingApprovals'] ?? ($workflowSummary['pendingApproval'] ?? 0),
+                    'overdueWorkflows' => $workflowSummary['overdue'] ?? 0,
+                    'escalatedWorkflows' => $workflowSummary['escalated'] ?? 0,
+                    'recentlyUpdatedWorkflows' => $workflowSummary['recentlyUpdatedWorkflows'] ?? 0,
+                    'myAssignments' => $workflowSummary['myAssignments'] ?? 0,
+                ],
+                'items' => $this->mapWorkflowItems(collect($workflowItems)),
+                'recentActivity' => $this->mapWorkflowItems(collect($workflowItems)),
+            ],
             'payments' => [
                 'summary' => $payments['summary'] ?? [],
                 'cards' => $payments['cards'] ?? [],
@@ -172,6 +193,10 @@ final class PreschoolOperationsService
                 'openAutomationTasks' => $taskSummary['open'] ?? 0,
                 'overdueAutomationTasks' => $taskSummary['overdue'] ?? 0,
                 'criticalNotifications' => $notificationSummary['critical'] ?? 0,
+                'pendingWorkflows' => $workflowSummary['pendingWorkflows'] ?? 0,
+                'pendingWorkflowApprovals' => $workflowSummary['pendingApprovals'] ?? ($workflowSummary['pendingApproval'] ?? 0),
+                'overdueWorkflows' => $workflowSummary['overdue'] ?? 0,
+                'escalatedWorkflows' => $workflowSummary['escalated'] ?? 0,
             ],
             'timeline' => $this->buildTimeline(
                 $reportDashboard['recentAttendance'] ?? [],
@@ -179,6 +204,7 @@ final class PreschoolOperationsService
                 $this->mapCommunications($recentCommunicationsItems),
                 $recentNotifications['items'] ?? [],
                 $recentTasks['items'] ?? [],
+                $this->mapWorkflowItems(collect($workflowItems)),
                 $this->mapSessions($todaySessions->take(5)),
             ),
             'quickActions' => $this->quickActions(),
@@ -258,7 +284,31 @@ final class PreschoolOperationsService
         })->values()->all();
     }
 
-    private function buildTimeline(array $recentAttendance, array $recentAlerts, array $recentCommunications, array $recentNotifications, array $recentTasks, array $recentSessions): array
+    private function mapWorkflowItems(Collection $workflows): array
+    {
+        return $workflows->map(static function (array $workflow): array {
+            return [
+                'id' => $workflow['id'] ?? null,
+                'workflowDefinitionName' => $workflow['workflowDefinitionName'] ?? null,
+                'workflowDefinitionKey' => $workflow['workflowDefinitionKey'] ?? null,
+                'sourceLabel' => $workflow['sourceLabel'] ?? null,
+                'sourceType' => $workflow['sourceType'] ?? null,
+                'sourceId' => $workflow['sourceId'] ?? null,
+                'sourceRouteName' => $workflow['sourceRouteName'] ?? null,
+                'sourceRouteParams' => $workflow['sourceRouteParams'] ?? [],
+                'sourceExists' => $workflow['sourceExists'] ?? false,
+                'status' => $workflow['status'] ?? null,
+                'priority' => $workflow['priority'] ?? null,
+                'currentStep' => $workflow['currentStep'] ?? null,
+                'assignedRole' => $workflow['assignedRole'] ?? null,
+                'assignee' => $workflow['assignee'] ?? null,
+                'dueAt' => $workflow['dueAt'] ?? null,
+                'updatedAt' => $workflow['updatedAt'] ?? null,
+            ];
+        })->values()->all();
+    }
+
+    private function buildTimeline(array $recentAttendance, array $recentAlerts, array $recentCommunications, array $recentNotifications, array $recentTasks, array $recentWorkflows, array $recentSessions): array
     {
         $timeline = [];
 
@@ -309,6 +359,16 @@ final class PreschoolOperationsService
                 'text' => $item['description'] ?? '',
                 'status' => $item['status'] ?? null,
                 'createdAt' => $item['createdAt'] ?? null,
+            ];
+        }
+
+        foreach ($recentWorkflows as $item) {
+            $timeline[] = [
+                'type' => 'workflow',
+                'label' => $item['sourceLabel'] ?? $item['workflowDefinitionName'] ?? 'Workflow',
+                'text' => trim(($item['status'] ?? '')) ?: ($item['currentStep']['name'] ?? $item['currentStep']['key'] ?? ''),
+                'status' => $item['status'] ?? null,
+                'createdAt' => $item['updatedAt'] ?? null,
             ];
         }
 

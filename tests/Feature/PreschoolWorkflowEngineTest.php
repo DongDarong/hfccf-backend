@@ -12,6 +12,7 @@ use App\Models\PreschoolWorkflowDefinition;
 use App\Models\PreschoolWorkflowEvent;
 use App\Models\PreschoolWorkflowInstance;
 use App\Models\PreschoolWorkflowStep;
+use App\Services\PreschoolWorkflowSourceLinkService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -164,8 +165,13 @@ class PreschoolWorkflowEngineTest extends TestCase
             ->json('data');
 
         $this->assertSame(3, $summary['total']);
+        $this->assertSame(2, $summary['pendingWorkflows']);
         $this->assertSame(1, $summary['pendingApproval']);
+        $this->assertSame(1, $summary['pendingApprovals']);
         $this->assertSame(1, $summary['completed']);
+        $this->assertNotEmpty($summary['byDefinition']);
+        $this->assertNotEmpty($summary['byStatus']);
+        $this->assertNotEmpty($summary['byPriority']);
 
         $this->actingWithToken($teacher)
             ->getJson('/api/preschool/workflows')
@@ -174,6 +180,45 @@ class PreschoolWorkflowEngineTest extends TestCase
         $this->actingAs($teacher, 'sanctum')
             ->patchJson('/api/preschool/workflows/'.$open->id.'/complete')
             ->assertForbidden();
+    }
+
+    public function test_source_link_resolver_handles_known_and_missing_sources_safely(): void
+    {
+        $resolver = app(PreschoolWorkflowSourceLinkService::class);
+
+        $application = $this->createEnrollmentApplication($this->createStudent('PS-WF-010', 'Mila', 'Stone'));
+        $resolvedSource = $resolver->resolveSource('preschool_enrollment_application', $application->id, null);
+
+        $this->assertSame('preschool_enrollment_application', $resolvedSource['sourceType']);
+        $this->assertSame('dashboard-preschool-admin-enrollments', $resolvedSource['sourceRouteName']);
+        $this->assertTrue($resolvedSource['sourceExists']);
+
+        $missingSource = $resolver->resolveSource('preschool_attendance_alert', 'missing-alert', null);
+
+        $this->assertSame('preschool_attendance_alert', $missingSource['sourceType']);
+        $this->assertFalse($missingSource['sourceExists']);
+        $this->assertSame([], $missingSource['sourceRouteParams']);
+
+        $workflow = $this->createWorkflowInstance('health_alert_resolution', 'health_alert', 'alert-010');
+        $linkedWorkflow = $resolver->resolveWorkflowLink('health_alert', 'alert-010');
+
+        $this->assertSame($workflow->id, $linkedWorkflow['workflowInstanceId']);
+        $this->assertSame('dashboard-preschool-admin-workflow-details', $linkedWorkflow['workflowRoute']);
+        $this->assertSame(['id' => $workflow->id], $linkedWorkflow['workflowActionParams']);
+    }
+
+    public function test_read_endpoints_do_not_create_workflow_instances(): void
+    {
+        $admin = $this->createUserWithRole('adminpreschool', ['email' => 'workflow-admin6@hfccf.org']);
+        Sanctum::actingAs($admin);
+
+        $this->assertSame(0, PreschoolWorkflowInstance::query()->count());
+
+        $this->getJson('/api/preschool/workflows/summary')->assertOk();
+        $this->getJson('/api/preschool/workflows')->assertOk();
+        $this->getJson('/api/preschool/workflows/definitions')->assertOk();
+
+        $this->assertSame(0, PreschoolWorkflowInstance::query()->count());
     }
 
     private function createStudent(string $code, string $firstName, string $lastName): PreschoolStudent

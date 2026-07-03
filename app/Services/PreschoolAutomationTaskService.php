@@ -11,6 +11,11 @@ use Illuminate\Validation\ValidationException;
 
 class PreschoolAutomationTaskService
 {
+    public function __construct(
+        private readonly PreschoolWorkflowSourceLinkService $sourceLinkService,
+    ) {
+    }
+
     public function listTasks(?User $viewer, array $filters = []): array
     {
         $query = $this->visibleQuery($viewer, $filters)
@@ -225,6 +230,8 @@ class PreschoolAutomationTaskService
 
     private function formatTask(PreschoolAutomationTask $task): array
     {
+        $workflowLink = $this->sourceLinkService->resolveWorkflowLink($task->source_type, $task->source_id);
+
         return [
             'id' => $task->id,
             'taskType' => $task->task_type,
@@ -243,6 +250,10 @@ class PreschoolAutomationTaskService
             'className' => $this->className($task),
             'actionRoute' => $task->action_route,
             'actionParams' => $task->action_params ?? [],
+            'workflowInstanceId' => $workflowLink['workflowInstanceId'],
+            'workflowStatus' => $workflowLink['workflowStatus'],
+            'workflowRoute' => $workflowLink['workflowRoute'],
+            'workflowActionParams' => $workflowLink['workflowActionParams'],
             'createdBy' => $task->created_by,
             'completedBy' => $task->completed_by,
             'completedAt' => $task->completed_at?->toISOString(),

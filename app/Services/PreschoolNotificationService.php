@@ -10,6 +10,11 @@ use Illuminate\Validation\ValidationException;
 
 class PreschoolNotificationService
 {
+    public function __construct(
+        private readonly PreschoolWorkflowSourceLinkService $sourceLinkService,
+    ) {
+    }
+
     public function listNotifications(?User $viewer, array $filters = []): array
     {
         $query = $this->visibleQuery($viewer, $filters)
@@ -185,6 +190,8 @@ class PreschoolNotificationService
 
     private function formatNotification(PreschoolNotification $notification): array
     {
+        $workflowLink = $this->sourceLinkService->resolveWorkflowLink($notification->source_type, $notification->source_id);
+
         return [
             'id' => $notification->id,
             'notificationType' => $notification->notification_type,
@@ -202,6 +209,10 @@ class PreschoolNotificationService
             'className' => $this->className($notification),
             'actionRoute' => $notification->action_route,
             'actionParams' => $notification->action_params ?? [],
+            'workflowInstanceId' => $workflowLink['workflowInstanceId'],
+            'workflowStatus' => $workflowLink['workflowStatus'],
+            'workflowRoute' => $workflowLink['workflowRoute'],
+            'workflowActionParams' => $workflowLink['workflowActionParams'],
             'readAt' => $notification->read_at?->toISOString(),
             'archivedAt' => $notification->archived_at?->toISOString(),
             'createdBy' => $notification->created_by,

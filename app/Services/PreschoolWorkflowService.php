@@ -23,6 +23,7 @@ class PreschoolWorkflowService
     public function __construct(
         private readonly PreschoolWorkflowDefinitionService $definitionService,
         private readonly PreschoolWorkflowTimelineService $timelineService,
+        private readonly PreschoolWorkflowSourceLinkService $sourceLinkService,
     ) {
     }
 
@@ -56,14 +57,17 @@ class PreschoolWorkflowService
 
     public function summary(?User $viewer, array $filters = []): array
     {
-        $instances = $this->visibleQuery($viewer, $filters)->get();
+        $instances = $this->visibleQuery($viewer, $filters)->with(['approvals', 'definition'])->get();
         $now = now();
+        $activeStatuses = ['open', 'in_progress', 'pending_approval', 'returned', 'approved', 'overdue', 'escalated'];
 
         return [
             'total' => $instances->count(),
+            'pendingWorkflows' => $instances->filter(static fn (PreschoolWorkflowInstance $instance): bool => in_array($instance->status, $activeStatuses, true) && ! in_array($instance->status, ['completed', 'cancelled', 'rejected'], true))->count(),
             'open' => $instances->where('status', 'open')->count(),
             'inProgress' => $instances->where('status', 'in_progress')->count(),
             'pendingApproval' => $instances->where('status', 'pending_approval')->count(),
+            'pendingApprovals' => $instances->where('status', 'pending_approval')->count(),
             'approved' => $instances->where('status', 'approved')->count(),
             'rejected' => $instances->where('status', 'rejected')->count(),
             'returned' => $instances->where('status', 'returned')->count(),
@@ -72,7 +76,39 @@ class PreschoolWorkflowService
             'escalated' => $instances->where('status', 'escalated')->count(),
             'overdue' => $instances->filter(static fn (PreschoolWorkflowInstance $instance): bool => in_array($instance->status, ['open', 'in_progress', 'pending_approval', 'returned', 'approved'], true) && $instance->due_at !== null && $instance->due_at->lt($now))->count(),
             'myAssignments' => $viewer ? $instances->where('assigned_to_user_id', $viewer->id)->count() : 0,
+            'assignedToMe' => $viewer ? $instances->where('assigned_to_user_id', $viewer->id)->count() : 0,
             'myApprovals' => $viewer ? $instances->filter(static fn (PreschoolWorkflowInstance $instance): bool => $instance->approvals->contains(fn ($approval) => in_array($approval->status, ['pending'], true) && ($approval->requested_to_user_id === $viewer->id || $approval->requested_to_role === $viewer->role_code)))->count() : 0,
+            'byDefinition' => $instances
+                ->groupBy(fn (PreschoolWorkflowInstance $instance): string => (string) ($instance->workflow_definition_id ?? 'unknown'))
+                ->map(static function (Collection $group, string $definitionId): array {
+                    $first = $group->first();
+
+                    return [
+                        'workflowDefinitionId' => $definitionId === 'unknown' ? null : (int) $definitionId,
+                        'workflowDefinitionKey' => $first?->definition?->key,
+                        'workflowDefinitionName' => $first?->definition?->name,
+                        'total' => $group->count(),
+                    ];
+                })
+                ->values()
+                ->all(),
+            'byStatus' => $instances
+                ->groupBy('status')
+                ->map(static fn (Collection $group, string $status): array => [
+                    'status' => $status,
+                    'total' => $group->count(),
+                ])
+                ->values()
+                ->all(),
+            'byPriority' => $instances
+                ->groupBy('priority')
+                ->map(static fn (Collection $group, string $priority): array => [
+                    'priority' => $priority,
+                    'total' => $group->count(),
+                ])
+                ->values()
+                ->all(),
+            'recentlyUpdatedWorkflows' => $instances->filter(static fn (PreschoolWorkflowInstance $instance): bool => $instance->updated_at !== null && $instance->updated_at->gte(now()->subDay()))->count(),
         ];
     }
 
@@ -428,6 +464,7 @@ class PreschoolWorkflowService
     public function formatInstance(PreschoolWorkflowInstance $instance, bool $includeChildren = false): array
     {
         $instance->loadMissing(['definition.steps', 'currentStep', 'assignee']);
+        $source = $this->sourceLinkService->resolveSource($instance->source_type, $instance->source_id, $instance->source_label);
 
         return [
             'id' => $instance->id,
@@ -435,9 +472,12 @@ class PreschoolWorkflowService
             'workflowDefinitionKey' => $instance->definition?->key,
             'workflowDefinitionName' => $instance->definition?->name,
             'workflowDefinitionDomain' => $instance->definition?->domain,
-            'sourceType' => $instance->source_type,
-            'sourceId' => $instance->source_id,
-            'sourceLabel' => $instance->source_label,
+            'sourceType' => $source['sourceType'],
+            'sourceId' => $source['sourceId'],
+            'sourceLabel' => $source['sourceLabel'],
+            'sourceRouteName' => $source['sourceRouteName'],
+            'sourceRouteParams' => $source['sourceRouteParams'] ?? [],
+            'sourceExists' => $source['sourceExists'],
             'currentStepId' => $instance->current_step_id,
             'currentStep' => $instance->currentStep ? [
                 'id' => $instance->currentStep->id,

@@ -8,6 +8,8 @@ use App\Models\PreschoolGuardian;
 use App\Models\PreschoolGuardianCommunication;
 use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentGuardian;
+use App\Models\PreschoolWorkflowDefinition;
+use App\Models\PreschoolWorkflowInstance;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\PreschoolAutomationTaskService;
@@ -80,6 +82,18 @@ class PreschoolAutomationTest extends TestCase
         $class = $this->createClass('PS-AUTO-010', 'Action Class', $teacher->id);
         $student = $this->createStudent('PS-AUTO-010', 'Mina', 'Student');
         $this->attachStudentToClass($class->id, $student->id);
+        $definition = PreschoolWorkflowDefinition::query()->where('key', 'attendance_follow_up')->firstOrFail();
+        $step = $definition->steps()->orderBy('sort_order')->first();
+        $workflowInstance = PreschoolWorkflowInstance::query()->create([
+            'workflow_definition_id' => $definition->id,
+            'source_type' => 'invoice',
+            'source_id' => 'task-2',
+            'source_label' => 'Review overdue invoice',
+            'current_step_id' => $step?->id,
+            'status' => 'open',
+            'priority' => 'normal',
+            'metadata' => [],
+        ]);
 
         $assignedTask = PreschoolAutomationTask::query()->create([
             'task_type' => 'attendance.follow_up',
@@ -120,7 +134,9 @@ class PreschoolAutomationTest extends TestCase
         $this->actingAs($teacher, 'sanctum')
             ->getJson('/api/preschool/automation-tasks?status=all')
             ->assertOk()
-            ->assertJsonCount(2, 'data.items');
+            ->assertJsonCount(2, 'data.items')
+            ->assertJsonPath('data.items.0.workflowInstanceId', $workflowInstance->id)
+            ->assertJsonPath('data.items.0.workflowRoute', 'dashboard-preschool-admin-workflow-details');
 
         $this->actingAs($otherTeacher, 'sanctum')
             ->getJson('/api/preschool/automation-tasks')

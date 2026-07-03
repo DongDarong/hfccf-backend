@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\PreschoolClass;
 use App\Models\PreschoolNotification;
 use App\Models\PreschoolStudent;
+use App\Models\PreschoolWorkflowDefinition;
+use App\Models\PreschoolWorkflowInstance;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\PreschoolNotificationService;
@@ -35,6 +37,19 @@ class PreschoolNotificationTest extends TestCase
         $class = $this->createClass('PS-NOTIF-001', 'Notification Class', $teacher->id);
         $student = $this->createStudent('PS-NOTIF-001', 'Nina', 'Student');
         $this->attachStudentToClass($class->id, $student->id);
+        $definition = PreschoolWorkflowDefinition::query()->where('key', 'attendance_follow_up')->firstOrFail();
+        $step = $definition->steps()->orderBy('sort_order')->first();
+
+        $workflowInstance = PreschoolWorkflowInstance::query()->create([
+            'workflow_definition_id' => $definition->id,
+            'source_type' => 'attendance_communication',
+            'source_id' => 'comm-1',
+            'source_label' => 'Attendance follow-up required',
+            'current_step_id' => $step?->id,
+            'status' => 'open',
+            'priority' => 'normal',
+            'metadata' => [],
+        ]);
 
         $targeted = PreschoolNotification::query()->create([
             'notification_type' => 'attendance.follow_up',
@@ -79,7 +94,9 @@ class PreschoolNotificationTest extends TestCase
             ->assertJsonPath('data.summary.unread', 1)
             ->assertJsonPath('data.summary.read', 0)
             ->assertJsonPath('data.items.0.id', $targeted->id)
-            ->assertJsonPath('data.items.0.notificationType', 'attendance.follow_up');
+            ->assertJsonPath('data.items.0.notificationType', 'attendance.follow_up')
+            ->assertJsonPath('data.items.0.workflowInstanceId', $workflowInstance->id)
+            ->assertJsonPath('data.items.0.workflowRoute', 'dashboard-preschool-admin-workflow-details');
 
         $this->getJson('/api/preschool/notifications/summary')
             ->assertOk()
