@@ -7,6 +7,10 @@ use App\Models\PreschoolAcademicTerm;
 use App\Models\PreschoolAcademicYear;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\PreschoolWorkflowEvent;
+use App\Models\PreschoolWorkflowDefinition;
+use App\Models\PreschoolWorkflowInstance;
+use App\Services\PreschoolWorkflowSourceLinkService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -214,6 +218,78 @@ class EnrollStudentCreatesPaymentTest extends TestCase
 
         // Event must not be dispatched when there is no payment to attach to it
         Event::assertNotDispatched(PaymentCreatedOnEnrollment::class);
+    }
+
+    public function test_submission_and_review_create_one_enrollment_workflow_instance(): void
+    {
+        $admin = $this->makeAdminUser('usr_enr_003', 'enr.admin003@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $applicationId = DB::table('preschool_enrollment_applications')->insertGetId([
+            'application_code' => 'ENR-TEST-0003',
+            'first_name' => 'Rina',
+            'last_name' => 'Ly',
+            'gender' => 'female',
+            'date_of_birth' => '2021-05-10',
+            'guardian_name' => 'Ly Dara',
+            'guardian_phone' => '+855 12 333 555',
+            'guardian_address' => 'Phnom Penh',
+            'status' => 'draft',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson("/api/preschool/enrollments/{$applicationId}/submit")
+            ->assertOk()
+            ->assertJsonPath('data.application.status', 'submitted');
+
+        $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+        $workflow = PreschoolWorkflowInstance::query()->firstOrFail();
+        $this->assertSame('preschool_enrollment_application', $workflow->source_type);
+        $this->assertSame((string) $applicationId, $workflow->source_id);
+        $this->assertSame('enrollment_admission', $workflow->definition?->key);
+        $this->assertSame(2, PreschoolWorkflowEvent::query()->count());
+
+        $this->postJson("/api/preschool/enrollments/{$applicationId}/review")
+            ->assertOk()
+            ->assertJsonPath('data.application.status', 'under_review');
+
+        $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+        $this->assertSame(2, PreschoolWorkflowEvent::query()->count());
+    }
+
+    public function test_enrollment_submission_succeeds_when_workflow_tracking_side_effect_fails(): void
+    {
+        $this->mock(PreschoolWorkflowSourceLinkService::class, function ($mock): void {
+            $mock->shouldReceive('resolveSource')->andThrow(new \RuntimeException('tracking failure'));
+        });
+
+        $admin = $this->makeAdminUser('usr_enr_004', 'enr.admin004@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $applicationId = DB::table('preschool_enrollment_applications')->insertGetId([
+            'application_code' => 'ENR-TEST-0004',
+            'first_name' => 'Sophy',
+            'last_name' => 'Nim',
+            'gender' => 'female',
+            'date_of_birth' => '2021-08-02',
+            'guardian_name' => 'Nim Sokha',
+            'guardian_phone' => '+855 12 333 666',
+            'guardian_address' => 'Kandal',
+            'status' => 'draft',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson("/api/preschool/enrollments/{$applicationId}/submit")
+            ->assertOk()
+            ->assertJsonPath('data.application.status', 'submitted');
+
+        $this->assertDatabaseHas('preschool_enrollment_applications', [
+            'id' => $applicationId,
+            'status' => 'submitted',
+        ]);
+        $this->assertSame(0, PreschoolWorkflowInstance::query()->count());
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

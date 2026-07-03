@@ -13,6 +13,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class PreschoolWorkflowService
@@ -139,33 +140,113 @@ class PreschoolWorkflowService
                 return $this->refreshInstance($existing, $data, $actor, false);
             }
 
-            $firstStep = $this->resolveStartingStep($definition, $data);
-            $status = $this->normalizeStatus($data['status'] ?? null) ?? ($firstStep?->step_type === 'approval' ? 'pending_approval' : 'open');
-            $dueAt = $this->normalizeDateTime($data['due_at'] ?? null) ?? $this->calculateDueAt($firstStep);
-
-            $instance = PreschoolWorkflowInstance::query()->create([
-                'workflow_definition_id' => $definition->id,
-                'source_type' => $sourceType,
-                'source_id' => $sourceId,
-                'source_label' => $this->nullableString($data['source_label'] ?? null),
-                'current_step_id' => $firstStep?->id,
-                'status' => $status,
-                'priority' => $this->normalizePriority($data['priority'] ?? null),
-                'assigned_to_user_id' => $this->nullableString($data['assigned_to_user_id'] ?? null),
-                'assigned_role' => $this->nullableString($data['assigned_role'] ?? null),
-                'due_at' => $dueAt,
-                'started_at' => now(),
-                'metadata' => $this->normalizeArray($data['metadata'] ?? null),
-            ]);
-
-            $this->recordEvent($instance, 'workflow_instance_created', 'Workflow instance created.', $actor, null, $status, null, $firstStep?->id, [
-                'definitionKey' => $definition->key,
-                'sourceType' => $sourceType,
-                'sourceId' => $sourceId,
-            ]);
-
-            return $instance->fresh(['definition.steps', 'currentStep', 'assignee', 'approvals', 'events']);
+            return $this->persistNewInstance($definition, $data, $actor);
         });
+    }
+
+    public function startForSource(string $definitionKey, string $sourceType, mixed $sourceId, array $payload = [], ?User $actor = null): ?PreschoolWorkflowInstance
+    {
+        try {
+            return DB::transaction(function () use ($definitionKey, $sourceType, $sourceId, $payload, $actor): ?PreschoolWorkflowInstance {
+                $definition = $this->definitionService->findByKey(trim($definitionKey));
+                if (! $definition) {
+                    throw ValidationException::withMessages([
+                        'workflow_definition_key' => ['Workflow definition was not found.'],
+                    ]);
+                }
+
+                $resolvedSource = $this->sourceLinkService->resolveSource(
+                    $sourceType,
+                    $sourceId,
+                    Arr::get($payload, 'source_label'),
+                );
+
+                $resolvedSourceId = $resolvedSource['sourceId'] ?? $this->nullableString($sourceId);
+                if ($resolvedSourceId === null) {
+                    throw ValidationException::withMessages([
+                        'source_id' => ['Workflow source id is required.'],
+                    ]);
+                }
+
+                $existing = $this->findExistingInstance($definition, $resolvedSource['sourceType'], $resolvedSourceId);
+                if ($existing) {
+                    return $existing->fresh(['definition.steps', 'currentStep', 'assignee', 'approvals', 'events']);
+                }
+
+                $trackingPayload = array_merge($payload, [
+                    'workflow_definition_id' => $definition->id,
+                    'source_type' => $resolvedSource['sourceType'],
+                    'source_id' => $resolvedSourceId,
+                    'source_label' => $resolvedSource['sourceLabel'] ?? null,
+                ]);
+
+                return $this->persistNewInstance($definition, $trackingPayload, $actor, $resolvedSource);
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Preschool workflow tracking could not be started from source.', [
+                'workflowDefinitionKey' => $definitionKey,
+                'sourceType' => $sourceType,
+                'sourceId' => is_scalar($sourceId) ? (string) $sourceId : gettype($sourceId),
+                'exception' => $e::class,
+            ]);
+            report($e);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|null  $resolvedSource
+     */
+    private function persistNewInstance(PreschoolWorkflowDefinition $definition, array $data, ?User $actor, ?array $resolvedSource = null): PreschoolWorkflowInstance
+    {
+        $firstStep = $this->resolveStartingStep($definition, $data);
+        $status = $this->normalizeStatus($data['status'] ?? null) ?? ($firstStep?->step_type === 'approval' ? 'pending_approval' : 'open');
+        $dueAt = $this->normalizeDateTime($data['due_at'] ?? null) ?? $this->calculateDueAt($firstStep);
+        $sourceType = $this->nullableString($data['source_type'] ?? null);
+        $sourceId = $this->nullableString($data['source_id'] ?? null);
+        $sourceLabel = $this->nullableString($data['source_label'] ?? null);
+
+        $instance = PreschoolWorkflowInstance::query()->create([
+            'workflow_definition_id' => $definition->id,
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'source_label' => $sourceLabel,
+            'current_step_id' => $firstStep?->id,
+            'status' => $status,
+            'priority' => $this->normalizePriority($data['priority'] ?? null),
+            'assigned_to_user_id' => $this->nullableString($data['assigned_to_user_id'] ?? null),
+            'assigned_role' => $this->nullableString($data['assigned_role'] ?? null),
+            'due_at' => $dueAt,
+            'started_at' => now(),
+            'metadata' => $this->normalizeArray($data['metadata'] ?? null),
+        ]);
+
+        $eventMetadata = [
+            'definitionKey' => $definition->key,
+            'priority' => $instance->priority,
+            'sourceType' => $sourceType,
+            'sourceId' => $sourceId,
+            'sourceLabel' => $sourceLabel,
+        ];
+
+        if ($resolvedSource !== null) {
+            $eventMetadata['sourceExists'] = (bool) ($resolvedSource['sourceExists'] ?? false);
+        }
+
+        $this->recordEvent($instance, 'workflow_created', 'Workflow instance created.', $actor, null, $status, null, $firstStep?->id, $eventMetadata);
+
+        if ($resolvedSource !== null) {
+            $this->recordEvent($instance, 'source_linked', 'Workflow source linked.', $actor, null, $status, null, $firstStep?->id, [
+                'sourceType' => $resolvedSource['sourceType'] ?? $sourceType,
+                'sourceId' => $resolvedSource['sourceId'] ?? $sourceId,
+                'sourceLabel' => $resolvedSource['sourceLabel'] ?? $sourceLabel,
+                'sourceExists' => $resolvedSource['sourceExists'] ?? false,
+            ]);
+        }
+
+        return $instance->fresh(['definition.steps', 'currentStep', 'assignee', 'approvals', 'events']);
     }
 
     public function assign(PreschoolWorkflowInstance $instance, array $data, ?User $actor = null): PreschoolWorkflowInstance

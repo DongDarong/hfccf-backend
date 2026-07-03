@@ -13,7 +13,9 @@ use App\Models\PreschoolGuardian;
 use App\Models\PreschoolPayment;
 use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentGuardian;
+use App\Models\PreschoolWorkflowInstance;
 use App\Models\User;
+use App\Services\PreschoolWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -40,6 +42,7 @@ class PreschoolEnrollmentService
      * @var PreschoolAcademicLifecycleService
      */
     private PreschoolAcademicLifecycleService $lifecycleService;
+    private PreschoolWorkflowService $workflowService;
 
     /**
      * The PreschoolPayment created during the most recent enrollAsStudent() call.
@@ -54,9 +57,10 @@ class PreschoolEnrollmentService
     /**
      * @param PreschoolAcademicLifecycleService $lifecycleService
      */
-    public function __construct(PreschoolAcademicLifecycleService $lifecycleService)
+    public function __construct(PreschoolAcademicLifecycleService $lifecycleService, PreschoolWorkflowService $workflowService)
     {
         $this->lifecycleService = $lifecycleService;
+        $this->workflowService = $workflowService;
     }
 
     /**
@@ -151,6 +155,19 @@ class PreschoolEnrollmentService
         }
 
         return null;
+    }
+
+    public function startEnrollmentWorkflow(PreschoolEnrollmentApplication $application, ?User $actor, string $definitionKey = 'enrollment_admission'): ?PreschoolWorkflowInstance
+    {
+        return $this->workflowService->startForSource($definitionKey, 'preschool_enrollment_application', (string) $application->getKey(), [
+            'source_label' => $application->application_code,
+            'priority' => 'normal',
+            'metadata' => [
+                'applicationStatus' => $application->status,
+                'applicationDate' => $application->application_date?->toDateString(),
+                'guardianName' => $application->guardian_name,
+            ],
+        ], $actor);
     }
 
     /**

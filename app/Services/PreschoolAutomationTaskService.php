@@ -13,6 +13,7 @@ class PreschoolAutomationTaskService
 {
     public function __construct(
         private readonly PreschoolWorkflowSourceLinkService $sourceLinkService,
+        private readonly PreschoolWorkflowService $workflowService,
     ) {
     }
 
@@ -168,6 +169,8 @@ class PreschoolAutomationTaskService
             $task->save();
         }
 
+        $this->startWorkflowTracking($task);
+
         return [
             'task' => $task->fresh(['creator', 'assignedToUser', 'student', 'preschoolClass']),
             'created' => $created,
@@ -298,6 +301,39 @@ class PreschoolAutomationTaskService
             'action_params' => is_array($value) ? $value : null,
             'due_at', 'completed_at', 'cancelled_at' => $value ?: null,
             default => $value,
+        };
+    }
+
+    private function startWorkflowTracking(PreschoolAutomationTask $task): void
+    {
+        $definitionKey = $this->workflowDefinitionKeyForTask($task);
+
+        if ($definitionKey === null || blank($task->source_type) || blank($task->source_id)) {
+            return;
+        }
+
+        $this->workflowService->startForSource($definitionKey, 'preschool_automation_task', (string) $task->getKey(), [
+            'source_label' => $task->title,
+            'priority' => $task->priority,
+            'assigned_to_user_id' => $task->assigned_to_user_id,
+            'assigned_role' => $task->assigned_role,
+            'due_at' => $task->due_at?->toISOString(),
+            'metadata' => [
+                'taskType' => $task->task_type,
+                'taskStatus' => $task->status,
+                'sourceType' => $task->source_type,
+                'sourceId' => $task->source_id,
+            ],
+        ], $task->creator);
+    }
+
+    private function workflowDefinitionKeyForTask(PreschoolAutomationTask $task): ?string
+    {
+        return match ($task->task_type) {
+            'attendance.follow_up' => 'attendance_follow_up',
+            'health.follow_up' => 'health_alert_resolution',
+            'payments.follow_up' => 'invoice_collection',
+            default => null,
         };
     }
 

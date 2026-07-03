@@ -8,6 +8,7 @@ use App\Models\PreschoolGuardian;
 use App\Models\PreschoolGuardianCommunication;
 use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentGuardian;
+use App\Models\PreschoolWorkflowEvent;
 use App\Models\PreschoolWorkflowDefinition;
 use App\Models\PreschoolWorkflowInstance;
 use App\Models\Role;
@@ -53,6 +54,19 @@ class PreschoolAutomationTest extends TestCase
 
         $this->assertSame(1, PreschoolAutomationTask::query()->count());
         $this->assertSame(1, DB::table('preschool_notifications')->where('notification_type', 'attendance.follow_up')->count());
+        $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+        $workflow = PreschoolWorkflowInstance::query()->firstOrFail();
+        $this->assertSame('preschool_automation_task', $workflow->source_type);
+        $this->assertSame((string) PreschoolAutomationTask::query()->firstOrFail()->id, $workflow->source_id);
+        $this->assertSame('attendance_follow_up', $workflow->definition?->key);
+        $this->assertSame(2, PreschoolWorkflowEvent::query()->count());
+
+        $this->getJson('/api/preschool/workflows/summary')
+            ->assertOk()
+            ->assertJsonPath('data.total', 1)
+            ->assertJsonPath('data.pendingWorkflows', 1)
+            ->assertJsonPath('data.open', 1)
+            ->assertJsonPath('data.byDefinition.0.workflowDefinitionKey', 'attendance_follow_up');
 
         $secondRun = $this->postJson('/api/preschool/automation/run-daily-checks');
 
@@ -63,6 +77,8 @@ class PreschoolAutomationTest extends TestCase
 
         $this->assertSame(1, PreschoolAutomationTask::query()->count());
         $this->assertSame(1, DB::table('preschool_notifications')->where('notification_type', 'attendance.follow_up')->count());
+        $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+        $this->assertSame(2, PreschoolWorkflowEvent::query()->count());
 
         $teacherView = $this->actingAs($teacher, 'sanctum')->getJson('/api/preschool/automation-tasks');
         $teacherView

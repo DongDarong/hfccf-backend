@@ -24,6 +24,7 @@ class PreschoolHealthAlertService
         private readonly PreschoolHealthAuditService $auditService,
         private readonly NotificationService $notificationService,
         private readonly PreschoolGuardianCommunicationService $communicationService,
+        private readonly PreschoolWorkflowService $workflowService,
     ) {
     }
 
@@ -414,6 +415,8 @@ class PreschoolHealthAlertService
             $wasNew ? $createdMessage : $updatedMessage,
         );
 
+        $this->startWorkflowTracking($alert, $actor);
+
         if (in_array($severity, ['high', 'critical'], true) && $alert->status === 'new') {
             $this->notify($alert, $actor, $wasNew ? 'created' : 'updated', $title, $description, [
                 'severity' => $severity,
@@ -426,6 +429,32 @@ class PreschoolHealthAlertService
         $this->communicationService->syncHealthAlert($alert, $actor);
 
         return $alert->fresh(['student', 'assignedTo', 'acknowledgedBy', 'resolvedBy', 'closedBy']);
+    }
+
+    private function startWorkflowTracking(PreschoolHealthAlert $alert, ?User $actor): void
+    {
+        if (blank($alert->source_type) || blank($alert->source_id)) {
+            return;
+        }
+
+        $priority = match ($alert->severity) {
+            'critical' => 'urgent',
+            'high' => 'high',
+            default => 'normal',
+        };
+
+        $this->workflowService->startForSource('health_alert_resolution', 'preschool_health_alert', (string) $alert->getKey(), [
+            'source_label' => $alert->title,
+            'priority' => $priority,
+            'assigned_to_user_id' => $alert->assigned_to_user_id,
+            'metadata' => [
+                'alertType' => $alert->alert_type,
+                'alertSeverity' => $alert->severity,
+                'alertStatus' => $alert->status,
+                'sourceType' => $alert->source_type,
+                'sourceId' => $alert->source_id,
+            ],
+        ], $actor);
     }
 
     private function auditAction(PreschoolHealthAlert $alert, ?User $actor, string $action, ?array $before, array $after, string $visibility, string $message): void
@@ -638,4 +667,3 @@ class PreschoolHealthAlertService
         }
     }
 }
-

@@ -255,6 +255,7 @@ class PreschoolEnrollmentController extends Controller
 
         $this->enrollment->logDecision($application, 'submitted', $prev, 'submitted', $request->user());
         $this->writeAuditLog('preschool_enrollment.submitted', $application, $request->user());
+        $this->enrollment->startEnrollmentWorkflow($application, $request->user());
 
         return $this->applicationResponse($request, $application, 'Application submitted for review.');
     }
@@ -283,6 +284,7 @@ class PreschoolEnrollmentController extends Controller
 
         $this->enrollment->logDecision($application, 'review_started', $prev, 'under_review', $request->user());
         $this->writeAuditLog('preschool_enrollment.review_started', $application, $request->user());
+        $this->enrollment->startEnrollmentWorkflow($application, $request->user());
 
         return $this->applicationResponse($request, $application, 'Application is now under review.');
     }
