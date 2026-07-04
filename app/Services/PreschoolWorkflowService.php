@@ -195,6 +195,24 @@ class PreschoolWorkflowService
         }
     }
 
+    public function findExistingForSource(string $definitionKey, string $sourceType, mixed $sourceId): ?PreschoolWorkflowInstance
+    {
+        $definition = $this->definitionService->findByKey(trim($definitionKey));
+
+        if (! $definition) {
+            return null;
+        }
+
+        $resolvedSource = $this->sourceLinkService->resolveSource($sourceType, $sourceId);
+        $resolvedSourceId = $resolvedSource['sourceId'] ?? $this->nullableString($sourceId);
+
+        if ($resolvedSourceId === null) {
+            return null;
+        }
+
+        return $this->findExistingInstance($definition, $resolvedSource['sourceType'], $resolvedSourceId);
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>|null  $resolvedSource

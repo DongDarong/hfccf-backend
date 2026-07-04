@@ -3,10 +3,13 @@
 use App\Http\Controllers\Api\Preschool\PreschoolWorkflowApprovalController;
 use App\Http\Controllers\Api\Preschool\PreschoolWorkflowController;
 use App\Http\Controllers\Api\Preschool\PreschoolWorkflowDefinitionController;
+use App\Http\Controllers\Api\Preschool\PreschoolWorkflowSyncController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('workflows')->group(function (): void {
     Route::get('definitions', [PreschoolWorkflowDefinitionController::class, 'index']);
+    Route::get('sync/preview', [PreschoolWorkflowSyncController::class, 'preview']);
+    Route::post('sync/run', [PreschoolWorkflowSyncController::class, 'run']);
     Route::get('', [PreschoolWorkflowController::class, 'index']);
     Route::get('summary', [PreschoolWorkflowController::class, 'summary']);
     Route::get('approvals', [PreschoolWorkflowApprovalController::class, 'index']);
