@@ -8,6 +8,7 @@ use App\Models\PreschoolInvoice;
 use App\Models\PreschoolStudent;
 use App\Models\PreschoolWorkflowDefinition;
 use App\Models\PreschoolWorkflowInstance;
+use App\Models\PreschoolWorkflowSyncRun;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\PreschoolWorkflowService;
@@ -45,6 +46,7 @@ class PreschoolWorkflowSyncTest extends TestCase
             ->assertJsonPath('data.summary.failed', 0)
             ->assertJsonPath('data.items.0.status', 'created');
 
+        $this->assertSame(0, PreschoolWorkflowSyncRun::query()->count());
         $this->assertSame(0, PreschoolWorkflowInstance::query()->count());
         $this->assertSame('submitted', $application->fresh()->status);
     }
@@ -70,9 +72,18 @@ class PreschoolWorkflowSyncTest extends TestCase
             ->assertJsonPath('data.summary.created', 2)
             ->assertJsonPath('data.summary.existing', 0)
             ->assertJsonPath('data.summary.skipped', 0)
-            ->assertJsonPath('data.summary.failed', 0);
+            ->assertJsonPath('data.summary.failed', 0)
+            ->assertJsonPath('data.run.mode', 'run')
+            ->assertJsonPath('data.run.status', 'completed')
+            ->assertJsonPath('data.run.processedCount', 2)
+            ->assertJsonPath('data.run.startedByUserId', $admin->id);
+
+        $this->assertNotEmpty($firstRun->json('data.run.startedAt'));
+        $this->assertNotEmpty($firstRun->json('data.run.completedAt'));
 
         $this->assertSame(2, PreschoolWorkflowInstance::query()->count());
+        $this->assertSame(1, PreschoolWorkflowSyncRun::query()->count());
+        $this->assertSame(2, PreschoolWorkflowSyncRun::query()->firstOrFail()->items()->count());
 
         $secondRun = $this->postJson('/api/preschool/workflows/sync/run', $payload);
         $secondRun->assertOk()
@@ -80,9 +91,12 @@ class PreschoolWorkflowSyncTest extends TestCase
             ->assertJsonPath('data.summary.created', 0)
             ->assertJsonPath('data.summary.existing', 2)
             ->assertJsonPath('data.summary.skipped', 0)
-            ->assertJsonPath('data.summary.failed', 0);
+            ->assertJsonPath('data.summary.failed', 0)
+            ->assertJsonPath('data.run.status', 'completed')
+            ->assertJsonPath('data.run.startedByUserId', $admin->id);
 
         $this->assertSame(2, PreschoolWorkflowInstance::query()->count());
+        $this->assertSame(2, PreschoolWorkflowSyncRun::query()->count());
         $this->assertSame('submitted', $first->fresh()->status);
         $this->assertSame('submitted', $second->fresh()->status);
     }
@@ -108,6 +122,27 @@ class PreschoolWorkflowSyncTest extends TestCase
             ->assertJsonPath('data.summary.created', 1);
 
         $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+    }
+
+    public function test_run_enforces_maximum_batch_size(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'sync-admin-003b', 'sync.admin.003b@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $this->createEnrollmentApplication('ENR-SYNC-004B', 'submitted');
+        $this->createEnrollmentApplication('ENR-SYNC-005B', 'submitted');
+
+        $response = $this->postJson('/api/preschool/workflows/sync/run', [
+            'definition_key' => 'enrollment_admission',
+            'source_type' => 'preschool_enrollment_application',
+            'status' => 'submitted',
+            'limit' => 2,
+            'batch_size' => 500,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.run.batchSize', 100)
+            ->assertJsonPath('data.run.processedCount', 2);
     }
 
     public function test_run_creates_workflow_instances_for_eligible_health_alerts(): void
@@ -137,9 +172,12 @@ class PreschoolWorkflowSyncTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.summary.eligible', 1)
             ->assertJsonPath('data.summary.created', 1)
-            ->assertJsonPath('data.items.0.sourceId', (string) $alert->id);
+            ->assertJsonPath('data.items.0.sourceId', (string) $alert->id)
+            ->assertJsonPath('data.run.status', 'completed')
+            ->assertJsonPath('data.run.startedByUserId', $admin->id);
 
         $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+        $this->assertSame(1, PreschoolWorkflowSyncRun::query()->count());
         $this->assertSame('new', $alert->fresh()->status);
     }
 
@@ -203,14 +241,26 @@ class PreschoolWorkflowSyncTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.summary.eligible', 1)
             ->assertJsonPath('data.summary.created', 1)
-            ->assertJsonPath('data.items.0.sourceId', (string) $invoice->id);
+            ->assertJsonPath('data.items.0.sourceId', (string) $invoice->id)
+            ->assertJsonPath('data.run.status', 'completed')
+            ->assertJsonPath('data.run.startedByUserId', $admin->id);
 
         $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+        $this->assertSame(1, PreschoolWorkflowSyncRun::query()->count());
         $this->assertSame('cancelled', $invoice->fresh()->status);
     }
 
     public function test_teacher_cannot_access_sync_endpoints(): void
     {
+        $admin = $this->makeUserWithRole('adminpreschool', 'sync-admin-teacher-gate', 'sync.admin.teacher.gate@hfccf.org');
+        $run = PreschoolWorkflowSyncRun::query()->create([
+            'mode' => 'run',
+            'status' => 'completed',
+            'started_by_user_id' => $admin->id,
+            'started_at' => now(),
+            'completed_at' => now(),
+        ]);
+
         $teacher = $this->makeUserWithRole('teacher-preschool', 'sync-teacher-001', 'sync.teacher.001@hfccf.org');
         Sanctum::actingAs($teacher);
 
@@ -218,6 +268,15 @@ class PreschoolWorkflowSyncTest extends TestCase
             ->assertForbidden();
 
         $this->postJson('/api/preschool/workflows/sync/run', [])
+            ->assertForbidden();
+
+        $this->getJson('/api/preschool/workflows/sync/runs')
+            ->assertForbidden();
+
+        $this->getJson("/api/preschool/workflows/sync/runs/{$run->id}")
+            ->assertForbidden();
+
+        $this->getJson("/api/preschool/workflows/sync/runs/{$run->id}/items")
             ->assertForbidden();
     }
 
@@ -273,9 +332,112 @@ class PreschoolWorkflowSyncTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.summary.eligible', 1)
             ->assertJsonPath('data.summary.failed', 1)
-            ->assertJsonPath('data.items.0.status', 'failed');
+            ->assertJsonPath('data.items.0.status', 'failed')
+            ->assertJsonPath('data.run.status', 'failed');
 
         $this->assertSame(0, PreschoolWorkflowInstance::query()->count());
+        $this->assertSame(1, PreschoolWorkflowSyncRun::query()->count());
+    }
+
+    public function test_run_records_completed_with_errors_and_keeps_successful_items(): void
+    {
+        $this->mock(PreschoolWorkflowService::class, function ($mock): void {
+            $mock->shouldReceive('findExistingForSource')->andReturnNull();
+            $mock->shouldReceive('startForSource')->andReturnUsing(function (
+                string $definitionKey,
+                string $sourceType,
+                mixed $sourceId,
+                array $options,
+                User $actor,
+            ): PreschoolWorkflowInstance {
+                static $call = 0;
+                $call++;
+
+                if ($call === 2) {
+                    throw new \RuntimeException('Intentional sync failure.');
+                }
+
+                $definition = PreschoolWorkflowDefinition::query()->where('key', $definitionKey)->firstOrFail();
+
+                return PreschoolWorkflowInstance::query()->create([
+                    'workflow_definition_id' => $definition->id,
+                    'source_type' => $sourceType,
+                    'source_id' => (string) $sourceId,
+                    'source_label' => $options['source_label'] ?? (string) $sourceId,
+                    'status' => 'open',
+                    'priority' => 'normal',
+                    'started_at' => now(),
+                    'metadata' => $options['metadata'] ?? [],
+                ]);
+            });
+        });
+
+        $admin = $this->makeUserWithRole('adminpreschool', 'sync-admin-009', 'sync.admin.009@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $first = $this->createEnrollmentApplication('ENR-SYNC-009', 'submitted');
+        $second = $this->createEnrollmentApplication('ENR-SYNC-010', 'submitted');
+
+        $response = $this->postJson('/api/preschool/workflows/sync/run', [
+            'definition_key' => 'enrollment_admission',
+            'source_type' => 'preschool_enrollment_application',
+            'status' => 'submitted',
+            'limit' => 2,
+            'batch_size' => 1,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.summary.eligible', 2)
+            ->assertJsonPath('data.summary.created', 1)
+            ->assertJsonPath('data.summary.failed', 1)
+            ->assertJsonPath('data.run.status', 'completed_with_errors')
+            ->assertJsonPath('data.run.batchSize', 1)
+            ->assertJsonPath('data.run.processedCount', 2)
+            ->assertJsonPath('data.run.startedByUserId', $admin->id);
+
+        $run = PreschoolWorkflowSyncRun::query()->firstOrFail();
+        $this->assertSame(2, $run->eligible_count);
+        $this->assertSame(2, $run->processed_count);
+        $this->assertSame(1, $run->created_count);
+        $this->assertSame(1, $run->failed_count);
+        $this->assertSame(1, $run->items()->where('result_status', 'created')->count());
+        $this->assertSame(1, $run->items()->where('result_status', 'failed')->count());
+        $this->assertSame('submitted', $first->fresh()->status);
+        $this->assertSame('submitted', $second->fresh()->status);
+        $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+    }
+
+    public function test_history_endpoints_return_runs_and_items(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'sync-admin-010', 'sync.admin.010@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $this->createEnrollmentApplication('ENR-SYNC-011', 'submitted');
+        $this->postJson('/api/preschool/workflows/sync/run', [
+            'definition_key' => 'enrollment_admission',
+            'source_type' => 'preschool_enrollment_application',
+            'status' => 'submitted',
+            'limit' => 10,
+            'batch_size' => 1,
+        ])->assertOk();
+
+        $history = $this->getJson('/api/preschool/workflows/sync/runs?mode=run&status=completed&definition_key=enrollment_admission&source_type=preschool_enrollment_application');
+        $history->assertOk()
+            ->assertJsonPath('data.items.0.definitionKey', 'enrollment_admission')
+            ->assertJsonPath('data.items.0.mode', 'run')
+            ->assertJsonPath('data.pagination.total', 1);
+
+        $runId = $history->json('data.items.0.id');
+        $show = $this->getJson("/api/preschool/workflows/sync/runs/{$runId}");
+        $show->assertOk()
+            ->assertJsonPath('data.id', $runId)
+            ->assertJsonPath('data.status', 'completed')
+            ->assertJsonPath('data.startedByUserId', $admin->id);
+
+        $items = $this->getJson("/api/preschool/workflows/sync/runs/{$runId}/items?result_status=created");
+        $items->assertOk()
+            ->assertJsonPath('data.items.0.resultStatus', 'created')
+            ->assertJsonPath('data.pagination.total', 1);
     }
 
     private function createEnrollmentApplication(string $code, string $status): PreschoolEnrollmentApplication

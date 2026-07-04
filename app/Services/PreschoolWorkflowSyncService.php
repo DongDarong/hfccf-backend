@@ -40,12 +40,17 @@ class PreschoolWorkflowSyncService
         return $this->execute($filters, $actor, false);
     }
 
+    public function discoverCandidates(array $filters): Collection
+    {
+        return $this->collectCandidates($filters);
+    }
+
     public function syncSource(string $definitionKey, string $sourceType, mixed $sourceId, User $actor): array
     {
         $candidate = $this->buildSingleCandidate($definitionKey, $sourceType, $sourceId);
 
         if ($candidate === null) {
-            return $this->resultItem($definitionKey, $sourceType, $sourceId, null, 'skipped', 'Unsupported source type.', null, null, null);
+            return $this->resultItem($definitionKey, $sourceType, $sourceId, null, 'skipped', 'Unsupported source type.', null, null, null, null);
         }
 
         return $this->evaluateCandidate($candidate, $actor, false);
@@ -53,7 +58,7 @@ class PreschoolWorkflowSyncService
 
     private function execute(array $filters, User $actor, bool $dryRun): array
     {
-        $candidates = $this->collectCandidates($filters);
+        $candidates = $this->discoverCandidates($filters);
         $limit = $this->resolveLimit($filters);
         $selected = $candidates->take($limit);
 
@@ -76,6 +81,7 @@ class PreschoolWorkflowSyncService
         return [
             'dryRun' => $dryRun,
             'limit' => $limit,
+            'batchSize' => $this->resolveBatchSize($filters),
             'summary' => $summary,
             'items' => $items,
             'generatedAt' => now()->toISOString(),
@@ -97,6 +103,7 @@ class PreschoolWorkflowSyncService
                 null,
                 $candidate['sourceStatus'],
                 $candidate['sourceRouteName'] ?? null,
+                $candidate['sourceRouteParams'] ?? null,
             );
         }
 
@@ -112,6 +119,7 @@ class PreschoolWorkflowSyncService
                 null,
                 $candidate['sourceStatus'],
                 $candidate['sourceRouteName'] ?? null,
+                $candidate['sourceRouteParams'] ?? null,
             );
         }
 
@@ -127,6 +135,7 @@ class PreschoolWorkflowSyncService
                 $existing->id,
                 $candidate['sourceStatus'],
                 $candidate['sourceRouteName'] ?? null,
+                $candidate['sourceRouteParams'] ?? null,
             );
         }
 
@@ -141,6 +150,7 @@ class PreschoolWorkflowSyncService
                 null,
                 $candidate['sourceStatus'],
                 $candidate['sourceRouteName'] ?? null,
+                $candidate['sourceRouteParams'] ?? null,
             );
         }
 
@@ -179,6 +189,7 @@ class PreschoolWorkflowSyncService
                 null,
                 $candidate['sourceStatus'],
                 $candidate['sourceRouteName'] ?? null,
+                $candidate['sourceRouteParams'] ?? null,
             );
         }
 
@@ -193,6 +204,7 @@ class PreschoolWorkflowSyncService
                 null,
                 $candidate['sourceStatus'],
                 $candidate['sourceRouteName'] ?? null,
+                $candidate['sourceRouteParams'] ?? null,
             );
         }
 
@@ -206,6 +218,7 @@ class PreschoolWorkflowSyncService
             $workflow->id,
             $candidate['sourceStatus'],
             $candidate['sourceRouteName'] ?? null,
+            $candidate['sourceRouteParams'] ?? null,
         );
     }
 
@@ -264,12 +277,12 @@ class PreschoolWorkflowSyncService
 
         return $candidates
             ->values()
-            ->sortBy(function (array $candidate): array {
-                return [
+            ->sortBy(function (array $candidate): string {
+                return implode('|', [
                     $candidate['createdAt'] ?? '',
                     $candidate['sourceType'] ?? '',
                     $candidate['sourceId'] ?? '',
-                ];
+                ]);
             })
             ->values();
     }
@@ -497,6 +510,7 @@ class PreschoolWorkflowSyncService
         int|string|null $workflowInstanceId,
         ?string $sourceStatus,
         ?string $sourceRouteName,
+        ?array $sourceRouteParams,
     ): array {
         return [
             'definitionKey' => $definitionKey,
@@ -505,6 +519,7 @@ class PreschoolWorkflowSyncService
             'sourceLabel' => $sourceLabel,
             'sourceStatus' => $sourceStatus,
             'sourceRouteName' => $sourceRouteName,
+            'sourceRouteParams' => $sourceRouteParams ?? [],
             'status' => $status,
             'reason' => $reason,
             'workflowInstanceId' => $workflowInstanceId,
@@ -547,6 +562,11 @@ class PreschoolWorkflowSyncService
     private function resolveLimit(array $filters): int
     {
         return min(max((int) ($filters['limit'] ?? 50), 1), 500);
+    }
+
+    private function resolveBatchSize(array $filters): int
+    {
+        return min(max((int) ($filters['batch_size'] ?? 25), 1), 100);
     }
 
     private function normalizeFilterString(mixed $value): ?string
