@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             HfccfAuthSeeder::class,
             HfccfNotificationSeeder::class,
+            PreschoolWorkflowSeeder::class,
             DsamDevSeeder::class,
         ]);
     }

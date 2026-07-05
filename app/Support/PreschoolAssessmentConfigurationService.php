@@ -436,13 +436,17 @@ class PreschoolAssessmentConfigurationService
             }
         }
 
-        if ($termId !== null && $termId !== '') {
-            $term = PreschoolAcademicTerm::query()->find($termId);
-            if (! $term || (int) $term->academic_year_id !== (int) $academicYearId) {
-                throw ValidationException::withMessages([
-                    'term_id' => 'The selected term must belong to the selected academic year.',
-                ]);
-            }
+        if ($termId === null || $termId === '') {
+            throw ValidationException::withMessages([
+                'term_id' => 'The selected term is required.',
+            ]);
+        }
+
+        $term = PreschoolAcademicTerm::query()->find($termId);
+        if (! $term || (int) $term->academic_year_id !== (int) $academicYearId) {
+            throw ValidationException::withMessages([
+                'term_id' => 'The selected term must belong to the selected academic year.',
+            ]);
         }
     }
 

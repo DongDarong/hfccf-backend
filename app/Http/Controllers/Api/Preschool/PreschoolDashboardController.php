@@ -9,6 +9,7 @@ use App\Models\PreschoolPayment;
 use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentHealthIncident;
 use App\Models\User;
+use App\Support\PreschoolAttendanceAlertService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -44,6 +45,7 @@ class PreschoolDashboardController extends Controller
         $attendanceQuery = PreschoolAttendanceRecord::query();
         $paymentQuery = PreschoolPayment::query()->whereNull('deleted_at');
         $incidentQuery = PreschoolStudentHealthIncident::query()->whereNull('deleted_at');
+        $attendanceAlertService = app(PreschoolAttendanceAlertService::class);
 
         if ($isTeacher) {
             $classQuery->whereIn('id', $teacherClassIds);
@@ -65,7 +67,6 @@ class PreschoolDashboardController extends Controller
             'teachers' => User::query()
                 ->whereNull('deleted_at')
                 ->where('role_code', 'teacher-preschool')
-                ->where('department_code', 'education')
                 ->count(),
             'attendanceToday' => (clone $attendanceQuery)->whereDate('attendance_date', $today)->count(),
             'pendingPayments' => (clone $paymentQuery)->where('payment_status', 'pending')->count(),
@@ -121,6 +122,9 @@ class PreschoolDashboardController extends Controller
             'cancelled' => (clone $paymentQuery)->where('payment_status', 'cancelled')->count(),
         ];
 
+        $attendanceAlerts = $attendanceAlertService->summary($user);
+        $recentAttendanceAlerts = $attendanceAlertService->recentAlerts($user, [], 4);
+
         return response()->json([
             'success' => true,
             'message' => 'Preschool dashboard retrieved successfully.',
@@ -129,6 +133,8 @@ class PreschoolDashboardController extends Controller
                 'recentAttendance' => $recentAttendance,
                 'upcomingClasses' => $upcomingClasses,
                 'paymentSummary' => $paymentSummary,
+                'attendanceAlerts' => $attendanceAlerts,
+                'recentAttendanceAlerts' => $recentAttendanceAlerts,
             ],
         ], Response::HTTP_OK);
     }

@@ -2,8 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\PreschoolAttendanceRecord;
+use App\Models\PreschoolGuardian;
+use App\Models\PreschoolGuardianCommunication;
 use App\Models\Role;
+use App\Models\PreschoolStudentGuardian;
 use App\Models\User;
+use App\Support\PreschoolAttendanceConfigurationService;
+use App\Services\PreschoolGuardianCommunicationService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +35,7 @@ class PreschoolApiTest extends TestCase
         $teacher = $this->makeUserWithRole('teacher-preschool', 'usr_501', 'teacher.preschool500@hfccf.org');
 
         $create = $this->postJson('/api/preschool/classes', [
-            'code' => 'PS-CLASS-001',
+            'code' => 'PS-NUR-001',
             'name' => 'Morning Stars',
             'teacher_user_id' => $teacher->id,
             'teacher_display_name' => trim($teacher->first_name.' '.$teacher->last_name),
@@ -44,14 +50,14 @@ class PreschoolApiTest extends TestCase
         $create
             ->assertCreated()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.class.code', 'PS-CLASS-001')
+            ->assertJsonPath('data.class.code', 'PS-NUR-001')
             ->assertJsonPath('data.class.teacherUserId', $teacher->id);
 
         $classId = $create->json('data.class.id');
 
         $this->assertDatabaseHas('preschool_classes', [
             'id' => $classId,
-            'code' => 'PS-CLASS-001',
+            'code' => 'PS-NUR-001',
             'teacher_user_id' => $teacher->id,
         ]);
 
@@ -248,6 +254,37 @@ class PreschoolApiTest extends TestCase
         ]);
     }
 
+    public function test_preschool_teacher_listing_includes_role_assigned_teachers_even_if_department_drifted(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_526', 'preschool.admin526@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $teacher = User::query()->create([
+            'id' => 'usr_5261',
+            'first_name' => 'Vannak',
+            'last_name' => 'Lim',
+            'username' => 'Vannak Lim Drifted',
+            'email' => 'teacher.preschool526@hfccf.org',
+            'phone' => '+855 12 526 526',
+            'role_code' => 'teacher-preschool',
+            'department_code' => 'sports',
+            'status' => 'active',
+            'password' => 'secret-pass',
+        ]);
+
+        $this->syncPermissions($teacher, Role::query()->findOrFail('teacher-preschool'));
+
+        $response = $this->getJson('/api/preschool/teachers?page=1&per_page=10');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonFragment([
+                'email' => 'teacher.preschool526@hfccf.org',
+                'role' => 'teacher-preschool',
+            ]);
+    }
+
     public function test_adminpreschool_can_record_attendance(): void
     {
         $admin = $this->makeUserWithRole('adminpreschool', 'usr_530', 'preschool.admin530@hfccf.org');
@@ -283,6 +320,159 @@ class PreschoolApiTest extends TestCase
         $this->getJson('/api/preschool/attendance?page=1&per_page=10')
             ->assertOk()
             ->assertJsonPath('success', true);
+    }
+
+    public function test_consecutive_absences_create_repeated_absence_communication_and_reuse_it(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_531', 'preschool.admin531@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        app(PreschoolAttendanceConfigurationService::class)->updateSettings($this->attendanceSettingsPayload([
+            'absence_alert_days' => 3,
+        ]), $admin);
+
+        $class = $this->createPreschoolClass('PS-CLASS-531', 'Absence Alert Class');
+        $student = $this->createPreschoolStudent('PS-STU-531', 'Absence', 'Student');
+        $guardian = $this->createGuardian('Guardian Absence', '+855 12 531 531', 'guardian.absence531@hfccf.org');
+        $this->linkGuardianToStudent($student->id, $guardian->id, $admin->id);
+        $this->attachStudentToClass($class->id, $student->id);
+
+        foreach (['2026-05-11', '2026-05-12', '2026-05-13'] as $date) {
+            $this->postJson('/api/preschool/attendance', [
+                'class_id' => $class->id,
+                'student_id' => $student->id,
+                'attendance_date' => $date,
+                'status' => 'absent',
+                'note' => 'Absent for alert regression',
+            ])
+                ->assertCreated()
+                ->assertJsonPath('success', true);
+        }
+
+        $this->assertDatabaseCount('preschool_guardian_communications', 1);
+        $this->assertDatabaseHas('preschool_guardian_communications', [
+            'student_id' => $student->id,
+            'guardian_id' => $guardian->id,
+            'source_type' => 'attendance',
+            'communication_type' => 'repeated_absence',
+            'status' => 'queued',
+            'created_by' => $admin->id,
+        ]);
+
+        $this->postJson('/api/preschool/attendance', [
+            'class_id' => $class->id,
+            'student_id' => $student->id,
+            'attendance_date' => '2026-05-14',
+            'status' => 'absent',
+            'note' => 'Follow-up absence',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseCount('preschool_guardian_communications', 1);
+    }
+
+    public function test_threshold_setting_controls_when_repeated_absence_alert_triggers(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_532', 'preschool.admin532@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        app(PreschoolAttendanceConfigurationService::class)->updateSettings($this->attendanceSettingsPayload([
+            'absence_alert_days' => 2,
+        ]), $admin);
+
+        $class = $this->createPreschoolClass('PS-CLASS-532', 'Threshold Alert Class');
+        $student = $this->createPreschoolStudent('PS-STU-532', 'Threshold', 'Student');
+        $guardian = $this->createGuardian('Guardian Threshold', '+855 12 532 532', 'guardian.threshold532@hfccf.org');
+        $this->linkGuardianToStudent($student->id, $guardian->id, $admin->id);
+        $this->attachStudentToClass($class->id, $student->id);
+
+        foreach (['2026-05-11', '2026-05-12'] as $date) {
+            $this->postJson('/api/preschool/attendance', [
+                'class_id' => $class->id,
+                'student_id' => $student->id,
+                'attendance_date' => $date,
+                'status' => 'absent',
+                'note' => 'Threshold regression',
+            ])
+                ->assertCreated()
+                ->assertJsonPath('success', true);
+        }
+
+        $this->assertDatabaseCount('preschool_guardian_communications', 1);
+        $this->assertDatabaseHas('preschool_guardian_communications', [
+            'student_id' => $student->id,
+            'guardian_id' => $guardian->id,
+            'communication_type' => 'repeated_absence',
+            'created_by' => $admin->id,
+        ]);
+    }
+
+    public function test_threshold_three_does_not_trigger_after_two_absences(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_533', 'preschool.admin533@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        app(PreschoolAttendanceConfigurationService::class)->updateSettings($this->attendanceSettingsPayload([
+            'absence_alert_days' => 3,
+        ]), $admin);
+
+        $class = $this->createPreschoolClass('PS-CLASS-533', 'No Trigger Class');
+        $student = $this->createPreschoolStudent('PS-STU-533', 'No', 'Trigger');
+        $guardian = $this->createGuardian('Guardian No Trigger', '+855 12 533 533', 'guardian.notrigger533@hfccf.org');
+        $this->linkGuardianToStudent($student->id, $guardian->id, $admin->id);
+        $this->attachStudentToClass($class->id, $student->id);
+
+        foreach (['2026-05-11', '2026-05-12'] as $date) {
+            $this->postJson('/api/preschool/attendance', [
+                'class_id' => $class->id,
+                'student_id' => $student->id,
+                'attendance_date' => $date,
+                'status' => 'absent',
+                'note' => 'Below threshold',
+            ])
+                ->assertCreated()
+                ->assertJsonPath('success', true);
+        }
+
+        $this->assertDatabaseCount('preschool_guardian_communications', 0);
+    }
+
+    public function test_attendance_save_still_succeeds_when_follow_up_sync_fails(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_534', 'preschool.admin534@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $this->app->instance(PreschoolGuardianCommunicationService::class, new class
+        {
+            public function syncAttendanceFollowUp(...$arguments): void
+            {
+                throw new \RuntimeException('forced follow-up failure');
+            }
+        });
+
+        $class = $this->createPreschoolClass('PS-CLASS-534', 'Side Effect Safety Class');
+        $student = $this->createPreschoolStudent('PS-STU-534', 'Side', 'Effect');
+        $this->attachStudentToClass($class->id, $student->id);
+
+        $response = $this->postJson('/api/preschool/attendance', [
+            'class_id' => $class->id,
+            'student_id' => $student->id,
+            'attendance_date' => '2026-05-15',
+            'status' => 'present',
+            'note' => 'Follow-up failure should not break attendance save',
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('preschool_attendance_records', [
+            'class_id' => $class->id,
+            'student_id' => $student->id,
+            'attendance_date' => '2026-05-15 00:00:00',
+            'status' => 'present',
+        ]);
     }
 
     public function test_teacher_preschool_can_access_own_students_and_classes(): void
@@ -461,4 +651,51 @@ class PreschoolApiTest extends TestCase
             'updated_at' => now(),
         ]);
     }
+
+    private function createGuardian(string $name, string $phone, string $email): PreschoolGuardian
+    {
+        return PreschoolGuardian::query()->create([
+            'full_name' => $name,
+            'phone' => $phone,
+            'email' => $email,
+            'status' => 'active',
+        ]);
+    }
+
+    private function linkGuardianToStudent(int $studentId, int $guardianId, string $userId): PreschoolStudentGuardian
+    {
+        return PreschoolStudentGuardian::query()->create([
+            'student_id' => $studentId,
+            'guardian_id' => $guardianId,
+            'relationship_type' => 'guardian',
+            'is_primary' => true,
+            'can_pickup' => true,
+            'emergency_priority' => 1,
+            'status' => 'active',
+            'starts_at' => now()->toDateString(),
+            'notes' => null,
+            'created_by_user_id' => $userId,
+            'updated_by_user_id' => $userId,
+        ]);
+    }
+
+    private function attendanceSettingsPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'late_threshold_minutes' => 15,
+            'half_day_threshold_minutes' => 180,
+            'absence_alert_days' => 3,
+            'guardian_alert_enabled' => true,
+            'teacher_alert_enabled' => true,
+            'admin_alert_enabled' => true,
+            'monday_enabled' => true,
+            'tuesday_enabled' => true,
+            'wednesday_enabled' => true,
+            'thursday_enabled' => true,
+            'friday_enabled' => true,
+            'saturday_enabled' => false,
+            'sunday_enabled' => false,
+        ], $overrides);
+    }
 }
+

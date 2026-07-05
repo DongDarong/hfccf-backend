@@ -7,15 +7,19 @@ use App\Http\Requests\Preschool\StorePreschoolAttendanceRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolAttendanceRequest;
 use App\Http\Resources\Preschool\PreschoolAttendanceResource;
 use App\Models\PreschoolAttendanceRecord;
+use App\Models\PreschoolAttendanceSession;
 use App\Models\PreschoolClass;
 use App\Models\User;
-use App\Support\PreschoolAcademicLifecycleService;
-use App\Support\PreschoolLifecycleGuardService;
 use App\Services\PreschoolGuardianCommunicationService;
+use App\Support\PreschoolAcademicLifecycleService;
+use App\Support\PreschoolAttendanceSessionService;
+use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class PreschoolAttendanceController extends Controller
 {
@@ -29,7 +33,7 @@ class PreschoolAttendanceController extends Controller
         $this->applyAttendanceFilters($request, $query);
 
         $paginator = $query
-            ->with(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term'])
+            ->with(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term', 'attendanceSession.schedule'])
             ->orderByDesc('attendance_date')
             ->orderByDesc('id')
             ->paginate($this->perPage($request), ['*'], 'page', $this->page($request));
@@ -50,18 +54,40 @@ class PreschoolAttendanceController extends Controller
             return $response;
         }
 
-        if ($response = $this->assertTeacherCanAccessClass($request->user(), (int) $request->validated()['class_id'])) {
+        $data = $request->validated();
+        $session = $this->resolveAttendanceSession($data);
+
+        if ($session) {
+            if (in_array($session->status, ['locked', 'cancelled'], true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot edit locked or cancelled session.',
+                    'data' => null,
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $data['class_id'] = $session->preschool_class_id;
+            $data['attendance_date'] = $session->attendance_date?->toDateString();
+            $data['attendance_session_id'] = $session->id;
+        }
+
+        $guardPayload = [
+            'class_id' => (int) $data['class_id'],
+            'attendance_date' => $data['attendance_date'],
+        ];
+        if ($response = app(PreschoolLifecycleGuardService::class)->attendanceWriteLock($request->user(), $guardPayload)) {
             return $response;
         }
 
-        $data = $request->validated();
-        if ($response = app(PreschoolLifecycleGuardService::class)->attendanceWriteLock($request->user(), $data)) {
+        if ($response = $this->assertTeacherCanAccessClass($request->user(), (int) $data['class_id'])) {
             return $response;
         }
+
         $academicContext = app(PreschoolAcademicLifecycleService::class)->currentContext();
         $attendance = PreschoolAttendanceRecord::query()->create([
             'class_id' => $data['class_id'],
             'student_id' => $data['student_id'],
+            'attendance_session_id' => $data['attendance_session_id'] ?? null,
             'recorded_by_user_id' => $request->user()->id,
             'attendance_date' => $data['attendance_date'],
             'status' => $data['status'],
@@ -70,8 +96,19 @@ class PreschoolAttendanceController extends Controller
             'term_id' => $academicContext['term_id'] ?? null,
         ]);
 
-        $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term']);
-        app(PreschoolGuardianCommunicationService::class)->syncAttendanceFollowUp($attendance, $request->user());
+        $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term', 'attendanceSession.schedule']);
+        $this->syncAttendanceFollowUpSafely($attendance, $request->user(), 'store');
+
+        if ($session) {
+            $finalize = (bool) ($data['finalize'] ?? $data['complete'] ?? $data['submit'] ?? false);
+            $sessionService = app(PreschoolAttendanceSessionService::class);
+
+            if ($finalize) {
+                $sessionService->completeSession($request->user(), $session);
+            } elseif ($session->status === 'scheduled') {
+                $sessionService->openSession($request->user(), $session);
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -97,29 +134,180 @@ class PreschoolAttendanceController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
-        if ($response = $this->assertTeacherCanAccessClass($request->user(), (int) ($request->validated()['class_id'] ?? $attendance->class_id))) {
+        $data = $request->validated();
+        $session = $this->resolveAttendanceSession($data);
+
+        if ($session) {
+            if (in_array($session->status, ['locked', 'cancelled'], true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot edit locked or cancelled session.',
+                    'data' => null,
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $data['class_id'] = $session->preschool_class_id;
+            $data['attendance_date'] = $session->attendance_date?->toDateString();
+            $data['attendance_session_id'] = $session->id;
+        }
+
+        if ($response = $this->assertTeacherCanAccessClass($request->user(), (int) ($data['class_id'] ?? $attendance->class_id))) {
             return $response;
         }
 
-        $data = $request->validated();
-        if ($response = app(PreschoolLifecycleGuardService::class)->attendanceWriteLock($request->user(), $data, $attendance)) {
+        $guardPayload = [
+            'class_id' => (int) ($data['class_id'] ?? $attendance->class_id),
+            'attendance_date' => $data['attendance_date'] ?? $attendance->attendance_date?->toDateString(),
+        ];
+        if ($response = app(PreschoolLifecycleGuardService::class)->attendanceWriteLock($request->user(), $guardPayload, $attendance)) {
             return $response;
         }
-        foreach (['class_id', 'student_id', 'attendance_date', 'status', 'note'] as $field) {
+
+        foreach (['class_id', 'student_id', 'attendance_session_id', 'attendance_date', 'status', 'note'] as $field) {
             if (array_key_exists($field, $data)) {
                 $attendance->{$field} = $data[$field];
             }
         }
 
         $attendance->save();
-        $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term']);
-        app(PreschoolGuardianCommunicationService::class)->syncAttendanceFollowUp($attendance, $request->user());
+        $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term', 'attendanceSession.schedule']);
+        $this->syncAttendanceFollowUpSafely($attendance, $request->user(), 'update');
+
+        if ($session) {
+            $finalize = (bool) ($data['finalize'] ?? $data['complete'] ?? $data['submit'] ?? false);
+            $sessionService = app(PreschoolAttendanceSessionService::class);
+
+            if ($finalize) {
+                $sessionService->completeSession($request->user(), $session);
+            } elseif ($session->status === 'scheduled') {
+                $sessionService->openSession($request->user(), $session);
+            }
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Attendance updated successfully.',
             'data' => [
                 'attendance' => PreschoolAttendanceResource::make($attendance)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function summary(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        $query = PreschoolAttendanceRecord::query();
+        $this->applyAttendanceFilters($request, $query);
+
+        $records = $query->get();
+        $statusCounts = $records->groupBy('status')->map->count();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool attendance summary retrieved successfully.',
+            'data' => [
+                'summary' => [
+                    'totalRecords' => $records->count(),
+                    'present' => (int) ($statusCounts->get('present', 0)),
+                    'absent' => (int) ($statusCounts->get('absent', 0)),
+                    'late' => (int) ($statusCounts->get('late', 0)),
+                    'excused' => (int) ($statusCounts->get('excused', 0)),
+                    'uniqueStudents' => $records->pluck('student_id')->filter()->unique()->count(),
+                    'uniqueClasses' => $records->pluck('class_id')->filter()->unique()->count(),
+                    'linkedSessions' => $records->whereNotNull('attendance_session_id')->count(),
+                    'legacyUnlinkedRecords' => $records->whereNull('attendance_session_id')->count(),
+                    'statusCounts' => [
+                        'present' => (int) ($statusCounts->get('present', 0)),
+                        'absent' => (int) ($statusCounts->get('absent', 0)),
+                        'late' => (int) ($statusCounts->get('late', 0)),
+                        'excused' => (int) ($statusCounts->get('excused', 0)),
+                    ],
+                ],
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function missing(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        $query = PreschoolAttendanceRecord::query()
+            ->with(['student', 'preschoolClass', 'recordedBy', 'attendanceSession.schedule']);
+        $this->applyAttendanceFilters($request, $query);
+        $query->whereNull('attendance_session_id');
+
+        $paginator = $query
+            ->orderByDesc('attendance_date')
+            ->orderByDesc('id')
+            ->paginate($this->perPage($request), ['*'], 'page', $this->page($request));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool attendance records without sessions retrieved successfully.',
+            'data' => [
+                'items' => PreschoolAttendanceResource::collection($paginator->getCollection())->resolve($request),
+                'pagination' => $this->paginationShape($paginator),
+                'count' => $paginator->total(),
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function classSummary(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        $query = PreschoolAttendanceRecord::query()->with(['preschoolClass.teacher']);
+        $this->applyAttendanceFilters($request, $query);
+        $records = $query->get();
+
+        $items = $records
+            ->groupBy('class_id')
+            ->map(static function ($group, $classId): array {
+                $first = $group->first();
+                $statusCounts = $group->groupBy('status')->map->count();
+                $class = $first?->preschoolClass;
+
+                return [
+                    'classId' => (int) $classId,
+                    'classCode' => $class?->code,
+                    'className' => $class?->name,
+                    'teacherName' => trim(($class?->teacher?->first_name ?? '').' '.($class?->teacher?->last_name ?? '')),
+                    'totalRecords' => $group->count(),
+                    'present' => (int) ($statusCounts->get('present', 0)),
+                    'absent' => (int) ($statusCounts->get('absent', 0)),
+                    'late' => (int) ($statusCounts->get('late', 0)),
+                    'excused' => (int) ($statusCounts->get('excused', 0)),
+                    'linkedSessions' => $group->whereNotNull('attendance_session_id')->count(),
+                    'legacyUnlinkedRecords' => $group->whereNull('attendance_session_id')->count(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $summary = [
+            'totalRecords' => $records->count(),
+            'classes' => count($items),
+            'present' => $records->where('status', 'present')->count(),
+            'absent' => $records->where('status', 'absent')->count(),
+            'late' => $records->where('status', 'late')->count(),
+            'excused' => $records->where('status', 'excused')->count(),
+            'linkedSessions' => $records->whereNotNull('attendance_session_id')->count(),
+            'legacyUnlinkedRecords' => $records->whereNull('attendance_session_id')->count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool attendance class summary retrieved successfully.',
+            'data' => [
+                'summary' => $summary,
+                'items' => $items,
             ],
         ], Response::HTTP_OK);
     }
@@ -131,6 +319,7 @@ class PreschoolAttendanceController extends Controller
         $studentId = trim((string) $request->query('student_id', ''));
         $status = trim((string) $request->query('status', ''));
         $date = trim((string) $request->query('attendance_date', ''));
+        $sessionId = trim((string) $request->query('attendance_session_id', ''));
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -161,6 +350,18 @@ class PreschoolAttendanceController extends Controller
         if ($date !== '') {
             $query->whereDate('attendance_date', $date);
         }
+        if ($sessionId !== '') {
+            $query->where('attendance_session_id', $sessionId);
+        }
+    }
+
+    private function resolveAttendanceSession(array &$data): ?PreschoolAttendanceSession
+    {
+        if (! array_key_exists('attendance_session_id', $data) || $data['attendance_session_id'] === null || $data['attendance_session_id'] === '') {
+            return null;
+        }
+
+        return app(PreschoolAttendanceSessionService::class)->findSessionOrFail((int) $data['attendance_session_id']);
     }
 
     private function assertTeacherCanAccessClass(?User $user, int $classId): ?JsonResponse
@@ -232,5 +433,25 @@ class PreschoolAttendanceController extends Controller
             'total' => $paginator->total(),
             'totalPages' => $paginator->lastPage(),
         ];
+    }
+
+    private function syncAttendanceFollowUpSafely(PreschoolAttendanceRecord $attendance, User $actor, string $action): void
+    {
+        try {
+            app(PreschoolGuardianCommunicationService::class)->syncAttendanceFollowUp($attendance, $actor);
+        } catch (Throwable $throwable) {
+            report($throwable);
+
+            Log::error('Failed to sync preschool attendance follow-up.', [
+                'action' => $action,
+                'attendance_id' => $attendance->id,
+                'student_id' => $attendance->student_id,
+                'class_id' => $attendance->class_id,
+                'status' => $attendance->status,
+                'actor_user_id' => $actor->id,
+                'exception' => $throwable::class,
+                'message' => $throwable->getMessage(),
+            ]);
+        }
     }
 }

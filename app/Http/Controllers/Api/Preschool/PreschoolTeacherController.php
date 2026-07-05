@@ -313,7 +313,7 @@ class PreschoolTeacherController extends Controller
         $page = max((int) $request->query('page', 1), 1);
         $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
 
-        $query = PreschoolAttendanceRecord::query()->with(['student', 'preschoolClass', 'recordedBy']);
+        $query = PreschoolAttendanceRecord::query()->with(['student', 'preschoolClass', 'recordedBy', 'attendanceSession.schedule']);
 
         if ($user->role_code === 'teacher-preschool') {
             $teacherClassIds = PreschoolClass::query()
@@ -343,8 +343,7 @@ class PreschoolTeacherController extends Controller
         return User::query()
             ->with(['department', 'role', 'permissions' => fn ($query) => $query->orderBy('permissions.code')])
             ->whereNull('deleted_at')
-            ->where('role_code', 'teacher-preschool')
-            ->where('department_code', 'education');
+            ->where('role_code', 'teacher-preschool');
     }
 
     private function studentQueryForUser(User $user): Builder
@@ -465,3 +464,4 @@ class PreschoolTeacherController extends Controller
         ];
     }
 }
+

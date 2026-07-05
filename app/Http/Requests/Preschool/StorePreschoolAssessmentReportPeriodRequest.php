@@ -17,7 +17,7 @@ class StorePreschoolAssessmentReportPeriodRequest extends FormRequest
     {
         return [
             'academic_year_id' => ['required', 'integer', 'exists:preschool_academic_years,id'],
-            'term_id' => ['nullable', 'integer', 'exists:preschool_terms,id'],
+            'term_id' => ['required', 'integer', 'exists:preschool_terms,id'],
             'name' => ['required', 'string', 'max:191'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],

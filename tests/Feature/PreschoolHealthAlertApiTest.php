@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\PreschoolWorkflowDefinition;
+use App\Models\PreschoolWorkflowEvent;
+use App\Models\PreschoolWorkflowInstance;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -73,6 +76,12 @@ class PreschoolHealthAlertApiTest extends TestCase
             'severity' => 'critical',
             'status' => 'new',
         ]);
+
+        $this->assertSame(1, PreschoolWorkflowInstance::query()->count());
+        $workflow = PreschoolWorkflowInstance::query()->firstOrFail();
+        $this->assertSame('preschool_health_alert', $workflow->source_type);
+        $this->assertSame('health_alert_resolution', $workflow->definition?->key);
+        $this->assertSame(2, PreschoolWorkflowEvent::query()->count());
 
         $alerts = $this->getJson("/api/preschool/health/alerts?student_id={$student->id}")
             ->assertOk()

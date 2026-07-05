@@ -16,10 +16,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('student_id')->nullable()->constrained('preschool_students')->nullOnDelete();
             $table->foreignId('guardian_id')->nullable()->constrained('preschool_guardians')->nullOnDelete();
-            $table->string('source_type')->nullable();
-            $table->string('source_id')->nullable();
-            $table->string('communication_type');
-            $table->string('channel');
+            $table->string('source_type', 191)->nullable();
+            $table->string('source_id', 191)->nullable();
+            $table->string('communication_type', 191);
+            $table->string('channel', 191);
             $table->string('subject');
             $table->text('message');
             $table->string('severity')->default('medium');

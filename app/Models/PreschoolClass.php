@@ -42,6 +42,7 @@ class PreschoolClass extends Model
         'name',
         'teacher_user_id',
         'teacher_display_name',
+        'class_level_id',
         'level',
         'schedule',
         'students_count',
@@ -67,6 +68,11 @@ class PreschoolClass extends Model
         return $this->belongsTo(User::class, 'teacher_user_id', 'id');
     }
 
+    public function classLevel(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolClassLevel::class, 'class_level_id');
+    }
+
     public function students(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -80,6 +86,11 @@ class PreschoolClass extends Model
     public function attendanceRecords(): HasMany
     {
         return $this->hasMany(PreschoolAttendanceRecord::class, 'class_id');
+    }
+
+    public function attendanceSessions(): HasMany
+    {
+        return $this->hasMany(PreschoolAttendanceSession::class, 'preschool_class_id');
     }
 
     public function payments(): HasMany

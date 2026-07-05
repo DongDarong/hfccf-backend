@@ -11,3 +11,4 @@ Artisan::command('inspire', function () {
 // Remove Sanctum personal access tokens that have passed their expires_at.
 // Tokens created without an expiry (remember-me tokens that never expire) are unaffected.
 Schedule::command('sanctum:prune-expired --hours=0')->daily();
+Schedule::command('preschool:automation-daily-checks')->dailyAt('02:15');

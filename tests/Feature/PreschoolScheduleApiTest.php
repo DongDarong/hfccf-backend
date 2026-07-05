@@ -46,6 +46,47 @@ class PreschoolScheduleApiTest extends TestCase
             ->assertJsonPath('data.items.0.activityLabel', 'Morning Literacy');
     }
 
+    public function test_admin_can_filter_preschool_schedules_by_saturday_day_of_week(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'psc-101', 'preschool.schedule101@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $teacher = $this->makeUserWithRole('teacher-preschool', 'psc-102', 'preschool.schedule102@hfccf.org');
+        $class = $this->createPreschoolClass('PS-SCH-101', 'Weekend Class', $teacher->id, trim($teacher->first_name.' '.$teacher->last_name));
+
+        $saturdaySchedule = $this->createSchedule($class->id, $teacher->id, 6, '08:00', '09:00', 'Room B1', 'Saturday Circle', PreschoolScheduleStatus::ACTIVE, $admin->id);
+        $this->createSchedule($class->id, $teacher->id, 5, '09:00', '10:00', 'Room B1', 'Friday Circle', PreschoolScheduleStatus::ACTIVE, $admin->id);
+
+        $this->getJson('/api/preschool/schedules?per_page=100&class_id='.$class->id.'&day_of_week=6')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.items.0.id', $saturdaySchedule->id)
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.dayOfWeek', 6);
+    }
+
+    public function test_admin_schedule_list_rejects_invalid_day_of_week_filter(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'psc-103', 'preschool.schedule103@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/preschool/schedules?per_page=100&day_of_week=8')
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'The day of week field must be between 1 and 7.')
+            ->assertJsonPath('data.errors.day_of_week.0', 'The day of week field must be between 1 and 7.');
+    }
+
+    public function test_admin_schedule_list_rejects_page_sizes_above_the_backend_limit(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'psc-104', 'preschool.schedule104@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/preschool/schedules?per_page=200&day_of_week=6')
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'The per page field must not be greater than 100.')
+            ->assertJsonPath('data.errors.per_page.0', 'The per page field must not be greater than 100.');
+    }
+
     public function test_teacher_can_view_own_schedule_but_cannot_manage_schedules(): void
     {
         $teacher = $this->makeUserWithRole('teacher-preschool', 'psc-110', 'preschool.schedule110@hfccf.org');
