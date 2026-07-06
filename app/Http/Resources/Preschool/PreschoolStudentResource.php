@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Preschool;
 
 use App\Models\PreschoolStudent;
+use App\Support\CambodiaLocationContract;
 use App\Support\ImageStorage;
 use App\Support\PreschoolGuardianSnapshotService;
 use Carbon\Carbon;
@@ -27,6 +28,15 @@ class PreschoolStudentResource extends JsonResource
 
     public function toArray(Request $request): array
     {
+        $birthProvince = $this->loadedRelation('birthProvince');
+        $birthDistrict = $this->loadedRelation('birthDistrict');
+        $birthCommune = $this->loadedRelation('birthCommune');
+        $birthVillage = $this->loadedRelation('birthVillage');
+        $residenceProvince = $this->loadedRelation('residenceProvince');
+        $residenceDistrict = $this->loadedRelation('residenceDistrict');
+        $residenceCommune = $this->loadedRelation('residenceCommune');
+        $residenceVillage = $this->loadedRelation('residenceVillage');
+
         // Resolve the underlying model so the canonical guardian snapshot
         // always works with the real PreschoolStudent instance, not the
         // JsonResource wrapper. This keeps normalized guardian data stable
@@ -94,8 +104,44 @@ class PreschoolStudentResource extends JsonResource
             'firstName' => $this->first_name,
             'lastName' => $this->last_name,
             'fullName' => trim($this->first_name.' '.$this->last_name),
+            'latinName' => $this->latin_name,
             'gender' => $this->gender,
             'dateOfBirth' => $this->date_of_birth?->toDateString(),
+            'placeOfBirth' => $this->place_of_birth,
+            'nationality' => $this->nationality,
+            'ethnicity' => $this->ethnicity,
+            'birthProvinceId' => $this->birth_province_id,
+            'birthDistrictId' => $this->birth_district_id,
+            'birthCommuneId' => $this->birth_commune_id,
+            'birthVillageId' => $this->birth_village_id,
+            'birthProvince' => CambodiaLocationContract::locationToArray($birthProvince),
+            'birthDistrict' => CambodiaLocationContract::locationToArray($birthDistrict),
+            'birthCommune' => CambodiaLocationContract::locationToArray($birthCommune),
+            'birthVillage' => CambodiaLocationContract::locationToArray($birthVillage),
+            'birthLocationDisplay' => CambodiaLocationContract::composeHierarchyDisplay(
+                $birthProvince,
+                $birthDistrict,
+                $birthCommune,
+                $birthVillage,
+                $this->place_of_birth,
+                'kh'
+            ),
+            'residenceProvinceId' => $this->residence_province_id,
+            'residenceDistrictId' => $this->residence_district_id,
+            'residenceCommuneId' => $this->residence_commune_id,
+            'residenceVillageId' => $this->residence_village_id,
+            'residenceProvince' => CambodiaLocationContract::locationToArray($residenceProvince),
+            'residenceDistrict' => CambodiaLocationContract::locationToArray($residenceDistrict),
+            'residenceCommune' => CambodiaLocationContract::locationToArray($residenceCommune),
+            'residenceVillage' => CambodiaLocationContract::locationToArray($residenceVillage),
+            'currentResidenceDisplay' => CambodiaLocationContract::composeHierarchyDisplay(
+                $residenceProvince,
+                $residenceDistrict,
+                $residenceCommune,
+                $residenceVillage,
+                $this->address,
+                'kh'
+            ),
             // Prefer the normalized guardian snapshot so the compatibility
             // columns do not override active relationships.
             'guardianName' => $guardianSnapshot['guardianName'] ?? $this->guardian_name,
@@ -125,5 +171,10 @@ class PreschoolStudentResource extends JsonResource
             'updatedAt' => self::toIsoString($this->updated_at),
             'deletedAt' => self::toIsoString($this->deleted_at),
         ];
+    }
+
+    private function loadedRelation(string $relation): ?object
+    {
+        return $this->relationLoaded($relation) ? $this->{$relation} : null;
     }
 }

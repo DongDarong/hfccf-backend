@@ -6,21 +6,8 @@ use App\Support\CambodiaLocationContract;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StorePreschoolStudentRequest extends FormRequest
+class StorePreschoolEnrollmentApplicationRequest extends FormRequest
 {
-    protected function prepareForValidation(): void
-    {
-        $name = trim((string) $this->input('name', ''));
-
-        if ($name !== '' && ! $this->filled('first_name') && ! $this->filled('last_name')) {
-            $parts = preg_split('/\s+/', $name, 2) ?: [];
-            $this->merge([
-                'first_name' => $parts[0] ?? '',
-                'last_name' => $parts[1] ?? '',
-            ]);
-        }
-    }
-
     public function authorize(): bool
     {
         return $this->hasPreschoolAdminAccess();
@@ -36,9 +23,9 @@ class StorePreschoolStudentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'student_code' => ['nullable', 'string', 'max:50', 'unique:preschool_students,student_code'],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
+            'khmer_name' => ['nullable', 'string', 'max:200'],
             'latin_name' => ['nullable', 'string', 'max:200'],
             'gender' => ['nullable', Rule::in(['male', 'female', 'other'])],
             'date_of_birth' => ['nullable', 'date'],
@@ -53,16 +40,21 @@ class StorePreschoolStudentRequest extends FormRequest
             'residence_district_id' => ['nullable', 'integer', 'exists:cambodia_districts,id'],
             'residence_commune_id' => ['nullable', 'integer', 'exists:cambodia_communes,id'],
             'residence_village_id' => ['nullable', 'integer', 'exists:cambodia_villages,id'],
-            'guardian_name' => ['nullable', 'string', 'max:191'],
-            'guardian_phone' => ['nullable', 'string', 'max:32'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'status' => ['required', Rule::in(['active', 'pending', 'inactive', 'graduated'])],
-            'student_type' => ['sometimes', 'nullable', Rule::in(['paying', 'non_paying'])],
-            'class_ids' => ['sometimes', 'array'],
-            'class_ids.*' => ['integer', 'exists:preschool_classes,id'],
-            'avatar' => ['sometimes', 'nullable', 'image', 'max:4096'],
-            'override_locked_context' => ['sometimes', 'boolean'],
-            'override_reason' => ['required_if:override_locked_context,1', 'nullable', 'string', 'max:500'],
+            'requested_academic_year_id' => ['nullable', 'integer', 'exists:preschool_academic_years,id'],
+            'requested_term_id' => ['nullable', 'integer', 'exists:preschool_terms,id'],
+            'requested_level' => ['nullable', 'string', 'max:100'],
+            'preferred_class_id' => ['nullable', 'integer', 'exists:preschool_classes,id'],
+            'requested_start_date' => ['nullable', 'date'],
+            'guardian_name' => ['nullable', 'string', 'max:200'],
+            'guardian_relationship' => ['nullable', 'string', 'max:100'],
+            'guardian_phone' => ['nullable', 'string', 'max:50'],
+            'guardian_email' => ['nullable', 'email', 'max:200'],
+            'guardian_address' => ['nullable', 'string', 'max:500'],
+            'guardian_can_pickup' => ['nullable', 'boolean'],
+            'guardian_is_emergency' => ['nullable', 'boolean'],
+            'application_date' => ['nullable', 'date'],
+            'source' => ['nullable', 'string', 'max:100'],
+            'admin_notes' => ['nullable', 'string'],
         ];
     }
 
