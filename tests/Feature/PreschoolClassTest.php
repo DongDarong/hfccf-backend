@@ -129,6 +129,59 @@ class PreschoolClassTest extends TestCase
         ]);
     }
 
+    public function test_teacher_assignment_must_reference_an_active_preschool_teacher(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_cls_630', 'preschool.class630@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $teacher = $this->makeUserWithRole('teacher-preschool', 'usr_cls_631', 'teacher.class631@hfccf.org');
+        $teacherRole = Role::query()->with('permissions')->findOrFail('teacher-preschool');
+        $inactiveTeacher = User::query()->create([
+            'id' => 'usr_cls_632',
+            'first_name' => 'Inactive',
+            'last_name' => 'Teacher',
+            'username' => 'Inactive Teacher Unique',
+            'email' => 'teacher.class632@hfccf.org',
+            'phone' => '+855 12 555 556',
+            'role_code' => $teacherRole->code,
+            'department_code' => $teacherRole->department_code,
+            'status' => 'inactive',
+            'password' => 'secret-pass',
+        ]);
+        $this->syncPermissions($inactiveTeacher, $teacherRole);
+        DB::table('users')->where('id', $inactiveTeacher->id)->update([
+            'status' => 'inactive',
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/preschool/classes', [
+            'name' => 'Active Teacher Class',
+            'teacher_user_id' => $teacher->id,
+            'class_level_id' => $this->classLevelId('NUR'),
+            'schedule' => 'Mon-Fri 8:00 AM',
+            'students_count' => 0,
+            'status' => 'active',
+        ])->assertCreated();
+
+        $this->postJson('/api/preschool/classes', [
+            'name' => 'Inactive Teacher Class',
+            'teacher_user_id' => $inactiveTeacher->id,
+            'class_level_id' => $this->classLevelId('NUR'),
+            'schedule' => 'Mon-Fri 8:00 AM',
+            'students_count' => 0,
+            'status' => 'active',
+        ])->assertStatus(422);
+
+        $this->postJson('/api/preschool/classes', [
+            'name' => 'Wrong Role Class',
+            'teacher_user_id' => $admin->id,
+            'class_level_id' => $this->classLevelId('NUR'),
+            'schedule' => 'Mon-Fri 8:00 AM',
+            'students_count' => 0,
+            'status' => 'active',
+        ])->assertStatus(422);
+    }
+
     private function classLevelId(string $code): int
     {
         return (int) DB::table('preschool_class_levels')->where('code', $code)->value('id');

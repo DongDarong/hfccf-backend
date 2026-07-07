@@ -87,7 +87,16 @@ class UpdatePreschoolClassRequest extends FormRequest
         return [
             'code' => ['sometimes', 'nullable', 'string', 'max:50', Rule::unique('preschool_classes', 'code')->ignore($classId)],
             'name' => ['sometimes', 'required', 'string', 'max:191'],
-            'teacher_user_id' => ['sometimes', 'nullable', 'string', 'exists:users,id'],
+            'teacher_user_id' => [
+                'sometimes',
+                'nullable',
+                'string',
+                Rule::exists('users', 'id')->where(static function ($query) {
+                    $query->where('role_code', 'teacher-preschool')
+                        ->where('status', 'active')
+                        ->whereNull('deleted_at');
+                }),
+            ],
             'teacher_display_name' => ['sometimes', 'nullable', 'string', 'max:191'],
             'class_level_id' => [
                 'sometimes',
