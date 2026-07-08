@@ -22,7 +22,7 @@ class PreschoolStudentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request->user())) {
+        if ($response = $this->authorizeStudentViewer($request->user())) {
             return $response;
         }
 
@@ -76,8 +76,16 @@ class PreschoolStudentController extends Controller
         }
 
         if ($classId !== '') {
-            $query->whereHas('classes', static function (Builder $builder) use ($classId): void {
+            $query->whereHas('classes', static function (Builder $builder) use ($classId, $request): void {
                 $builder->where('preschool_classes.id', $classId);
+
+                if ($request->user()?->role_code === 'teacher-preschool') {
+                    $builder->where('teacher_user_id', $request->user()->id);
+                }
+            });
+        } elseif ($request->user()?->role_code === 'teacher-preschool') {
+            $query->whereHas('classes', static function (Builder $builder) use ($request): void {
+                $builder->where('teacher_user_id', $request->user()->id);
             });
         }
 
@@ -422,6 +430,27 @@ class PreschoolStudentController extends Controller
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminpreschool'], true)) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Forbidden.',
+            'data' => null,
+        ], Response::HTTP_FORBIDDEN);
+    }
+
+    private function authorizeStudentViewer(?User $user): ?JsonResponse
+    {
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+                'data' => null,
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (in_array($user->role_code, ['superadmin', 'adminpreschool', 'teacher-preschool'], true)) {
             return null;
         }
 

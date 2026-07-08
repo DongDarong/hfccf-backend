@@ -324,6 +324,7 @@ class PreschoolAttendanceSessionTest extends TestCase
             'session_key' => 'class:'.$class->id.':'.Carbon::now()->toDateString().':manual',
         ]);
         $student = $this->createStudent();
+        $this->attachStudentToClass($class->id, $student->id);
 
         $this->getJson('/api/preschool/attendance-sessions?date='.Carbon::now()->toDateString())
             ->assertOk();
@@ -336,6 +337,27 @@ class PreschoolAttendanceSessionTest extends TestCase
             'student_id' => $student->id,
             'status' => 'present',
         ])->assertOk();
+    }
+
+    public function test_teacher_cannot_submit_session_records_for_unassigned_students(): void
+    {
+        $teacher = User::factory()->asTeacherPreschool()->create();
+        Sanctum::actingAs($teacher);
+
+        $class = $this->createClass($teacher);
+        $session = PreschoolAttendanceSession::query()->create([
+            'preschool_class_id' => $class->id,
+            'attendance_date' => Carbon::now()->toDateString(),
+            'status' => 'open',
+            'generated_from_schedule' => false,
+            'session_key' => 'class:'.$class->id.':'.Carbon::now()->toDateString().':manual-unassigned',
+        ]);
+        $student = $this->createStudent();
+
+        $this->postJson('/api/preschool/attendance-sessions/'.$session->id.'/records', [
+            'student_id' => $student->id,
+            'status' => 'present',
+        ])->assertForbidden();
     }
 
     private function seedReferenceData(): void
@@ -431,6 +453,25 @@ class PreschoolAttendanceSessionTest extends TestCase
             'status' => 'active',
             'student_type' => 'regular',
             'avatar' => null,
+        ]);
+    }
+
+    private function attachStudentToClass(int $classId, int $studentId): void
+    {
+        DB::table('preschool_class_students')->insert([
+            'class_id' => $classId,
+            'student_id' => $studentId,
+            'enrolled_at' => now(),
+            'academic_year' => '2025-2026',
+            'term_label' => 'Term 1',
+            'academic_year_id' => null,
+            'term_id' => null,
+            'enrollment_status' => 'active',
+            'enrollment_started_at' => now(),
+            'enrollment_ended_at' => null,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 

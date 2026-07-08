@@ -9,6 +9,7 @@ use App\Http\Resources\Preschool\PreschoolAttendanceResource;
 use App\Models\PreschoolAttendanceRecord;
 use App\Models\PreschoolAttendanceSession;
 use App\Models\PreschoolClass;
+use App\Models\PreschoolClassStudent;
 use App\Models\User;
 use App\Services\PreschoolGuardianCommunicationService;
 use App\Support\PreschoolAcademicLifecycleService;
@@ -30,6 +31,9 @@ class PreschoolAttendanceController extends Controller
         }
 
         $query = PreschoolAttendanceRecord::query();
+        if ($response = $this->applyTeacherScope($request->user(), $query)) {
+            return $response;
+        }
         $this->applyAttendanceFilters($request, $query);
 
         $paginator = $query
@@ -69,6 +73,10 @@ class PreschoolAttendanceController extends Controller
             $data['class_id'] = $session->preschool_class_id;
             $data['attendance_date'] = $session->attendance_date?->toDateString();
             $data['attendance_session_id'] = $session->id;
+        }
+
+        if ($response = $this->assertTeacherCanAccessAttendance($request->user(), (int) $data['class_id'], (int) $data['student_id'])) {
+            return $response;
         }
 
         $guardPayload = [
@@ -151,6 +159,10 @@ class PreschoolAttendanceController extends Controller
             $data['attendance_session_id'] = $session->id;
         }
 
+        if ($response = $this->assertTeacherCanAccessAttendance($request->user(), (int) ($data['class_id'] ?? $attendance->class_id), (int) ($data['student_id'] ?? $attendance->student_id))) {
+            return $response;
+        }
+
         if ($response = $this->assertTeacherCanAccessClass($request->user(), (int) ($data['class_id'] ?? $attendance->class_id))) {
             return $response;
         }
@@ -200,6 +212,9 @@ class PreschoolAttendanceController extends Controller
         }
 
         $query = PreschoolAttendanceRecord::query();
+        if ($response = $this->applyTeacherScope($request->user(), $query)) {
+            return $response;
+        }
         $this->applyAttendanceFilters($request, $query);
 
         $records = $query->get();
@@ -238,6 +253,9 @@ class PreschoolAttendanceController extends Controller
 
         $query = PreschoolAttendanceRecord::query()
             ->with(['student', 'preschoolClass', 'recordedBy', 'attendanceSession.schedule']);
+        if ($response = $this->applyTeacherScope($request->user(), $query)) {
+            return $response;
+        }
         $this->applyAttendanceFilters($request, $query);
         $query->whereNull('attendance_session_id');
 
@@ -264,6 +282,9 @@ class PreschoolAttendanceController extends Controller
         }
 
         $query = PreschoolAttendanceRecord::query()->with(['preschoolClass.teacher']);
+        if ($response = $this->applyTeacherScope($request->user(), $query)) {
+            return $response;
+        }
         $this->applyAttendanceFilters($request, $query);
         $records = $query->get();
 
@@ -392,6 +413,73 @@ class PreschoolAttendanceController extends Controller
             'message' => 'Forbidden.',
             'data' => null,
         ], Response::HTTP_FORBIDDEN);
+    }
+
+    private function assertTeacherCanAccessAttendance(?User $user, int $classId, int $studentId): ?JsonResponse
+    {
+        if (! $user || in_array($user->role_code, ['superadmin', 'adminpreschool'], true)) {
+            return null;
+        }
+
+        if ($user->role_code !== 'teacher-preschool') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+                'data' => null,
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $hasClassAccess = PreschoolClass::query()
+            ->where('id', $classId)
+            ->where('teacher_user_id', $user->id)
+            ->exists();
+
+        if (! $hasClassAccess) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+                'data' => null,
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $hasStudentAccess = PreschoolClassStudent::query()
+            ->where('class_id', $classId)
+            ->where('student_id', $studentId)
+            ->where('status', 'active')
+            ->where('enrollment_status', 'active')
+            ->exists();
+
+        if (! $hasStudentAccess) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+                'data' => null,
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        return null;
+    }
+
+    private function applyTeacherScope(?User $user, Builder $query): ?JsonResponse
+    {
+        if (! $user || in_array($user->role_code, ['superadmin', 'adminpreschool'], true)) {
+            return null;
+        }
+
+        if ($user->role_code !== 'teacher-preschool') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+                'data' => null,
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $query->whereIn('class_id', PreschoolClass::query()
+            ->where('teacher_user_id', $user->id)
+            ->pluck('id')
+            ->all());
+
+        return null;
     }
 
     private function authorizeAny(?User $user): ?JsonResponse

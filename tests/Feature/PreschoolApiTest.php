@@ -481,33 +481,139 @@ class PreschoolApiTest extends TestCase
         Sanctum::actingAs($teacher);
 
         $class = $this->createPreschoolClass('PS-CLASS-540', 'Teacher Class', $teacher->id, trim($teacher->first_name.' '.$teacher->last_name));
+        $otherClass = $this->createPreschoolClass('PS-CLASS-541', 'Other Class');
         $student = $this->createPreschoolStudent('PS-STU-540', 'Teacher', 'Student');
+        $otherStudent = $this->createPreschoolStudent('PS-STU-541', 'Other', 'Student');
         DB::table('preschool_class_students')->insert([
             'class_id' => $class->id,
             'student_id' => $student->id,
             'enrolled_at' => now(),
             'status' => 'active',
+            'enrollment_status' => 'active',
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+        DB::table('preschool_class_students')->insert([
+            'class_id' => $otherClass->id,
+            'student_id' => $otherStudent->id,
+            'enrolled_at' => now(),
+            'status' => 'active',
+            'enrollment_status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        PreschoolAttendanceRecord::query()->create([
+            'class_id' => $class->id,
+            'student_id' => $student->id,
+            'attendance_date' => '2026-05-14',
+            'status' => 'present',
+            'recorded_by_user_id' => $teacher->id,
+        ]);
+        PreschoolAttendanceRecord::query()->create([
+            'class_id' => $otherClass->id,
+            'student_id' => $otherStudent->id,
+            'attendance_date' => '2026-05-14',
+            'status' => 'present',
+            'recorded_by_user_id' => $teacher->id,
         ]);
 
         $this->getJson('/api/preschool/teacher/my-classes')
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonFragment([
-                'code' => 'PS-CLASS-540',
+            ->assertJsonPath('data.items.0.code', 'PS-CLASS-540')
+            ->assertJsonMissing([
+                'code' => 'PS-CLASS-541',
             ]);
 
-        $this->getJson('/api/preschool/teacher/my-students')
+        $this->getJson('/api/preschool/students?class_id='.$class->id)
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonFragment([
-                'studentCode' => 'PS-STU-540',
+            ->assertJsonPath('data.items.0.studentCode', 'PS-STU-540')
+            ->assertJsonMissing([
+                'studentCode' => 'PS-STU-541',
             ]);
 
-        $this->getJson('/api/preschool/teacher/attendance')
+        $this->getJson('/api/preschool/attendance?class_id='.$class->id.'&attendance_date=2026-05-14')
             ->assertOk()
-            ->assertJsonPath('success', true);
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.items.0.classId', $class->id)
+            ->assertJsonMissing([
+                'classId' => $otherClass->id,
+            ]);
+    }
+
+    public function test_teacher_preschool_can_record_scoped_attendance_and_update_it(): void
+    {
+        $teacher = $this->makeUserWithRole('teacher-preschool', 'usr_541', 'teacher.preschool541@hfccf.org');
+        Sanctum::actingAs($teacher);
+
+        $class = $this->createPreschoolClass('PS-CLASS-542', 'Teacher Attendance Class', $teacher->id, trim($teacher->first_name.' '.$teacher->last_name));
+        $student = $this->createPreschoolStudent('PS-STU-542', 'Scoped', 'Student');
+        $this->attachStudentToClass($class->id, $student->id);
+
+        $create = $this->postJson('/api/preschool/attendance', [
+            'class_id' => $class->id,
+            'student_id' => $student->id,
+            'attendance_date' => '2026-05-14',
+            'status' => 'present',
+            'note' => 'Teacher scoped attendance',
+        ]);
+
+        $create
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.attendance.classId', $class->id)
+            ->assertJsonPath('data.attendance.studentId', $student->id);
+
+        $attendanceId = $create->json('data.attendance.id');
+
+        $this->putJson('/api/preschool/attendance/'.$attendanceId, [
+            'status' => 'late',
+            'note' => 'Updated by teacher',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.attendance.status', 'late');
+    }
+
+    public function test_teacher_preschool_cannot_record_unassigned_or_spoofed_attendance(): void
+    {
+        $teacher = $this->makeUserWithRole('teacher-preschool', 'usr_542', 'teacher.preschool542@hfccf.org');
+        Sanctum::actingAs($teacher);
+
+        $ownedClass = $this->createPreschoolClass('PS-CLASS-543', 'Owned Class', $teacher->id, trim($teacher->first_name.' '.$teacher->last_name));
+        $foreignClass = $this->createPreschoolClass('PS-CLASS-544', 'Foreign Class');
+        $ownedStudent = $this->createPreschoolStudent('PS-STU-543', 'Owned', 'Student');
+        $foreignStudent = $this->createPreschoolStudent('PS-STU-544', 'Foreign', 'Student');
+        $this->attachStudentToClass($ownedClass->id, $ownedStudent->id);
+        $this->attachStudentToClass($foreignClass->id, $foreignStudent->id);
+
+        $this->postJson('/api/preschool/attendance', [
+            'class_id' => $ownedClass->id,
+            'student_id' => $foreignStudent->id,
+            'attendance_date' => '2026-05-14',
+            'status' => 'present',
+        ])->assertForbidden();
+
+        $this->postJson('/api/preschool/attendance', [
+            'class_id' => $foreignClass->id,
+            'student_id' => $foreignStudent->id,
+            'attendance_date' => '2026-05-14',
+            'status' => 'present',
+        ])->assertForbidden();
+
+        $foreignAttendance = PreschoolAttendanceRecord::query()->create([
+            'class_id' => $foreignClass->id,
+            'student_id' => $foreignStudent->id,
+            'attendance_date' => '2026-05-14',
+            'status' => 'present',
+            'recorded_by_user_id' => $teacher->id,
+        ]);
+
+        $this->putJson('/api/preschool/attendance/'.$foreignAttendance->id, [
+            'status' => 'absent',
+        ])->assertForbidden();
     }
 
     public function test_teacher_preschool_cannot_manage_all_preschool_data(): void

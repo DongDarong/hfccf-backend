@@ -63,6 +63,50 @@ class PreschoolAcademicCalendarTest extends TestCase
             ->assertJsonPath('data.academicYear.name', '2026 - 2027 Updated');
     }
 
+    public function test_terms_endpoint_returns_unauthorized_instead_of_login_redirect_for_guests(): void
+    {
+        $this->get('/api/preschool/settings/terms')
+            ->assertUnauthorized()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Unauthenticated.');
+    }
+
+    public function test_terms_endpoint_returns_current_terms_payload_for_admins(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_psac_100t', 'preschool.calendar100t@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $year = PreschoolAcademicYear::query()->create([
+            'code' => 'AY-2025-2026',
+            'label' => '2025 - 2026',
+            'start_date' => '2025-06-01',
+            'end_date' => '2026-05-31',
+            'status' => 'active',
+            'is_current' => true,
+            'created_by' => $admin->id,
+            'updated_by' => $admin->id,
+        ]);
+
+        PreschoolAcademicTerm::query()->create([
+            'academic_year_id' => $year->id,
+            'code' => 'TERM-1',
+            'name' => 'Term 1',
+            'start_date' => '2025-06-01',
+            'end_date' => '2025-08-31',
+            'status' => 'active',
+            'is_current' => true,
+            'sort_order' => 1,
+            'created_by' => $admin->id,
+            'updated_by' => $admin->id,
+        ]);
+
+        $this->getJson('/api/preschool/settings/terms')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.terms.0.name', 'Term 1')
+            ->assertJsonPath('data.academicYears.0.name', '2025 - 2026');
+    }
+
     public function test_superadmin_can_manage_academic_years_and_teacher_is_forbidden(): void
     {
         $superadmin = $this->makeUserWithRole('superadmin', 'usr_psac_101', 'superadmin.calendar101@hfccf.org');
