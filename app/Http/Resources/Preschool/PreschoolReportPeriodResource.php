@@ -14,6 +14,7 @@ class PreschoolReportPeriodResource extends JsonResource
         return [
             'id' => $this->id,
             'periodLabel' => $this->period_label,
+            'periodType' => $this->period_type,
             'academicYearId' => $this->academic_year_id,
             'academicYear' => $this->academicYear?->label,
             'academicYearCode' => $this->academicYear?->code,

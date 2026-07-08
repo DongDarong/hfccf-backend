@@ -9,6 +9,7 @@ class PreschoolReportPeriod extends Model
 {
     protected $fillable = [
         'period_label',
+        'period_type',
         'academic_year_id',
         'term_id',
         'from_date',

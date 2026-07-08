@@ -124,6 +124,7 @@ class PreschoolConfigurationTest extends TestCase
         ]);
 
         $this->postJson('/api/preschool/settings/assessments/report-periods', [
+            'period_type' => 'term',
             'academic_year_id' => $year->id,
             'term_id' => null,
             'name' => 'Midterm',
@@ -132,7 +133,7 @@ class PreschoolConfigurationTest extends TestCase
             'is_active' => true,
         ])
             ->assertUnprocessable()
-            ->assertJsonPath('data.errors.term_id.0', 'The term id field is required.');
+            ->assertJsonPath('data.errors.term_id.0', 'The selected term is required.');
     }
 
     private function makeUserWithRole(string $roleCode, string $id, string $email): User
