@@ -24,7 +24,7 @@ class PreschoolReportPeriodService
         private readonly PreschoolLifecycleAuditService $audit,
     ) {}
 
-    public function reportPeriods(User $user, ?PreschoolStudent $student = null, ?PreschoolClass $class = null): Collection
+    public function reportPeriods(User $user, ?PreschoolStudent $student = null, ?PreschoolClass $class = null, array $filters = []): Collection
     {
         $derived = $this->aggregation->reportPeriods($user, $student, $class);
         $this->syncDerivedPeriods($derived);
@@ -33,15 +33,30 @@ class PreschoolReportPeriodService
             return collect();
         }
 
-        $derivedKeys = $derived->map(fn (array $row): string => $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null))->all();
+        $periodType = $this->nullableText($filters['period_type'] ?? null);
+        $academicYearId = $this->nullableInt($filters['academic_year_id'] ?? null);
+        $termId = $this->nullableInt($filters['term_id'] ?? null);
+
+        $derivedKeys = $derived
+            ->map(fn (array $row): string => $this->periodKey(
+                $this->rowLabel($row),
+                $row['periodType'] ?? null,
+                $row['academicYearId'] ?? null,
+                $row['termId'] ?? null,
+            ))
+            ->all();
 
         $records = PreschoolReportPeriod::query()
             ->with(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy'])
+            ->when($periodType, fn (Builder $query, string $type) => $query->where('period_type', $type))
+            ->when($academicYearId !== null, fn (Builder $query) => $query->where('academic_year_id', $academicYearId))
+            ->when($termId !== null, fn (Builder $query) => $query->where('term_id', $termId))
             ->when(($student !== null || $class !== null) && $derivedKeys !== [], function (Builder $query) use ($derived): void {
                 $query->where(function (Builder $builder) use ($derived): void {
                     foreach ($derived as $row) {
                         $builder->orWhere(function (Builder $inner) use ($row): void {
                             $inner->where('period_label', $this->rowLabel($row))
+                                ->where('period_type', $row['periodType'] ?? 'term')
                                 ->where('academic_year_id', $row['academicYearId'] ?? null)
                                 ->where('term_id', $row['termId'] ?? null);
                         });
@@ -52,7 +67,7 @@ class PreschoolReportPeriodService
             ->orderByDesc('id')
             ->get();
 
-        $periods = $records->map(fn (PreschoolReportPeriod $period) => $this->snapshot($period))->keyBy(fn (array $row) => $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null));
+        $periods = $records->map(fn (PreschoolReportPeriod $period) => $this->snapshot($period))->keyBy(fn (array $row) => $this->periodKey($this->rowLabel($row), $row['periodType'] ?? null, $row['academicYearId'] ?? null, $row['termId'] ?? null));
 
         if ($derived->isEmpty()) {
             return $records->map(fn (PreschoolReportPeriod $period) => $this->snapshot($period))->values();
@@ -60,7 +75,7 @@ class PreschoolReportPeriodService
 
         $combined = $derived
             ->map(function (array $row) use ($periods): array {
-                $key = $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null);
+                $key = $this->periodKey($this->rowLabel($row), $row['periodType'] ?? null, $row['academicYearId'] ?? null, $row['termId'] ?? null);
                 $existing = $periods->get($key);
 
                 if ($existing) {
@@ -70,6 +85,7 @@ class PreschoolReportPeriodService
                 return $row + [
                     'id' => null,
                     'reportPeriodId' => null,
+                    'periodType' => $row['periodType'] ?? 'term',
                     'status' => 'finalized',
                     'isDraft' => false,
                     'isActive' => false,
@@ -80,9 +96,9 @@ class PreschoolReportPeriodService
             })
             ->values();
 
-        $derivedKeys = $combined->map(fn (array $row) => $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null))->all();
+        $derivedKeys = $combined->map(fn (array $row) => $this->periodKey($this->rowLabel($row), $row['periodType'] ?? null, $row['academicYearId'] ?? null, $row['termId'] ?? null))->all();
         $manualPeriods = $records
-            ->filter(fn (PreschoolReportPeriod $period) => ! in_array($this->periodKey($period->period_label, $period->academic_year_id, $period->term_id), $derivedKeys, true))
+            ->filter(fn (PreschoolReportPeriod $period) => ! in_array($this->periodKey($period->period_label, $period->period_type, $period->academic_year_id, $period->term_id), $derivedKeys, true))
             ->map(fn (PreschoolReportPeriod $period) => $this->snapshot($period));
 
         return $combined->concat($manualPeriods)->values();
@@ -92,6 +108,7 @@ class PreschoolReportPeriodService
     {
         $period = PreschoolReportPeriod::query()
             ->whereIn('status', ['active', 'finalized', 'locked'])
+            ->orderByRaw("case period_type when 'monthly' then 1 when 'term' then 2 when 'annual' then 3 else 4 end")
             ->orderByDesc('to_date')
             ->orderByDesc('id')
             ->first();
@@ -99,6 +116,7 @@ class PreschoolReportPeriodService
         if (! $period) {
             $period = PreschoolReportPeriod::query()
                 ->where('status', 'draft')
+                ->orderByRaw("case period_type when 'monthly' then 1 when 'term' then 2 when 'annual' then 3 else 4 end")
                 ->orderByDesc('id')
                 ->first();
         }
@@ -109,6 +127,7 @@ class PreschoolReportPeriodService
                 'report_period_id' => null,
                 'report_period_label' => '',
                 'report_period_status' => '',
+                'report_period_type' => '',
                 'report_period_locked_at' => null,
                 'report_period_finalized_at' => null,
                 'report_period_archived_at' => null,
@@ -129,11 +148,32 @@ class PreschoolReportPeriodService
                 $query->whereNull('to_date')
                     ->orWhereDate('to_date', '>=', $normalizedDate);
             })
+            ->orderByRaw("case period_type when 'monthly' then 1 when 'term' then 2 when 'annual' then 3 else 4 end")
             ->orderByDesc('to_date')
             ->orderByDesc('id')
             ->first();
 
         return $period ? $this->contextSnapshot($period) : $this->currentContext();
+    }
+
+    public function findByContext(string $periodLabel, mixed $periodType = null, mixed $academicYearId = null, mixed $termId = null): ?PreschoolReportPeriod
+    {
+        $label = trim($periodLabel);
+        if ($label === '') {
+            return null;
+        }
+
+        $query = PreschoolReportPeriod::query()
+            ->where('period_label', $label)
+            ->when($this->nullableText($periodType), fn (Builder $builder, string $type) => $builder->where('period_type', $type))
+            ->when($academicYearId !== null && $academicYearId !== '', fn (Builder $builder) => $builder->where('academic_year_id', $this->nullableInt($academicYearId)))
+            ->when($termId !== null && $termId !== '', fn (Builder $builder) => $builder->where('term_id', $this->nullableInt($termId)));
+
+        return $query
+            ->orderByRaw("case period_type when 'monthly' then 1 when 'term' then 2 when 'annual' then 3 else 4 end")
+            ->orderByDesc('to_date')
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function resolveForAssessment(array $payload = [], ?string $assessmentDate = null): ?PreschoolReportPeriod
@@ -146,11 +186,57 @@ class PreschoolReportPeriodService
         $academicContext = app(PreschoolAcademicLifecycleService::class)->resolveForDate($assessmentDate ?: ($payload['assessment_date'] ?? null));
         $academicYearId = $academicContext['academic_year_id'] ?? null;
         $termId = $academicContext['term_id'] ?? null;
+        $periodType = $this->nullableText($payload['period_type'] ?? null);
+        $reportPeriodId = $this->nullableInt($payload['report_period_id'] ?? null);
+        $normalizedAssessmentDate = $this->normalizeDate($assessmentDate ?: ($payload['assessment_date'] ?? null));
 
-        $period = PreschoolReportPeriod::query()
+        if ($reportPeriodId !== null) {
+            $matched = PreschoolReportPeriod::query()->find($reportPeriodId);
+            if ($matched) {
+                return $matched;
+            }
+        }
+
+        $query = PreschoolReportPeriod::query()
+            ->where('period_label', $periodLabel)
+            ->where('academic_year_id', $academicYearId);
+
+        if ($periodType) {
+            $query->where('period_type', $periodType);
+        }
+
+        if ($normalizedAssessmentDate) {
+            $query->whereDate('from_date', '<=', $normalizedAssessmentDate)
+                ->where(function (Builder $builder) use ($normalizedAssessmentDate): void {
+                    $builder->whereNull('to_date')
+                        ->orWhereDate('to_date', '>=', $normalizedAssessmentDate);
+                });
+        }
+
+        $period = $query
+            ->orderByRaw("case period_type when 'monthly' then 1 when 'term' then 2 when 'annual' then 3 else 4 end")
+            ->orderByDesc('to_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($period) {
+            return $period;
+        }
+
+        $termQuery = PreschoolReportPeriod::query()
             ->where('period_label', $periodLabel)
             ->where('academic_year_id', $academicYearId)
-            ->where('term_id', $termId)
+            ->whereNotNull('term_id')
+            ->where('term_id', $termId);
+
+        if ($periodType) {
+            $termQuery->where('period_type', $periodType);
+        }
+
+        $period = $termQuery
+            ->orderByRaw("case period_type when 'monthly' then 1 when 'term' then 2 when 'annual' then 3 else 4 end")
+            ->orderByDesc('to_date')
+            ->orderByDesc('id')
             ->first();
 
         if ($period) {
@@ -173,6 +259,7 @@ class PreschoolReportPeriodService
 
         return PreschoolReportPeriod::query()->create([
             'period_label' => $periodLabel,
+            'period_type' => $periodType ?: 'term',
             'academic_year_id' => $academicYearId,
             'term_id' => $termId,
             'from_date' => $derived->assessment_date?->toDateString(),
@@ -185,6 +272,7 @@ class PreschoolReportPeriodService
     {
         $period = new PreschoolReportPeriod([
             'period_label' => trim((string) ($data['period_label'] ?? '')),
+            'period_type' => $this->normalizePeriodType($data['period_type'] ?? null),
             'academic_year_id' => $this->nullableInt($data['academic_year_id'] ?? null),
             'term_id' => $this->nullableInt($data['term_id'] ?? null),
             'from_date' => $this->normalizeDate($data['from_date'] ?? null),
@@ -200,11 +288,11 @@ class PreschoolReportPeriodService
 
     public function update(PreschoolReportPeriod $period, array $data): PreschoolReportPeriod
     {
-        foreach (['period_label', 'status', 'notes'] as $field) {
+        foreach (['period_label', 'period_type', 'status', 'notes'] as $field) {
             if (array_key_exists($field, $data)) {
                 $period->{$field} = $field === 'status'
                     ? $this->normalizeStatus($data[$field] ?? null)
-                    : ($field === 'notes' ? $this->nullableText($data[$field] ?? null) : trim((string) $data[$field]));
+                    : ($field === 'notes' ? $this->nullableText($data[$field] ?? null) : ($field === 'period_type' ? $this->normalizePeriodType($data[$field] ?? null) : trim((string) $data[$field])));
             }
         }
 
@@ -269,6 +357,7 @@ class PreschoolReportPeriodService
             'id' => $period->id,
             'label' => $period->period_label,
             'periodLabel' => $period->period_label,
+            'periodType' => $period->period_type,
             'reportPeriodId' => $period->id,
             'fromDate' => $period->from_date?->toDateString(),
             'toDate' => $period->to_date?->toDateString(),
@@ -296,6 +385,7 @@ class PreschoolReportPeriodService
         return [
             'report_period_id' => $period->id,
             'report_period_label' => $period->period_label,
+            'report_period_type' => $period->period_type,
             'report_period_status' => $period->status,
             'report_period_locked_at' => $period->locked_at?->toISOString(),
             'report_period_finalized_at' => $period->finalized_at?->toISOString(),
@@ -317,13 +407,14 @@ class PreschoolReportPeriodService
     private function syncDerivedPeriods(Collection $derived): void
     {
         foreach ($derived as $row) {
-            $key = $this->periodKey($this->rowLabel($row), $row['academicYearId'] ?? null, $row['termId'] ?? null);
-            if ($key === '--') {
+            $key = $this->periodKey($this->rowLabel($row), $row['periodType'] ?? null, $row['academicYearId'] ?? null, $row['termId'] ?? null);
+            if ($key === '|||') {
                 continue;
             }
 
             $period = PreschoolReportPeriod::query()->firstOrNew([
                 'period_label' => $this->rowLabel($row),
+                'period_type' => $this->normalizePeriodType($row['periodType'] ?? null),
                 'academic_year_id' => $row['academicYearId'] ?? null,
                 'term_id' => $row['termId'] ?? null,
             ]);
@@ -338,9 +429,9 @@ class PreschoolReportPeriodService
         }
     }
 
-    private function periodKey(mixed $label, mixed $academicYearId, mixed $termId): string
+    private function periodKey(mixed $label, mixed $periodType, mixed $academicYearId, mixed $termId): string
     {
-        return trim((string) $label).'|'.((string) $academicYearId).'|'.((string) $termId);
+        return trim((string) $label).'|'.trim((string) $periodType).'|'.((string) $academicYearId).'|'.((string) $termId);
     }
 
     /**
@@ -356,6 +447,13 @@ class PreschoolReportPeriodService
         $value = strtolower(trim((string) $value));
 
         return in_array($value, ['draft', 'active', 'finalized', 'locked', 'archived'], true) ? $value : 'draft';
+    }
+
+    private function normalizePeriodType(mixed $value): string
+    {
+        $value = strtolower(trim((string) $value));
+
+        return in_array($value, ['monthly', 'term', 'annual'], true) ? $value : 'term';
     }
 
     private function normalizeDate(mixed $value): ?string

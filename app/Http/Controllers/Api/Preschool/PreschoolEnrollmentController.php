@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\Preschool;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Preschool\StorePreschoolEnrollmentApplicationRequest;
+use App\Http\Requests\Preschool\UpdatePreschoolEnrollmentApplicationRequest;
 use App\Http\Resources\Preschool\PreschoolEnrollmentResource;
 use App\Models\PreschoolAcademicTerm;
 use App\Models\PreschoolAcademicYear;
@@ -32,7 +34,10 @@ class PreschoolEnrollmentController extends Controller
         }
 
         $query = PreschoolEnrollmentApplication::query()
-            ->with(['requestedAcademicYear', 'requestedTerm', 'preferredClass']);
+            ->with(array_merge(
+                ['requestedAcademicYear', 'requestedTerm', 'preferredClass'],
+                $this->applicationLocationRelations(),
+            ));
 
         $this->applyFilters($request, $query);
 
@@ -96,36 +101,9 @@ class PreschoolEnrollmentController extends Controller
 
     // ── Create draft application ─────────────────────────────────────────────
 
-    public function store(Request $request): JsonResponse
+    public function store(StorePreschoolEnrollmentApplicationRequest $request): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request->user())) {
-            return $response;
-        }
-
-        $data = $request->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'khmer_name' => ['nullable', 'string', 'max:200'],
-            'gender' => ['nullable', 'in:male,female,other'],
-            'date_of_birth' => ['nullable', 'date'],
-            'place_of_birth' => ['nullable', 'string', 'max:200'],
-            'nationality' => ['nullable', 'string', 'max:100'],
-            'requested_academic_year_id' => ['nullable', 'integer', 'exists:preschool_academic_years,id'],
-            'requested_term_id' => ['nullable', 'integer', 'exists:preschool_terms,id'],
-            'requested_level' => ['nullable', 'string', 'max:100'],
-            'preferred_class_id' => ['nullable', 'integer', 'exists:preschool_classes,id'],
-            'requested_start_date' => ['nullable', 'date'],
-            'guardian_name' => ['nullable', 'string', 'max:200'],
-            'guardian_relationship' => ['nullable', 'string', 'max:100'],
-            'guardian_phone' => ['nullable', 'string', 'max:50'],
-            'guardian_email' => ['nullable', 'email', 'max:200'],
-            'guardian_address' => ['nullable', 'string', 'max:500'],
-            'guardian_can_pickup' => ['nullable', 'boolean'],
-            'guardian_is_emergency' => ['nullable', 'boolean'],
-            'application_date' => ['nullable', 'date'],
-            'source' => ['nullable', 'string', 'max:100'],
-            'admin_notes' => ['nullable', 'string'],
-        ]);
+        $data = $this->normalizeIdentityPayload($request->validated());
 
         $application = PreschoolEnrollmentApplication::create([
             ...$data,
@@ -140,7 +118,10 @@ class PreschoolEnrollmentController extends Controller
         $this->enrollment->logDecision($application, 'created', null, 'draft', $request->user(), 'Application created.');
         $this->writeAuditLog('preschool_enrollment.created', $application, $request->user());
 
-        $application->load(['requestedAcademicYear', 'requestedTerm', 'preferredClass', 'documents', 'decisionLogs.actor']);
+        $application->load(array_merge(
+            ['requestedAcademicYear', 'requestedTerm', 'preferredClass', 'documents', 'decisionLogs.actor'],
+            $this->applicationLocationRelations(),
+        ));
 
         return response()->json([
             'success' => true,
@@ -162,11 +143,20 @@ class PreschoolEnrollmentController extends Controller
             return $application;
         }
 
-        $application->load([
-            'requestedAcademicYear', 'requestedTerm', 'preferredClass',
-            'reviewedBy', 'approvedBy', 'enrolledBy', 'enrolledStudent',
-            'documents', 'decisionLogs.actor',
-        ]);
+        $application->load(array_merge(
+            [
+                'requestedAcademicYear',
+                'requestedTerm',
+                'preferredClass',
+                'reviewedBy',
+                'approvedBy',
+                'enrolledBy',
+                'enrolledStudent',
+                'documents',
+                'decisionLogs.actor',
+            ],
+            $this->applicationLocationRelations(),
+        ));
 
         return response()->json([
             'success' => true,
@@ -177,12 +167,8 @@ class PreschoolEnrollmentController extends Controller
 
     // ── Patch application data (only while not in a terminal state) ──────────
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(UpdatePreschoolEnrollmentApplicationRequest $request, string $id): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request->user())) {
-            return $response;
-        }
-
         $application = $this->findOr404($id);
         if ($application instanceof JsonResponse) {
             return $application;
@@ -196,32 +182,18 @@ class PreschoolEnrollmentController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $data = $request->validate([
-            'first_name' => ['sometimes', 'string', 'max:100'],
-            'last_name' => ['sometimes', 'string', 'max:100'],
-            'khmer_name' => ['nullable', 'string', 'max:200'],
-            'gender' => ['nullable', 'in:male,female,other'],
-            'date_of_birth' => ['nullable', 'date'],
-            'place_of_birth' => ['nullable', 'string', 'max:200'],
-            'nationality' => ['nullable', 'string', 'max:100'],
-            'requested_academic_year_id' => ['nullable', 'integer', 'exists:preschool_academic_years,id'],
-            'requested_term_id' => ['nullable', 'integer', 'exists:preschool_terms,id'],
-            'requested_level' => ['nullable', 'string', 'max:100'],
-            'preferred_class_id' => ['nullable', 'integer', 'exists:preschool_classes,id'],
-            'requested_start_date' => ['nullable', 'date'],
-            'guardian_name' => ['nullable', 'string', 'max:200'],
-            'guardian_relationship' => ['nullable', 'string', 'max:100'],
-            'guardian_phone' => ['nullable', 'string', 'max:50'],
-            'guardian_email' => ['nullable', 'email', 'max:200'],
-            'guardian_address' => ['nullable', 'string', 'max:500'],
-            'guardian_can_pickup' => ['nullable', 'boolean'],
-            'guardian_is_emergency' => ['nullable', 'boolean'],
-            'admin_notes' => ['nullable', 'string'],
-        ]);
+        $data = $this->normalizeIdentityPayload(
+            $request->validated(),
+            $application->latin_name,
+            $application->khmer_name,
+        );
 
         $application->fill([...$data, 'updated_by_user_id' => $request->user()->id]);
         $application->save();
-        $application->load(['requestedAcademicYear', 'requestedTerm', 'preferredClass', 'documents', 'decisionLogs.actor']);
+        $application->load(array_merge(
+            ['requestedAcademicYear', 'requestedTerm', 'preferredClass', 'documents', 'decisionLogs.actor'],
+            $this->applicationLocationRelations(),
+        ));
 
         return response()->json([
             'success' => true,
@@ -242,6 +214,8 @@ class PreschoolEnrollmentController extends Controller
         if ($application instanceof JsonResponse) {
             return $application;
         }
+
+        $application->loadMissing($this->applicationLocationRelations());
 
         if ($response = $this->enrollment->assertStatus($application, ['draft'])) {
             return $response;
@@ -488,6 +462,7 @@ class PreschoolEnrollmentController extends Controller
             'requestedAcademicYear', 'requestedTerm', 'preferredClass',
             'reviewedBy', 'approvedBy', 'enrolledBy', 'enrolledStudent',
             'documents', 'decisionLogs.actor',
+            ...$this->applicationLocationRelations(),
         ]);
 
         // Return a custom response that includes the created payment alongside
@@ -582,7 +557,12 @@ class PreschoolEnrollmentController extends Controller
                 $like = '%' . $search . '%';
                 $q->where('first_name', 'like', $like)
                     ->orWhere('last_name', 'like', $like)
+                    ->orWhere('khmer_name', 'like', $like)
+                    ->orWhere('latin_name', 'like', $like)
                     ->orWhere('application_code', 'like', $like)
+                    ->orWhere('place_of_birth', 'like', $like)
+                    ->orWhere('nationality', 'like', $like)
+                    ->orWhere('ethnicity', 'like', $like)
                     ->orWhere('guardian_name', 'like', $like)
                     ->orWhere('guardian_phone', 'like', $like);
             });
@@ -603,6 +583,7 @@ class PreschoolEnrollmentController extends Controller
             'requestedAcademicYear', 'requestedTerm', 'preferredClass',
             'reviewedBy', 'approvedBy', 'enrolledBy', 'enrolledStudent',
             'documents', 'decisionLogs.actor',
+            ...$this->applicationLocationRelations(),
         ]);
 
         return response()->json([
@@ -610,6 +591,58 @@ class PreschoolEnrollmentController extends Controller
             'message' => $message,
             'data' => ['application' => PreschoolEnrollmentResource::make($application)->resolve($request)],
         ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function applicationLocationRelations(): array
+    {
+        return [
+            'birthProvince',
+            'birthDistrict',
+            'birthCommune',
+            'birthVillage',
+            'residenceProvince',
+            'residenceDistrict',
+            'residenceCommune',
+            'residenceVillage',
+        ];
+    }
+
+    /**
+     * Keep the legacy `khmer_name` column and the new canonical `latin_name`
+     * column in sync for compatibility with existing clients.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizeIdentityPayload(
+        array $data,
+        ?string $existingLatinName = null,
+        ?string $existingLegacyName = null,
+    ): array
+    {
+        $hasLatinName = array_key_exists('latin_name', $data);
+        $hasLegacyName = array_key_exists('khmer_name', $data);
+
+        if (! $hasLatinName && ! $hasLegacyName) {
+            return $data;
+        }
+
+        $latinName = $hasLatinName ? trim((string) ($data['latin_name'] ?? '')) : '';
+        $legacyName = $hasLegacyName ? trim((string) ($data['khmer_name'] ?? '')) : '';
+
+        if ($latinName !== '') {
+            $legacyName = $latinName;
+        } elseif ($legacyName !== '') {
+            $latinName = $legacyName;
+        }
+
+        $data['latin_name'] = $latinName !== '' ? $latinName : null;
+        $data['khmer_name'] = $legacyName !== '' ? $legacyName : null;
+
+        return $data;
     }
 
     private function authorizeAdmin(?User $user): ?JsonResponse

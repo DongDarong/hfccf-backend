@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Preschool;
 
+use App\Support\CambodiaLocationContract;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,8 +41,20 @@ class UpdatePreschoolStudentRequest extends FormRequest
             'student_code' => ['sometimes', 'nullable', 'string', 'max:50', Rule::unique('preschool_students', 'student_code')->ignore($studentId)],
             'first_name' => ['sometimes', 'required', 'string', 'max:100'],
             'last_name' => ['sometimes', 'required', 'string', 'max:100'],
+            'latin_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female', 'other'])],
             'date_of_birth' => ['sometimes', 'nullable', 'date'],
+            'place_of_birth' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'nationality' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'ethnicity' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'birth_province_id' => ['sometimes', 'nullable', 'integer', 'exists:cambodia_provinces,id'],
+            'birth_district_id' => ['sometimes', 'nullable', 'integer', 'exists:cambodia_districts,id'],
+            'birth_commune_id' => ['sometimes', 'nullable', 'integer', 'exists:cambodia_communes,id'],
+            'birth_village_id' => ['sometimes', 'nullable', 'integer', 'exists:cambodia_villages,id'],
+            'residence_province_id' => ['sometimes', 'nullable', 'integer', 'exists:cambodia_provinces,id'],
+            'residence_district_id' => ['sometimes', 'nullable', 'integer', 'exists:cambodia_districts,id'],
+            'residence_commune_id' => ['sometimes', 'nullable', 'integer', 'exists:cambodia_communes,id'],
+            'residence_village_id' => ['sometimes', 'nullable', 'integer', 'exists:cambodia_villages,id'],
             'guardian_name' => ['sometimes', 'nullable', 'string', 'max:191'],
             'guardian_phone' => ['sometimes', 'nullable', 'string', 'max:32'],
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -54,5 +67,16 @@ class UpdatePreschoolStudentRequest extends FormRequest
             'override_locked_context' => ['sometimes', 'boolean'],
             'override_reason' => ['required_if:override_locked_context,1', 'nullable', 'string', 'max:500'],
         ];
+    }
+
+    protected function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            foreach (['birth', 'residence'] as $prefix) {
+                foreach (CambodiaLocationContract::hierarchyErrors($this->all(), $prefix) as $field => $message) {
+                    $validator->errors()->add($field, $message);
+                }
+            }
+        });
     }
 }

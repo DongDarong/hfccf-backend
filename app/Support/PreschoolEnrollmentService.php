@@ -15,6 +15,7 @@ use App\Models\PreschoolStudent;
 use App\Models\PreschoolStudentGuardian;
 use App\Models\PreschoolWorkflowInstance;
 use App\Models\User;
+use App\Support\CambodiaLocationContract;
 use App\Services\PreschoolWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -208,6 +209,17 @@ class PreschoolEnrollmentService
             throw new \RuntimeException('Cannot enroll a rejected application.');
         }
 
+        $application->loadMissing([
+            'birthProvince',
+            'birthDistrict',
+            'birthCommune',
+            'birthVillage',
+            'residenceProvince',
+            'residenceDistrict',
+            'residenceCommune',
+            'residenceVillage',
+        ]);
+
         // Resolve academic context (year ID + term ID) before opening the
         // transaction — this involves read-only queries and should not be
         // retried inside the write transaction.
@@ -234,11 +246,37 @@ class PreschoolEnrollmentService
                 'student_code'   => PreschoolStudent::nextStudentCode(),
                 'first_name'     => $application->first_name,
                 'last_name'      => $application->last_name,
+                'latin_name'     => $application->latin_name ?? $application->khmer_name,
                 'gender'         => $application->gender,
                 'date_of_birth'  => $application->date_of_birth,
+                'place_of_birth' => $application->place_of_birth ?: CambodiaLocationContract::composeHierarchyDisplay(
+                    $application->birthProvince,
+                    $application->birthDistrict,
+                    $application->birthCommune,
+                    $application->birthVillage,
+                    null,
+                    'kh'
+                ),
+                'nationality'    => $application->nationality,
+                'ethnicity'      => $application->ethnicity,
+                'birth_province_id' => $application->birth_province_id,
+                'birth_district_id' => $application->birth_district_id,
+                'birth_commune_id' => $application->birth_commune_id,
+                'birth_village_id' => $application->birth_village_id,
+                'residence_province_id' => $application->residence_province_id,
+                'residence_district_id' => $application->residence_district_id,
+                'residence_commune_id' => $application->residence_commune_id,
+                'residence_village_id' => $application->residence_village_id,
                 'guardian_name'  => $application->guardian_name,
                 'guardian_phone' => $application->guardian_phone,
-                'address'        => $application->guardian_address,
+                'address'        => CambodiaLocationContract::composeHierarchyDisplay(
+                    $application->residenceProvince,
+                    $application->residenceDistrict,
+                    $application->residenceCommune,
+                    $application->residenceVillage,
+                    $application->guardian_address,
+                    'kh'
+                ),
                 'status'         => 'active',
             ]);
 

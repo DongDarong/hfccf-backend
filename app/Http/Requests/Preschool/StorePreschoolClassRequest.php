@@ -72,7 +72,15 @@ class StorePreschoolClassRequest extends FormRequest
         return [
             'code' => ['sometimes', 'nullable', 'string', 'max:50'],
             'name' => ['required', 'string', 'max:191'],
-            'teacher_user_id' => ['nullable', 'string', 'exists:users,id'],
+            'teacher_user_id' => [
+                'nullable',
+                'string',
+                Rule::exists('users', 'id')->where(static function ($query) {
+                    $query->where('role_code', 'teacher-preschool')
+                        ->where('status', 'active')
+                        ->whereNull('deleted_at');
+                }),
+            ],
             'teacher_display_name' => ['nullable', 'string', 'max:191'],
             'class_level_id' => [
                 'required',

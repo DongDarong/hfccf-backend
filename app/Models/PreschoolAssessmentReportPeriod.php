@@ -14,6 +14,7 @@ class PreschoolAssessmentReportPeriod extends Model
     protected $table = 'preschool_assessment_report_periods';
 
     protected $fillable = [
+        'period_type',
         'academic_year_id',
         'term_id',
         'name',

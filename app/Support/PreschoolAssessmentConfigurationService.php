@@ -9,6 +9,7 @@ use App\Models\PreschoolAssessmentGradingScale;
 use App\Models\PreschoolAssessmentReportPeriod;
 use App\Models\PreschoolAssessmentSetting;
 use App\Models\PreschoolAssessmentWeight;
+use App\Models\PreschoolReportPeriod;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
@@ -176,10 +177,13 @@ class PreschoolAssessmentConfigurationService
         return $category->refresh();
     }
 
-    public function listReportPeriods(bool $includeArchived = false): Collection
+    public function listReportPeriods(bool $includeArchived = false, array $filters = []): Collection
     {
         $query = PreschoolAssessmentReportPeriod::query()
             ->with(['academicYear', 'term'])
+            ->when(isset($filters['period_type']) && $filters['period_type'] !== '', fn ($builder) => $builder->where('period_type', $this->normalizePeriodType($filters['period_type'])))
+            ->when(isset($filters['academic_year_id']) && $filters['academic_year_id'] !== '', fn ($builder) => $builder->where('academic_year_id', (int) $filters['academic_year_id']))
+            ->when(array_key_exists('term_id', $filters) && $filters['term_id'] !== null && $filters['term_id'] !== '', fn ($builder) => $builder->where('term_id', (int) $filters['term_id']))
             ->orderByDesc('start_date')
             ->orderByDesc('id');
 
@@ -193,9 +197,11 @@ class PreschoolAssessmentConfigurationService
     public function createReportPeriod(array $data, ?User $actor = null): PreschoolAssessmentReportPeriod
     {
         return DB::transaction(function () use ($data, $actor): PreschoolAssessmentReportPeriod {
-            $this->assertReportPeriodIntegrity($data['academic_year_id'] ?? null, $data['term_id'] ?? null, $data['start_date'] ?? null, $data['end_date'] ?? null);
+            $periodType = $this->normalizePeriodType($data['period_type'] ?? null);
+            $this->assertReportPeriodIntegrity($periodType, $data['academic_year_id'] ?? null, $data['term_id'] ?? null, $data['start_date'] ?? null, $data['end_date'] ?? null);
 
             $period = PreschoolAssessmentReportPeriod::query()->create([
+                'period_type' => $periodType,
                 'academic_year_id' => (int) $data['academic_year_id'],
                 'term_id' => $this->nullableInt($data['term_id'] ?? null),
                 'name' => trim((string) $data['name']),
@@ -206,6 +212,8 @@ class PreschoolAssessmentConfigurationService
                 'updated_by' => $actor?->id,
             ]);
 
+            $this->syncRuntimeReportPeriod($period, $actor);
+
             return $period->refresh()->load(['academicYear', 'term']);
         });
     }
@@ -213,19 +221,23 @@ class PreschoolAssessmentConfigurationService
     public function updateReportPeriod(PreschoolAssessmentReportPeriod $period, array $data, ?User $actor = null): PreschoolAssessmentReportPeriod
     {
         return DB::transaction(function () use ($period, $data, $actor): PreschoolAssessmentReportPeriod {
+            $periodType = array_key_exists('period_type', $data)
+                ? $this->normalizePeriodType($data['period_type'] ?? null)
+                : $this->normalizePeriodType($period->period_type ?? null);
             $academicYearId = array_key_exists('academic_year_id', $data) ? $data['academic_year_id'] : $period->academic_year_id;
             $termId = array_key_exists('term_id', $data) ? $data['term_id'] : $period->term_id;
             $startDate = array_key_exists('start_date', $data) ? $data['start_date'] : $period->start_date?->toDateString();
             $endDate = array_key_exists('end_date', $data) ? $data['end_date'] : $period->end_date?->toDateString();
 
-            $this->assertReportPeriodIntegrity($academicYearId, $termId, $startDate, $endDate);
+            $this->assertReportPeriodIntegrity($periodType, $academicYearId, $termId, $startDate, $endDate);
 
-            foreach (['academic_year_id', 'term_id', 'name', 'start_date', 'end_date', 'is_active'] as $field) {
+            foreach (['period_type', 'academic_year_id', 'term_id', 'name', 'start_date', 'end_date', 'is_active'] as $field) {
                 if (! array_key_exists($field, $data)) {
                     continue;
                 }
 
                 $period->{$field} = match ($field) {
+                    'period_type' => $periodType,
                     'academic_year_id' => (int) $data[$field],
                     'term_id' => $this->nullableInt($data[$field] ?? null),
                     'name' => trim((string) $data[$field]),
@@ -236,6 +248,7 @@ class PreschoolAssessmentConfigurationService
 
             $period->updated_by = $actor?->id;
             $period->save();
+            $this->syncRuntimeReportPeriod($period, $actor);
 
             return $period->refresh()->load(['academicYear', 'term']);
         });
@@ -246,6 +259,7 @@ class PreschoolAssessmentConfigurationService
         $period->is_active = false;
         $period->updated_by = $actor?->id;
         $period->save();
+        $this->syncRuntimeReportPeriod($period, $actor);
         $period->delete();
 
         return $period->refresh()->load(['academicYear', 'term']);
@@ -343,10 +357,14 @@ class PreschoolAssessmentConfigurationService
             ->first();
     }
 
-    public function calculateWeightedScore(array $categoryScores): float
+    public function calculateWeightedScore(array $categoryScores): ?float
     {
         $settings = $this->getSettings();
         $scores = collect($categoryScores);
+
+        if ($scores->isEmpty()) {
+            return null;
+        }
 
         if (! $settings->weighting_enabled) {
             return round((float) ($scores->avg('score') ?? 0), 2);
@@ -400,8 +418,9 @@ class PreschoolAssessmentConfigurationService
         }
     }
 
-    private function assertReportPeriodIntegrity(mixed $academicYearId, mixed $termId, mixed $startDate, mixed $endDate): void
+    private function assertReportPeriodIntegrity(mixed $periodType, mixed $academicYearId, mixed $termId, mixed $startDate, mixed $endDate): void
     {
+        $periodType = $this->normalizePeriodType($periodType);
         $academicYear = PreschoolAcademicYear::query()->find($academicYearId);
 
         if (! $academicYear) {
@@ -436,16 +455,47 @@ class PreschoolAssessmentConfigurationService
             }
         }
 
-        if ($termId === null || $termId === '') {
-            throw ValidationException::withMessages([
-                'term_id' => 'The selected term is required.',
-            ]);
+        if ($periodType === 'term') {
+            if ($termId === null || $termId === '') {
+                throw ValidationException::withMessages([
+                    'term_id' => 'The selected term is required.',
+                ]);
+            }
+
+            $term = PreschoolAcademicTerm::query()->find($termId);
+            if (! $term || (int) $term->academic_year_id !== (int) $academicYearId) {
+                throw ValidationException::withMessages([
+                    'term_id' => 'The selected term must belong to the selected academic year.',
+                ]);
+            }
+
+            if ($term->start_date && $term->end_date) {
+                $termStart = $term->start_date->toDateString();
+                $termEnd = $term->end_date->toDateString();
+
+                if ($start < $termStart || $end > $termEnd) {
+                    throw ValidationException::withMessages([
+                        'start_date' => 'The term period must fall within the selected term.',
+                        'end_date' => 'The term period must fall within the selected term.',
+                    ]);
+                }
+            }
+        } elseif ($termId !== null && $termId !== '') {
+            $term = PreschoolAcademicTerm::query()->find($termId);
+            if (! $term || (int) $term->academic_year_id !== (int) $academicYearId) {
+                throw ValidationException::withMessages([
+                    'term_id' => 'The selected term must belong to the selected academic year.',
+                ]);
+            }
         }
 
-        $term = PreschoolAcademicTerm::query()->find($termId);
-        if (! $term || (int) $term->academic_year_id !== (int) $academicYearId) {
+        if ($periodType === 'annual' && $start !== $academicYear->start_date?->toDateString() && $academicYear->start_date && $academicYear->end_date) {
+            // Annual periods may span the academic year, but they must not extend beyond it.
+        }
+
+        if (! in_array($periodType, ['monthly', 'term', 'annual'], true)) {
             throw ValidationException::withMessages([
-                'term_id' => 'The selected term must belong to the selected academic year.',
+                'period_type' => 'The selected period type is invalid.',
             ]);
         }
     }
@@ -478,5 +528,44 @@ class PreschoolAssessmentConfigurationService
         $value = trim((string) $value);
 
         return $value === '' ? null : \Illuminate\Support\Carbon::parse($value)->toDateString();
+    }
+
+    private function normalizePeriodType(mixed $value): string
+    {
+        $value = strtolower(trim((string) $value));
+
+        return in_array($value, ['monthly', 'term', 'annual'], true) ? $value : 'term';
+    }
+
+    private function syncRuntimeReportPeriod(PreschoolAssessmentReportPeriod $period, ?User $actor = null): void
+    {
+        $runtime = PreschoolReportPeriod::query()->firstOrNew([
+            'period_label' => trim((string) $period->name),
+            'period_type' => $this->normalizePeriodType($period->period_type),
+            'academic_year_id' => $period->academic_year_id,
+            'term_id' => $period->term_id,
+        ]);
+
+        $runtime->fill([
+            'from_date' => $period->start_date?->toDateString(),
+            'to_date' => $period->end_date?->toDateString(),
+            'status' => $period->is_active ? 'active' : 'archived',
+        ]);
+
+        if (! $runtime->exists) {
+            $runtime->summary_snapshot = $runtime->summary_snapshot ?? null;
+            $runtime->report_snapshot = $runtime->report_snapshot ?? null;
+        }
+
+        if (! $runtime->exists || $runtime->status !== 'archived') {
+            $runtime->status = $period->is_active ? 'active' : 'archived';
+        }
+
+        if ($runtime->status === 'archived') {
+            $runtime->archived_at ??= now();
+            $runtime->archived_by ??= $actor?->id;
+        }
+
+        $runtime->save();
     }
 }

@@ -13,6 +13,7 @@ use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -66,15 +67,21 @@ class PreschoolAnalyticsTest extends TestCase
         $admin = $this->makeUserWithRole('adminpreschool', 'ana-admin-020', 'ana-admin-020@hfccf.org');
         Sanctum::actingAs($admin);
 
-        $this->seedAnalyticsDataset($admin);
+        Carbon::setTestNow(Carbon::parse('2026-07-08 10:00:00'));
 
-        $this->getJson('/api/preschool/analytics/sessions')
-            ->assertOk()
-            ->assertJsonPath('data.scope', 'sessions')
-            ->assertJsonPath('data.summary.totalSessions', 2)
-            ->assertJsonPath('data.summary.completed', 1)
-            ->assertJsonPath('data.summary.missing', 1)
-            ->assertJsonPath('data.summary.averageSessionDuration', 45);
+        try {
+            $this->seedAnalyticsDataset($admin);
+
+            $this->getJson('/api/preschool/analytics/sessions')
+                ->assertOk()
+                ->assertJsonPath('data.scope', 'sessions')
+                ->assertJsonPath('data.summary.totalSessions', 2)
+                ->assertJsonPath('data.summary.completed', 1)
+                ->assertJsonPath('data.summary.missing', 1)
+                ->assertJsonPath('data.summary.averageSessionDuration', 45);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_schedule_analytics_reports_heatmap_and_utilization(): void

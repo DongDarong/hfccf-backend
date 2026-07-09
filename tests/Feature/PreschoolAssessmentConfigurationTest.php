@@ -70,6 +70,15 @@ class PreschoolAssessmentConfigurationTest extends TestCase
         Sanctum::actingAs($teacher);
 
         $this->getJson('/api/preschool/settings/assessments')->assertForbidden();
+        $this->postJson('/api/preschool/settings/assessments/report-periods', [
+            'period_type' => 'term',
+            'academic_year_id' => 1,
+            'term_id' => 1,
+            'name' => 'Blocked',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-01-31',
+            'is_active' => true,
+        ])->assertForbidden();
     }
 
     public function test_unrelated_admin_forbidden(): void
@@ -172,6 +181,7 @@ class PreschoolAssessmentConfigurationTest extends TestCase
         $term = $this->createTerm($academicYear->id, 'TERM-1', 'Term 1');
 
         $period = $this->postJson('/api/preschool/settings/assessments/report-periods', [
+            'period_type' => 'term',
             'academic_year_id' => $academicYear->id,
             'term_id' => $term->id,
             'name' => 'Midterm',
@@ -183,6 +193,35 @@ class PreschoolAssessmentConfigurationTest extends TestCase
             ->assertJsonPath('data.period.name', 'Midterm');
 
         $periodId = $period->json('data.period.id');
+
+        $this->postJson('/api/preschool/settings/assessments/report-periods', [
+            'period_type' => 'monthly',
+            'academic_year_id' => $academicYear->id,
+            'term_id' => null,
+            'name' => 'September',
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-09-30',
+            'is_active' => true,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.period.period_type', 'monthly');
+
+        $this->postJson('/api/preschool/settings/assessments/report-periods', [
+            'period_type' => 'annual',
+            'academic_year_id' => $academicYear->id,
+            'term_id' => null,
+            'name' => 'Academic Year',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'is_active' => true,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.period.period_type', 'annual');
+
+        $this->getJson('/api/preschool/settings/assessments/report-periods?period_type=term')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.items.0.period_type', 'term');
 
         $this->putJson('/api/preschool/settings/assessments/report-periods/'.$periodId, [
             'name' => 'Midterm Updated',
@@ -329,6 +368,7 @@ class PreschoolAssessmentConfigurationTest extends TestCase
     private function createReportPeriod(int $academicYearId, string $name): PreschoolAssessmentReportPeriod
     {
         return PreschoolAssessmentReportPeriod::query()->create([
+            'period_type' => 'term',
             'academic_year_id' => $academicYearId,
             'term_id' => null,
             'name' => $name,

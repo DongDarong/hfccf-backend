@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Dsam\FormSubmission;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
@@ -19,8 +20,20 @@ class PreschoolStudent extends Model
         'student_code',
         'first_name',
         'last_name',
+        'latin_name',
         'gender',
         'date_of_birth',
+        'place_of_birth',
+        'nationality',
+        'ethnicity',
+        'birth_province_id',
+        'birth_district_id',
+        'birth_commune_id',
+        'birth_village_id',
+        'residence_province_id',
+        'residence_district_id',
+        'residence_commune_id',
+        'residence_village_id',
         'guardian_name',
         'guardian_phone',
         'address',
@@ -116,6 +129,46 @@ class PreschoolStudent extends Model
             'id',
             'id',
         )->orderByDesc('issued_at');
+    }
+
+    public function birthProvince(): BelongsTo
+    {
+        return $this->belongsTo(CambodiaProvince::class, 'birth_province_id');
+    }
+
+    public function birthDistrict(): BelongsTo
+    {
+        return $this->belongsTo(CambodiaDistrict::class, 'birth_district_id');
+    }
+
+    public function birthCommune(): BelongsTo
+    {
+        return $this->belongsTo(CambodiaCommune::class, 'birth_commune_id');
+    }
+
+    public function birthVillage(): BelongsTo
+    {
+        return $this->belongsTo(CambodiaVillage::class, 'birth_village_id');
+    }
+
+    public function residenceProvince(): BelongsTo
+    {
+        return $this->belongsTo(CambodiaProvince::class, 'residence_province_id');
+    }
+
+    public function residenceDistrict(): BelongsTo
+    {
+        return $this->belongsTo(CambodiaDistrict::class, 'residence_district_id');
+    }
+
+    public function residenceCommune(): BelongsTo
+    {
+        return $this->belongsTo(CambodiaCommune::class, 'residence_commune_id');
+    }
+
+    public function residenceVillage(): BelongsTo
+    {
+        return $this->belongsTo(CambodiaVillage::class, 'residence_village_id');
     }
 
     /**

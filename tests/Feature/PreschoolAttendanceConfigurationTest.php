@@ -158,6 +158,39 @@ class PreschoolAttendanceConfigurationTest extends TestCase
         ]);
     }
 
+    public function test_calendar_events_list_accepts_maximum_per_page_and_returns_pagination_metadata(): void
+    {
+        $superadmin = $this->makeUserWithRole('superadmin', 'usr_pas_105a', 'superadmin.settings105a@hfccf.org');
+        Sanctum::actingAs($superadmin);
+        $academicYear = $this->createAcademicYear('AY-2026-LIST', '2026 - 2027');
+        $this->createCalendarEvent($academicYear->id, 'Event A', 'holiday', '2026-09-24', '2026-09-24');
+        $this->createCalendarEvent($academicYear->id, 'Event B', 'special_event', '2026-10-01', '2026-10-01');
+
+        $response = $this->getJson('/api/preschool/settings/attendance/calendar-events?per_page=100&page=1');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.items.0.title', 'Event A')
+            ->assertJsonPath('data.pagination.page', 1)
+            ->assertJsonPath('data.pagination.perPage', 100)
+            ->assertJsonPath('data.pagination.total', 2)
+            ->assertJsonPath('data.pagination.totalPages', 1);
+    }
+
+    public function test_calendar_events_list_rejects_oversized_per_page(): void
+    {
+        $superadmin = $this->makeUserWithRole('superadmin', 'usr_pas_105b', 'superadmin.settings105b@hfccf.org');
+        Sanctum::actingAs($superadmin);
+
+        $response = $this->getJson('/api/preschool/settings/attendance/calendar-events?per_page=250');
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'The per page field must not be greater than 100.')
+            ->assertJsonPath('data.errors.per_page.0', 'The per page field must not be greater than 100.');
+    }
+
     public function test_calendar_event_validates_date_range(): void
     {
         $admin = $this->makeUserWithRole('adminpreschool', 'usr_pas_106', 'adminpreschool.settings106@hfccf.org');

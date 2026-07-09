@@ -179,7 +179,7 @@ class PreschoolClassroomResourceController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (in_array($user->role_code, ['superadmin', 'adminpreschool', 'teacherpreschool'], true)) {
+        if (in_array($user->role_code, ['superadmin', 'adminpreschool', 'teacher-preschool'], true)) {
             return null;
         }
 

@@ -97,11 +97,15 @@ class CambodiaLocationController extends Controller
 
     private function formatLocations($items): array
     {
-        return $items->map(static fn ($item): array => [
+        return $items->map(static fn ($item): array => array_filter([
+            'id' => $item->id,
             'code' => $item->code,
             'name_kh' => $item->name_kh,
             'name_en' => $item->name_en,
-        ])->values()->all();
+            'province_id' => $item->province_id ?? null,
+            'district_id' => $item->district_id ?? null,
+            'commune_id' => $item->commune_id ?? null,
+        ], static fn ($value): bool => $value !== null))->values()->all();
     }
 
     private function notFound(string $message): JsonResponse

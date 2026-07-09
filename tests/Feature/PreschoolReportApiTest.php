@@ -50,12 +50,14 @@ class PreschoolReportApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.periods.0.label', 'Term 1')
+            ->assertJsonPath('data.periods.0.periodType', 'term')
             ->assertJsonPath('data.periods.0.assessmentCount', 3);
 
         $this->getJson("/api/preschool/students/{$studentOne->id}/reports")
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.periods.0.label', 'Term 1')
+            ->assertJsonPath('data.report.scoreSummary.includedAssessments', 2)
             ->assertJsonPath('data.report.summary.finalizedAssessments', 2)
             ->assertJsonPath('data.report.attendanceSummary.presentCount', 1)
             ->assertJsonPath('data.report.assessments.0.status', PreschoolAssessmentStatus::FINALIZED);
@@ -69,6 +71,7 @@ class PreschoolReportApiTest extends TestCase
         $this->getJson("/api/preschool/classes/{$class->id}/reports")
             ->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.report.scoreSummary.includedAssessments', 3)
             ->assertJsonPath('data.report.summary.finalizedAssessments', 3)
             ->assertJsonPath('data.report.summary.studentCount', 2)
             ->assertJsonPath('data.report.studentSummaries.0.student.fullName', 'Dara Sok');
@@ -78,6 +81,45 @@ class PreschoolReportApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.report.summary.finalizedAssessments', 3)
             ->assertJsonPath('data.report.assessments.0.status', PreschoolAssessmentStatus::FINALIZED);
+    }
+
+    public function test_report_scores_ignore_categories_without_assessed_scores_instead_of_treating_them_as_zero(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'psr-101', 'preschool.report101@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $class = $this->createPreschoolClass('PS-REPORT-101', 'Weighted Report Class');
+        $student = $this->createPreschoolStudent('PS-REPORT-104', 'Sothea', 'Rin');
+        $this->attachStudentToClass($class->id, $student->id);
+
+        $learningProgressId = $this->categoryId('learning_progress');
+        $behaviorId = $this->categoryId('behavior');
+
+        $this->insertAssessment($student->id, $class->id, $learningProgressId, 'Term 1', '2026-05-10', 85, PreschoolAssessmentStatus::FINALIZED, 'Strong focus.', $admin->id, $admin->id);
+
+        DB::table('preschool_student_assessments')->insert([
+            'student_id' => $student->id,
+            'class_id' => $class->id,
+            'category_id' => $behaviorId,
+            'assessed_by_user_id' => $admin->id,
+            'period_label' => 'Term 1',
+            'assessment_date' => '2026-05-11',
+            'score' => null,
+            'rating' => null,
+            'observation' => 'No numeric score captured.',
+            'teacher_comment' => 'No numeric score captured.',
+            'status' => PreschoolAssessmentStatus::FINALIZED,
+            'finalized_at' => now(),
+            'finalized_by_user_id' => $admin->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->getJson("/api/preschool/students/{$student->id}/reports")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.report.scoreSummary.overallScore', 85)
+            ->assertJsonFragment(['code' => 'behavior']);
     }
 
     public function test_teacher_access_is_limited_to_assigned_students_and_classes(): void

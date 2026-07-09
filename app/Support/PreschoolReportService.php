@@ -2,9 +2,9 @@
 
 namespace App\Support;
 
-use App\Models\PreschoolStudent;
 use App\Models\PreschoolReportPeriod;
 use App\Models\PreschoolReportSnapshot;
+use App\Models\PreschoolStudent;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -20,30 +20,30 @@ final class PreschoolReportService
      * Student reports stay derived from finalized assessment data so every
      * report page can safely reuse the same contract without a PDF snapshot.
      */
-    public function bundle(User $user, PreschoolStudent $student, ?string $periodLabel = null): array
+    public function bundle(User $user, PreschoolStudent $student, ?string $periodLabel = null, array $filters = []): array
     {
-        $periods = app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
-        $selectedPeriod = $this->resolveSelectedPeriod($periods, $periodLabel);
+        $periods = app(PreschoolReportPeriodService::class)->reportPeriods($user, $student, null, $filters);
+        $selectedPeriod = $this->resolveSelectedPeriod($periods, $periodLabel, $filters['report_period_id'] ?? null);
 
         return [
             'student' => $this->studentSnapshot($student),
             'periods' => $periods->all(),
-            'period' => $selectedPeriod ? $this->periodFromPeriods($periods, $selectedPeriod) : null,
+            'period' => $selectedPeriod,
             'report' => $selectedPeriod ? $this->studentReportForPeriods($user, $student, $selectedPeriod, $periods) : null,
         ];
     }
 
-    public function reportPeriods(User $user, ?PreschoolStudent $student = null): Collection
+    public function reportPeriods(User $user, ?PreschoolStudent $student = null, array $filters = []): Collection
     {
-        return app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
+        return app(PreschoolReportPeriodService::class)->reportPeriods($user, $student, null, $filters);
     }
 
-    public function studentReportForPeriod(User $user, PreschoolStudent $student, string $periodLabel): array
+    public function studentReportForPeriod(User $user, PreschoolStudent $student, string $periodLabel, array $filters = []): array
     {
-        $periods = app(PreschoolReportPeriodService::class)->reportPeriods($user, $student);
-        $selectedPeriod = $this->normalizeLabel($periodLabel);
+        $periods = app(PreschoolReportPeriodService::class)->reportPeriods($user, $student, null, $filters);
+        $selectedPeriod = $this->resolveSelectedPeriod($periods, $periodLabel, $filters['report_period_id'] ?? null);
 
-        if ($periods->doesntContain('label', $selectedPeriod)) {
+        if (! $selectedPeriod) {
             throw ValidationException::withMessages([
                 'period' => 'Selected report period is not available.',
             ]);
@@ -52,19 +52,16 @@ final class PreschoolReportService
         return $this->studentReportForPeriods($user, $student, $selectedPeriod, $periods);
     }
 
-    private function studentReportForPeriods(User $user, PreschoolStudent $student, string $periodLabel, Collection $periods): array
+    private function studentReportForPeriods(User $user, PreschoolStudent $student, array $period, Collection $periods): array
     {
-        $period = $this->periodFromPeriods($periods, $periodLabel);
-        if ($period) {
-            $snapshot = app(PreschoolReportSnapshotService::class)->latestForContext('student_report', $this->snapshotContext($student, $period));
-            if ($snapshot) {
-                return $this->decorateReport($snapshot->snapshot_payload['report'] ?? $snapshot->snapshot_payload, $snapshot);
-            }
+        $snapshot = app(PreschoolReportSnapshotService::class)->latestForContext('student_report', $this->snapshotContext($student, $period));
+        if ($snapshot) {
+            return $this->decorateReport($snapshot->snapshot_payload['report'] ?? $snapshot->snapshot_payload, $snapshot);
         }
 
-        $report = $this->buildStudentReport($user, $student, $periodLabel, $periods);
+        $report = $this->buildStudentReport($user, $student, $period, $periods);
 
-        if ($period && $this->isFrozenPeriod($period)) {
+        if ($this->isFrozenPeriod($period)) {
             $snapshot = app(PreschoolReportSnapshotService::class)->storeSnapshot(
                 'student_report',
                 $this->snapshotContext($student, $period),
@@ -83,10 +80,12 @@ final class PreschoolReportService
         return $this->decorateReport($report, null);
     }
 
-    private function buildStudentReport(User $user, PreschoolStudent $student, string $periodLabel, Collection $periods): array
+    private function buildStudentReport(User $user, PreschoolStudent $student, array $period, Collection $periods): array
     {
-        $assessments = $this->aggregation->finalizedAssessmentsForStudent($user, $student, $periodLabel);
-        $period = $this->periodFromPeriods($periods, $periodLabel);
+        $periodModel = $this->periodModelFromRow($period);
+        $assessments = $periodModel
+            ? $this->aggregation->finalizedAssessmentsForPeriod($user, $student, null, $periodModel)
+            : $this->aggregation->finalizedAssessmentsForStudent($user, $student, (string) ($period['label'] ?? ''));
 
         if ($assessments->isEmpty()) {
             throw ValidationException::withMessages([
@@ -94,8 +93,8 @@ final class PreschoolReportService
             ]);
         }
 
-        $attendance = $period
-            ? $this->aggregation->studentAttendanceSummary($student, $period['fromDate'], $period['toDate'])
+        $attendance = $periodModel && $periodModel->from_date && $periodModel->to_date
+            ? $this->aggregation->studentAttendanceSummary($student, $periodModel->from_date->toDateString(), $periodModel->to_date->toDateString())
             : [
                 'attendanceCount' => 0,
                 'presentCount' => 0,
@@ -152,6 +151,7 @@ final class PreschoolReportService
                 'latestAssessmentDate' => $assessments->first()?->assessment_date?->toDateString(),
                 'observationCount' => count($observations),
             ],
+            'scoreSummary' => $this->aggregation->scoreSummary($assessments),
             'attendanceSummary' => $attendance,
             'categorySummaries' => $categorySummaries,
             'observations' => $observations,
@@ -182,21 +182,26 @@ final class PreschoolReportService
         ];
     }
 
-    private function resolveSelectedPeriod(Collection $periods, ?string $periodLabel = null): ?string
+    private function resolveSelectedPeriod(Collection $periods, ?string $periodLabel = null, mixed $reportPeriodId = null): ?array
     {
-        $requested = $this->normalizeLabel($periodLabel ?? '');
-
-        if ($requested !== '') {
-            return $requested;
+        $resolvedId = $this->nullableInt($reportPeriodId);
+        if ($resolvedId !== null) {
+            $matched = $periods->firstWhere('reportPeriodId', $resolvedId);
+            if ($matched) {
+                return $matched;
+            }
         }
 
-        return (string) ($periods->first()['label'] ?? '');
+        $requested = $this->normalizeLabel($periodLabel ?? '');
+        if ($requested !== '') {
+            return $periods->firstWhere('label', $requested);
+        }
+
+        return $periods->first() ?: null;
     }
 
-    private function periodFromPeriods(Collection $periods, string $periodLabel): ?array
+    private function periodFromPeriods(Collection $periods, array $period): ?array
     {
-        $period = $periods->firstWhere('label', $periodLabel);
-
         return $period ?: null;
     }
 
@@ -263,5 +268,27 @@ final class PreschoolReportService
     private function isFrozenPeriod(array $period): bool
     {
         return in_array(strtolower((string) ($period['status'] ?? '')), ['finalized', 'locked', 'archived'], true);
+    }
+
+    private function periodModelFromRow(array $period): ?PreschoolReportPeriod
+    {
+        $reportPeriodId = $this->nullableInt($period['reportPeriodId'] ?? $period['id'] ?? null);
+
+        if ($reportPeriodId === null) {
+            return null;
+        }
+
+        return PreschoolReportPeriod::query()
+            ->with(['academicYear', 'term', 'lockedBy', 'finalizedBy', 'archivedBy'])
+            ->find($reportPeriodId);
+    }
+
+    private function nullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) $value;
     }
 }

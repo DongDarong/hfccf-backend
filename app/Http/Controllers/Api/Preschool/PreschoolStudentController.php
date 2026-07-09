@@ -9,6 +9,7 @@ use App\Http\Resources\Preschool\PreschoolStudentResource;
 use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolStudent;
 use App\Models\User;
+use App\Support\CambodiaLocationContract;
 use App\Support\ImageStorage;
 use App\Support\PreschoolAcademicLifecycleService;
 use App\Support\PreschoolLifecycleGuardService;
@@ -21,7 +22,7 @@ class PreschoolStudentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeAdmin($request->user())) {
+        if ($response = $this->authorizeStudentViewer($request->user())) {
             return $response;
         }
 
@@ -47,7 +48,7 @@ class PreschoolStudentController extends Controller
             ? 'asc'
             : 'desc';
 
-        $query = PreschoolStudent::query()->with(['classes']);
+        $query = PreschoolStudent::query()->with(array_merge(['classes'], $this->studentLocationRelations()));
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -55,6 +56,10 @@ class PreschoolStudentController extends Controller
                 $builder->where('student_code', 'like', $like)
                     ->orWhere('first_name', 'like', $like)
                     ->orWhere('last_name', 'like', $like)
+                    ->orWhere('latin_name', 'like', $like)
+                    ->orWhere('place_of_birth', 'like', $like)
+                    ->orWhere('nationality', 'like', $like)
+                    ->orWhere('ethnicity', 'like', $like)
                     ->orWhere('guardian_name', 'like', $like)
                     ->orWhere('guardian_phone', 'like', $like)
                     ->orWhere('address', 'like', $like)
@@ -71,8 +76,16 @@ class PreschoolStudentController extends Controller
         }
 
         if ($classId !== '') {
-            $query->whereHas('classes', static function (Builder $builder) use ($classId): void {
+            $query->whereHas('classes', static function (Builder $builder) use ($classId, $request): void {
                 $builder->where('preschool_classes.id', $classId);
+
+                if ($request->user()?->role_code === 'teacher-preschool') {
+                    $builder->where('teacher_user_id', $request->user()->id);
+                }
+            });
+        } elseif ($request->user()?->role_code === 'teacher-preschool') {
+            $query->whereHas('classes', static function (Builder $builder) use ($request): void {
+                $builder->where('teacher_user_id', $request->user()->id);
             });
         }
 
@@ -115,8 +128,20 @@ class PreschoolStudentController extends Controller
             'student_code' => $data['student_code'] ?? PreschoolStudent::nextStudentCode(),
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
+            'latin_name' => $data['latin_name'] ?? null,
             'gender' => $data['gender'] ?? null,
             'date_of_birth' => $data['date_of_birth'] ?? null,
+            'place_of_birth' => $data['place_of_birth'] ?? null,
+            'nationality' => $data['nationality'] ?? null,
+            'ethnicity' => $data['ethnicity'] ?? null,
+            'birth_province_id' => $data['birth_province_id'] ?? null,
+            'birth_district_id' => $data['birth_district_id'] ?? null,
+            'birth_commune_id' => $data['birth_commune_id'] ?? null,
+            'birth_village_id' => $data['birth_village_id'] ?? null,
+            'residence_province_id' => $data['residence_province_id'] ?? null,
+            'residence_district_id' => $data['residence_district_id'] ?? null,
+            'residence_commune_id' => $data['residence_commune_id'] ?? null,
+            'residence_village_id' => $data['residence_village_id'] ?? null,
             'guardian_name' => $data['guardian_name'] ?? null,
             'guardian_phone' => $data['guardian_phone'] ?? null,
             'address' => $data['address'] ?? null,
@@ -125,8 +150,32 @@ class PreschoolStudentController extends Controller
             'avatar' => ImageStorage::store($request->file('avatar'), 'preschool/students'),
         ]);
 
+        if (blank($student->address)) {
+            $student->address = CambodiaLocationContract::composeHierarchyDisplay(
+                $student->residenceProvince,
+                $student->residenceDistrict,
+                $student->residenceCommune,
+                $student->residenceVillage,
+                null,
+                'kh',
+            );
+        }
+
+        if (blank($student->place_of_birth)) {
+            $student->place_of_birth = CambodiaLocationContract::composeHierarchyDisplay(
+                $student->birthProvince,
+                $student->birthDistrict,
+                $student->birthCommune,
+                $student->birthVillage,
+                null,
+                'kh',
+            );
+        }
+
+        $student->save();
+
         $this->syncStudentClasses($student, $data['class_ids'] ?? []);
-        $student->load(['classes']);
+        $student->load(array_merge(['classes'], $this->studentLocationRelations()));
 
         return response()->json([
             'success' => true,
@@ -143,7 +192,7 @@ class PreschoolStudentController extends Controller
             return $response;
         }
 
-        $student = PreschoolStudent::query()->with(['classes'])->find($id);
+        $student = PreschoolStudent::query()->with(array_merge(['classes'], $this->studentLocationRelations()))->find($id);
 
         if (! $student) {
             return response()->json([
@@ -184,11 +233,39 @@ class PreschoolStudentController extends Controller
             }
         }
 
-        foreach (['student_code', 'first_name', 'last_name', 'gender', 'date_of_birth', 'guardian_name', 'guardian_phone', 'address', 'status', 'student_type'] as $field) {
+        foreach ([
+            'student_code',
+            'first_name',
+            'last_name',
+            'latin_name',
+            'gender',
+            'date_of_birth',
+            'place_of_birth',
+            'nationality',
+            'ethnicity',
+            'birth_province_id',
+            'birth_district_id',
+            'birth_commune_id',
+            'birth_village_id',
+            'residence_province_id',
+            'residence_district_id',
+            'residence_commune_id',
+            'residence_village_id',
+            'guardian_name',
+            'guardian_phone',
+            'address',
+            'status',
+            'student_type',
+        ] as $field) {
             if (array_key_exists($field, $data)) {
                 $student->{$field} = $data[$field];
             }
         }
+
+        $hasResidenceUpdate = array_key_exists('residence_province_id', $data)
+            || array_key_exists('residence_district_id', $data)
+            || array_key_exists('residence_commune_id', $data)
+            || array_key_exists('residence_village_id', $data);
 
         $replaceAvatar = $request->hasFile('avatar');
         $removeAvatar = (bool) ($data['remove_avatar'] ?? false);
@@ -201,9 +278,31 @@ class PreschoolStudentController extends Controller
             $student->avatar = null;
         }
 
+        if ($hasResidenceUpdate && ! array_key_exists('address', $data)) {
+            $student->address = CambodiaLocationContract::composeHierarchyDisplay(
+                $student->residenceProvince,
+                $student->residenceDistrict,
+                $student->residenceCommune,
+                $student->residenceVillage,
+                null,
+                'kh',
+            );
+        }
+
+        if (($hasResidenceUpdate || array_key_exists('birth_province_id', $data) || array_key_exists('birth_district_id', $data) || array_key_exists('birth_commune_id', $data) || array_key_exists('birth_village_id', $data)) && ! array_key_exists('place_of_birth', $data)) {
+            $student->place_of_birth = $student->place_of_birth ?: CambodiaLocationContract::composeHierarchyDisplay(
+                $student->birthProvince,
+                $student->birthDistrict,
+                $student->birthCommune,
+                $student->birthVillage,
+                null,
+                'kh',
+            );
+        }
+
         $student->save();
         $this->syncStudentClasses($student, $data['class_ids'] ?? null);
-        $student->load(['classes']);
+        $student->load(array_merge(['classes'], $this->studentLocationRelations()));
 
         return response()->json([
             'success' => true,
@@ -303,6 +402,23 @@ class PreschoolStudentController extends Controller
         }
     }
 
+    /**
+     * @return array<int, string>
+     */
+    private function studentLocationRelations(): array
+    {
+        return [
+            'birthProvince',
+            'birthDistrict',
+            'birthCommune',
+            'birthVillage',
+            'residenceProvince',
+            'residenceDistrict',
+            'residenceCommune',
+            'residenceVillage',
+        ];
+    }
+
     private function authorizeAdmin(?User $user): ?JsonResponse
     {
         if (! $user) {
@@ -314,6 +430,27 @@ class PreschoolStudentController extends Controller
         }
 
         if (in_array($user->role_code, ['superadmin', 'adminpreschool'], true)) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Forbidden.',
+            'data' => null,
+        ], Response::HTTP_FORBIDDEN);
+    }
+
+    private function authorizeStudentViewer(?User $user): ?JsonResponse
+    {
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+                'data' => null,
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (in_array($user->role_code, ['superadmin', 'adminpreschool', 'teacher-preschool'], true)) {
             return null;
         }
 

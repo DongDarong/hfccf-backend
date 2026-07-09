@@ -24,7 +24,11 @@ class PreschoolAssessmentReportPeriodController extends Controller
             'success' => true,
             'message' => 'Preschool assessment report periods retrieved successfully.',
             'data' => [
-                'items' => PreschoolAssessmentReportPeriodResource::collection($service->listReportPeriods(true))->resolve($request),
+                'items' => PreschoolAssessmentReportPeriodResource::collection($service->listReportPeriods(true, [
+                    'period_type' => $request->query('period_type'),
+                    'academic_year_id' => $request->query('academic_year_id'),
+                    'term_id' => $request->query('term_id'),
+                ]))->resolve($request),
             ],
         ], Response::HTTP_OK);
     }

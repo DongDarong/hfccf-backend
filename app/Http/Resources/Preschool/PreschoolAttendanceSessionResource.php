@@ -12,6 +12,12 @@ class PreschoolAttendanceSessionResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $recordCount = $this->relationLoaded('attendanceRecords')
+            ? $this->attendanceRecords->count()
+            : (int) ($this->attendance_count ?? $this->attendanceRecords()->count());
+        $studentCount = (int) ($this->preschoolClass?->students_count ?? 0);
+        $missingCount = max($studentCount - $recordCount, 0);
+
         return [
             'id' => $this->id,
             'classId' => $this->preschool_class_id,
@@ -29,6 +35,7 @@ class PreschoolAttendanceSessionResource extends JsonResource
             'startTime' => $this->formatTime($this->start_time),
             'endTime' => $this->formatTime($this->end_time),
             'status' => $this->status,
+            'statusLabel' => $this->status,
             'isScheduled' => $this->status === 'scheduled',
             'isOpen' => $this->status === 'open',
             'isCompleted' => $this->status === 'completed',
@@ -36,6 +43,12 @@ class PreschoolAttendanceSessionResource extends JsonResource
             'isCancelled' => $this->status === 'cancelled',
             'generatedFromSchedule' => (bool) $this->generated_from_schedule,
             'notes' => $this->notes,
+            'studentCount' => $studentCount,
+            'recordedStudents' => $recordCount,
+            'missingStudents' => $missingCount,
+            'completionRate' => $studentCount > 0 ? round(($recordCount / $studentCount) * 100, 2) : 0.0,
+            'canRecord' => ! in_array($this->status, ['completed', 'locked', 'cancelled'], true),
+            'canViewDetails' => true,
             'createdByUserId' => $this->created_by,
             'createdByName' => $this->createdBy?->name,
             'openedByUserId' => $this->opened_by,
@@ -57,7 +70,8 @@ class PreschoolAttendanceSessionResource extends JsonResource
             'cancelledByName' => $this->cancelledBy?->name,
             'cancelledAt' => $this->cancelled_at?->toISOString(),
             'cancellationReason' => $this->cancellation_reason,
-            'attendanceCount' => $this->whenCounted('attendanceRecords'),
+            'attendanceCount' => $recordCount,
+            'recordsCount' => $recordCount,
             'records' => $this->relationLoaded('attendanceRecords')
                 ? PreschoolAttendanceResource::collection($this->attendanceRecords)->resolve($request)
                 : [],

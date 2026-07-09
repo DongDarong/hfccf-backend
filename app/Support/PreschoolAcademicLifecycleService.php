@@ -650,7 +650,7 @@ class PreschoolAcademicLifecycleService
     {
         $value = trim((string) $value);
 
-        return in_array($value, ['draft', 'active', 'closed', 'archived'], true) ? $value : 'active';
+        return in_array($value, ['active', 'closed', 'archived'], true) ? $value : 'active';
     }
 
     private function resolveYearName(PreschoolAcademicYear $year): string

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\PreschoolAttendanceRecord;
 use App\Models\PreschoolAttendanceSession;
+use App\Models\PreschoolClassStudent;
 use App\Models\PreschoolScheduleEntry;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -266,6 +267,10 @@ class PreschoolAttendanceSessionService
         $saved = collect();
 
         foreach ($records as $recordData) {
+            if ($actor->role_code === 'teacher-preschool') {
+                $this->ensureTeacherCanAccessSessionStudent($actor, $session, (int) $recordData['student_id']);
+            }
+
             $attendance = PreschoolAttendanceRecord::query()->updateOrCreate(
                 [
                     'attendance_session_id' => $session->id,
@@ -573,6 +578,22 @@ class PreschoolAttendanceSessionService
     private function ensureCanAccessSession(User $actor, PreschoolAttendanceSession $session): void
     {
         $this->ensureCanManageSession($actor, $session);
+    }
+
+    private function ensureTeacherCanAccessSessionStudent(User $actor, PreschoolAttendanceSession $session, int $studentId): void
+    {
+        if ($actor->role_code !== 'teacher-preschool') {
+            return;
+        }
+
+        $hasAccess = PreschoolClassStudent::query()
+            ->where('class_id', $session->preschool_class_id)
+            ->where('student_id', $studentId)
+            ->where('status', 'active')
+            ->where('enrollment_status', 'active')
+            ->exists();
+
+        abort_unless($hasAccess, 403, 'Forbidden.');
     }
 
     private function nullableInt(mixed $value): ?int

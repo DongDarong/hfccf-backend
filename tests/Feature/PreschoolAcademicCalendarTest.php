@@ -63,6 +63,50 @@ class PreschoolAcademicCalendarTest extends TestCase
             ->assertJsonPath('data.academicYear.name', '2026 - 2027 Updated');
     }
 
+    public function test_terms_endpoint_returns_unauthorized_instead_of_login_redirect_for_guests(): void
+    {
+        $this->get('/api/preschool/settings/terms')
+            ->assertUnauthorized()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Unauthenticated.');
+    }
+
+    public function test_terms_endpoint_returns_current_terms_payload_for_admins(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_psac_100t', 'preschool.calendar100t@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $year = PreschoolAcademicYear::query()->create([
+            'code' => 'AY-2025-2026',
+            'label' => '2025 - 2026',
+            'start_date' => '2025-06-01',
+            'end_date' => '2026-05-31',
+            'status' => 'active',
+            'is_current' => true,
+            'created_by' => $admin->id,
+            'updated_by' => $admin->id,
+        ]);
+
+        PreschoolAcademicTerm::query()->create([
+            'academic_year_id' => $year->id,
+            'code' => 'TERM-1',
+            'name' => 'Term 1',
+            'start_date' => '2025-06-01',
+            'end_date' => '2025-08-31',
+            'status' => 'active',
+            'is_current' => true,
+            'sort_order' => 1,
+            'created_by' => $admin->id,
+            'updated_by' => $admin->id,
+        ]);
+
+        $this->getJson('/api/preschool/settings/terms')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.terms.0.name', 'Term 1')
+            ->assertJsonPath('data.academicYears.0.name', '2025 - 2026');
+    }
+
     public function test_superadmin_can_manage_academic_years_and_teacher_is_forbidden(): void
     {
         $superadmin = $this->makeUserWithRole('superadmin', 'usr_psac_101', 'superadmin.calendar101@hfccf.org');
@@ -111,6 +155,56 @@ class PreschoolAcademicCalendarTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_create_academic_year_rejects_invalid_status_before_persistence(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_psac_103b', 'preschool.calendar103b@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/preschool/settings/academic-years', [
+            'name' => '2026 - 2027',
+            'code' => 'AY-2026-2027-DRAFT',
+            'description' => 'Invalid lifecycle status',
+            'start_date' => '2026-06-01',
+            'end_date' => '2027-05-31',
+            'status' => 'draft',
+            'is_current' => true,
+        ])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseMissing('preschool_academic_years', [
+            'code' => 'AY-2026-2027-DRAFT',
+        ]);
+    }
+
+    public function test_create_academic_year_preserves_date_only_values(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_psac_103c', 'preschool.calendar103c@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/preschool/settings/academic-years', [
+            'name' => '2025 - 2026',
+            'code' => 'AY-2025-2026-DATE',
+            'description' => 'Date preservation check',
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-12-31',
+            'status' => 'active',
+            'is_current' => true,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.academicYear.startDate', '2025-01-01')
+            ->assertJsonPath('data.academicYear.endDate', '2025-12-31');
+
+        $this->assertDatabaseHas('preschool_academic_years', [
+            'code' => 'AY-2025-2026-DATE',
+            'start_date' => '2025-01-01 00:00:00',
+            'end_date' => '2025-12-31 00:00:00',
+            'status' => 'active',
+        ]);
+
+        $this->assertSame('2025-01-01', $response->json('data.academicYear.startDate'));
+        $this->assertSame('2025-12-31', $response->json('data.academicYear.endDate'));
+    }
+
     public function test_activate_academic_year_deactivates_previous_active_year(): void
     {
         $admin = $this->makeUserWithRole('adminpreschool', 'usr_psac_104', 'preschool.calendar104@hfccf.org');
@@ -132,7 +226,7 @@ class PreschoolAcademicCalendarTest extends TestCase
             'label' => '2025 - 2026',
             'start_date' => '2025-06-01',
             'end_date' => '2026-05-31',
-            'status' => 'draft',
+            'status' => 'closed',
             'is_current' => false,
             'created_by' => $admin->id,
             'updated_by' => $admin->id,
@@ -180,6 +274,39 @@ class PreschoolAcademicCalendarTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_create_term_rejects_invalid_status_before_persistence(): void
+    {
+        $admin = $this->makeUserWithRole('adminpreschool', 'usr_psac_105b', 'preschool.calendar105b@hfccf.org');
+        Sanctum::actingAs($admin);
+
+        $year = PreschoolAcademicYear::query()->create([
+            'code' => 'AY-2025-2026',
+            'label' => '2025 - 2026',
+            'start_date' => '2025-06-01',
+            'end_date' => '2026-05-31',
+            'status' => 'active',
+            'is_current' => true,
+            'created_by' => $admin->id,
+            'updated_by' => $admin->id,
+        ]);
+
+        $this->postJson('/api/preschool/settings/terms', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term Draft',
+            'code' => 'TERM-DRAFT',
+            'description' => 'Invalid lifecycle status',
+            'start_date' => '2025-06-01',
+            'end_date' => '2025-08-31',
+            'status' => 'draft',
+            'sort_order' => 1,
+        ])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseMissing('preschool_terms', [
+            'code' => 'TERM-DRAFT',
+        ]);
+    }
+
     public function test_activate_term_deactivates_previous_active_term_and_keeps_year_alignment(): void
     {
         $admin = $this->makeUserWithRole('adminpreschool', 'usr_psac_106', 'preschool.calendar106@hfccf.org');
@@ -215,7 +342,7 @@ class PreschoolAcademicCalendarTest extends TestCase
             'name' => 'Term 2',
             'start_date' => '2025-09-01',
             'end_date' => '2025-11-30',
-            'status' => 'draft',
+            'status' => 'closed',
             'is_current' => false,
             'sort_order' => 2,
             'created_by' => $admin->id,

@@ -48,16 +48,18 @@ class CambodiaLocationTest extends TestCase
         Artisan::call('db:seed', ['--class' => CambodiaLocationSeeder::class]);
         Sanctum::actingAs($this->makeUser());
 
-        $provinceResponse = $this->getJson('/api/locations/provinces')->assertOk();
-        $provinceResponse->assertJsonPath('data.0.code', '01');
-        $provinceResponse->assertJsonPath('data.0.name_kh', CambodiaProvince::query()->where('code', '01')->value('name_kh'));
-
         $province = CambodiaProvince::query()->where('code', '01')->firstOrFail();
+        $provinceResponse = $this->getJson('/api/locations/provinces')->assertOk();
+        $provinceResponse->assertJsonPath('data.0.id', $province->id);
+        $provinceResponse->assertJsonPath('data.0.code', '01');
+        $provinceResponse->assertJsonPath('data.0.name_kh', $province->name_kh);
+
         $district = CambodiaDistrict::query()->where('province_id', $province->id)->where('code', '0102')->firstOrFail();
         $commune = CambodiaCommune::query()->where('district_id', $district->id)->where('code', '010201')->firstOrFail();
         $village = CambodiaVillage::query()->where('commune_id', $commune->id)->where('code', '01020101')->firstOrFail();
 
         $districtResponse = $this->getJson('/api/locations/districts?province_code=1')->assertOk();
+        $districtResponse->assertJsonPath('data.0.id', $district->id);
         $districtResponse->assertJsonCount($province->districts()->count(), 'data');
         $districtResponse->assertJsonFragment(['code' => '0102', 'name_kh' => $district->name_kh]);
 
@@ -69,10 +71,12 @@ class CambodiaLocationTest extends TestCase
         $districtResponseNumeric->assertJsonCount($provinceTwo->districts()->count(), 'data');
 
         $communeResponse = $this->getJson('/api/locations/communes?district_code=102')->assertOk();
+        $communeResponse->assertJsonPath('data.0.id', $commune->id);
         $communeResponse->assertJsonCount($district->communes()->count(), 'data');
         $communeResponse->assertJsonFragment(['code' => '010201', 'name_kh' => $commune->name_kh]);
 
         $villageResponse = $this->getJson('/api/locations/villages?commune_code=10201')->assertOk();
+        $villageResponse->assertJsonPath('data.0.id', $village->id);
         $villageResponse->assertJsonCount($commune->villages()->count(), 'data');
         $villageResponse->assertJsonFragment(['code' => '01020101', 'name_kh' => $village->name_kh]);
     }

@@ -11,7 +11,7 @@ class UpdatePreschoolAttendanceRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user !== null && in_array($user->role_code, ['superadmin', 'adminpreschool'], true);
+        return $user !== null && in_array($user->role_code, ['superadmin', 'adminpreschool', 'teacher-preschool'], true);
     }
 
     public function rules(): array

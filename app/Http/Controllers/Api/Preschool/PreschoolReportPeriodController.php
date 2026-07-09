@@ -29,8 +29,13 @@ class PreschoolReportPeriodController extends Controller
 
         $student = $this->resolveStudent($request);
         $class = $this->resolveClass($request);
+        $filters = [
+            'period_type' => $request->query('period_type'),
+            'academic_year_id' => $request->query('academic_year_id'),
+            'term_id' => $request->query('term_id'),
+        ];
 
-        $periods = $service->reportPeriods($request->user(), $student, $class)->values();
+        $periods = $service->reportPeriods($request->user(), $student, $class, $filters)->values();
 
         return response()->json([
             'success' => true,
@@ -189,6 +194,7 @@ class PreschoolReportPeriodController extends Controller
     {
         return [
             'period_label' => ['sometimes', 'required', 'string', 'max:120'],
+            'period_type' => ['sometimes', 'required', 'string', 'in:monthly,term,annual'],
             'academic_year_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_academic_years,id'],
             'term_id' => ['sometimes', 'nullable', 'integer', 'exists:preschool_terms,id'],
             'from_date' => ['sometimes', 'nullable', 'date'],

@@ -22,7 +22,12 @@ class PreschoolClassroomReportController extends Controller
             return $response;
         }
 
-        $bundle = $service->bundle($request->user(), $class);
+        $bundle = $service->bundle($request->user(), $class, null, [
+            'period_type' => $request->query('period_type'),
+            'report_period_id' => $request->query('report_period_id'),
+            'academic_year_id' => $request->query('academic_year_id'),
+            'term_id' => $request->query('term_id'),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -37,8 +42,15 @@ class PreschoolClassroomReportController extends Controller
             return $response;
         }
 
-        $bundle = $service->bundle($request->user(), $class, $period);
-        $bundle['report'] = $service->classroomReportForPeriod($request->user(), $class, $period);
+        $filters = [
+            'period_type' => $request->query('period_type'),
+            'report_period_id' => $request->query('report_period_id'),
+            'academic_year_id' => $request->query('academic_year_id'),
+            'term_id' => $request->query('term_id'),
+        ];
+
+        $bundle = $service->bundle($request->user(), $class, $period, $filters);
+        $bundle['report'] = $service->classroomReportForPeriod($request->user(), $class, $period, $filters);
 
         return response()->json([
             'success' => true,
