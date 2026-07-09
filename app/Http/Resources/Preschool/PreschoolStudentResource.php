@@ -146,6 +146,7 @@ class PreschoolStudentResource extends JsonResource
             // columns do not override active relationships.
             'guardianName' => $guardianSnapshot['guardianName'] ?? $this->guardian_name,
             'guardianPhone' => $guardianSnapshot['guardianPhone'] ?? $this->guardian_phone,
+            'guardianType' => $guardianSnapshot['relationshipType'] ?? null,
             'guardianSource' => $guardianSnapshot['source'] ?? 'legacy',
             'address' => $this->address,
             'status' => $this->status,

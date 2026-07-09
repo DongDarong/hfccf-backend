@@ -16,6 +16,7 @@ use App\Support\PreschoolLifecycleGuardService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class PreschoolStudentController extends Controller
@@ -362,39 +363,62 @@ class PreschoolStudentController extends Controller
             ->unique()
             ->values();
 
+        $now = now();
+
         foreach ($targetClassIds as $classId) {
-            $assignment = PreschoolClassStudent::query()->firstOrNew([
+            $existingAssignment = DB::table('preschool_class_students')
+                ->where('class_id', $classId)
+                ->where('student_id', $student->id)
+                ->first();
+
+            $assignmentData = [
                 'class_id' => $classId,
                 'student_id' => $student->id,
-            ]);
+                'enrolled_at' => $existingAssignment && ($existingAssignment->status ?? null) === 'active'
+                    ? $existingAssignment->enrolled_at
+                    : $now,
+                'academic_year' => $academicContext['academic_year'],
+                'term_label' => $academicContext['term_label'],
+                'academic_year_id' => $academicContext['academic_year_id'] ?? null,
+                'term_id' => $academicContext['term_id'] ?? null,
+                'enrollment_status' => 'active',
+                'enrollment_started_at' => $existingAssignment->enrollment_started_at ?? $now,
+                'enrollment_ended_at' => null,
+                'status' => 'active',
+                'updated_at' => $now,
+            ];
 
-            if (! $assignment->exists || ($assignment->status ?? null) !== 'active') {
-                $assignment->enrolled_at = now();
+            if ($existingAssignment) {
+                DB::table('preschool_class_students')
+                    ->where('class_id', $classId)
+                    ->where('student_id', $student->id)
+                    ->update($assignmentData);
+
+                continue;
             }
 
-            $assignment->academic_year = $academicContext['academic_year'];
-            $assignment->term_label = $academicContext['term_label'];
-            $assignment->academic_year_id = $academicContext['academic_year_id'] ?? null;
-            $assignment->term_id = $academicContext['term_id'] ?? null;
-            $assignment->enrollment_status = 'active';
-            $assignment->enrollment_started_at = $assignment->enrollment_started_at ?: now();
-            $assignment->enrollment_ended_at = null;
-            $assignment->status = 'active';
-            $assignment->save();
+            $assignmentData['created_at'] = $now;
+
+            DB::table('preschool_class_students')->insert($assignmentData);
         }
 
-        PreschoolClassStudent::query()
-            ->where('student_id', $student->id)
-            ->whereNotIn('class_id', $targetClassIds->all())
-            ->update([
-                'status' => 'inactive',
-                'enrollment_status' => 'inactive',
-                'enrollment_ended_at' => now(),
-            ]);
+        $inactiveQuery = DB::table('preschool_class_students')
+            ->where('student_id', $student->id);
+
+        if ($targetClassIds->isNotEmpty()) {
+            $inactiveQuery->whereNotIn('class_id', $targetClassIds->all());
+        }
+
+        $inactiveQuery->update([
+            'status' => 'inactive',
+            'enrollment_status' => 'inactive',
+            'enrollment_ended_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $student->load('classes');
         foreach ($student->classes as $class) {
-            $class->students_count = PreschoolClassStudent::query()
+            $class->students_count = DB::table('preschool_class_students')
                 ->where('class_id', $class->id)
                 ->where('status', 'active')
                 ->count();

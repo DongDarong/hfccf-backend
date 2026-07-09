@@ -66,6 +66,24 @@ class PreschoolStudentIdentityFoundationTest extends TestCase
             'residence_village_id' => $location['villageId'],
         ]);
 
+        $show = $this->getJson('/api/preschool/students/'.$studentId);
+
+        $show->assertOk()
+            ->assertJsonPath('data.student.latinName', 'Dara Sok')
+            ->assertJsonPath('data.student.nationality', 'Cambodian')
+            ->assertJsonPath('data.student.ethnicity', 'Khmer')
+            ->assertJsonPath('data.student.guardianType', null)
+            ->assertJsonPath('data.student.birthProvinceId', $location['provinceId'])
+            ->assertJsonPath('data.student.birthDistrictId', $location['districtId'])
+            ->assertJsonPath('data.student.birthCommuneId', $location['communeId'])
+            ->assertJsonPath('data.student.birthVillageId', $location['villageId'])
+            ->assertJsonPath('data.student.residenceProvinceId', $location['provinceId'])
+            ->assertJsonPath('data.student.residenceDistrictId', $location['districtId'])
+            ->assertJsonPath('data.student.residenceCommuneId', $location['communeId'])
+            ->assertJsonPath('data.student.residenceVillageId', $location['villageId'])
+            ->assertJsonPath('data.student.birthLocationDisplay', 'ភូមិ STU, ឃុំ STU, ស្រុក STU, ខេត្ត STU')
+            ->assertJsonPath('data.student.currentResidenceDisplay', 'ភូមិ STU, ឃុំ STU, ស្រុក STU, ខេត្ត STU');
+
         $update = $this->putJson('/api/preschool/students/'.$studentId, [
             'latin_name' => 'Dara Sok Updated',
         ]);
@@ -199,6 +217,63 @@ class PreschoolStudentIdentityFoundationTest extends TestCase
         ]);
     }
 
+    public function test_student_update_with_empty_class_ids_does_not_throw_and_deactivates_assignments(): void
+    {
+        $admin = $this->createUserWithRole('adminpreschool', [
+            'id' => 'usr-stu-found-004',
+            'email' => 'stu-found-004@hfccf.org',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $class = $this->createPreschoolClass('PS-STU-FOUND-CLS-004', 'Regression Class');
+
+        $create = $this->postJson('/api/preschool/students', [
+            'student_code' => 'PS-STU-FOUND-004',
+            'first_name' => 'Sok',
+            'last_name' => 'Vanna',
+            'status' => 'active',
+            'class_ids' => [$class['id']],
+        ]);
+
+        $create->assertCreated();
+
+        $studentId = $create->json('data.student.id');
+
+        $this->assertDatabaseHas('preschool_class_students', [
+            'class_id' => $class['id'],
+            'student_id' => $studentId,
+            'status' => 'active',
+        ]);
+
+        $update = $this->putJson('/api/preschool/students/'.$studentId, [
+            'class_ids' => [$class['id']],
+        ]);
+
+        $update->assertOk()
+            ->assertJsonPath('data.student.id', $studentId);
+
+        $this->assertDatabaseHas('preschool_class_students', [
+            'class_id' => $class['id'],
+            'student_id' => $studentId,
+            'status' => 'active',
+            'enrollment_status' => 'active',
+        ]);
+
+        $clear = $this->putJson('/api/preschool/students/'.$studentId, [
+            'class_ids' => [],
+        ]);
+
+        $clear->assertOk()
+            ->assertJsonPath('data.student.id', $studentId);
+
+        $this->assertDatabaseHas('preschool_class_students', [
+            'class_id' => $class['id'],
+            'student_id' => $studentId,
+            'status' => 'inactive',
+            'enrollment_status' => 'inactive',
+        ]);
+    }
+
     private function createProvince(string $code, string $nameKh, string $nameEn): array
     {
         $id = DB::table('cambodia_provinces')->insertGetId([
@@ -270,5 +345,23 @@ class PreschoolStudentIdentityFoundationTest extends TestCase
             'communeId' => $commune['id'],
             'villageId' => $village['id'],
         ];
+    }
+
+    private function createPreschoolClass(string $code, string $name): array
+    {
+        $classId = DB::table('preschool_classes')->insertGetId([
+            'code' => $code,
+            'name' => $name,
+            'level' => 'Nursery',
+            'schedule' => 'Mon-Fri 8:00 AM',
+            'students_count' => 0,
+            'status' => 'active',
+            'room' => 'Room A1',
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return ['id' => $classId];
     }
 }
