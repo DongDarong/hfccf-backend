@@ -28,6 +28,30 @@ class SportTeamRosterService
             ->get();
     }
 
+    public function eligiblePlayersForTeam(SportTeam $team): Collection
+    {
+        $players = SportPlayer::query()
+            ->with(['team', 'createdBy', 'approvedBy', 'activeMembership', 'memberships.team'])
+            ->where('approval_status', SportPlayerApprovalStatus::APPROVED)
+            ->where(function ($query): void {
+                $query->whereNull('roster_status')
+                    ->orWhereNotIn('roster_status', [SportPlayerRosterStatus::ARCHIVED, SportPlayerRosterStatus::RELEASED]);
+            })
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        return $players->filter(function (SportPlayer $player) use ($team): bool {
+            if (! $this->eligibilityService->playerCanJoinTeam($player, $team)) {
+                return false;
+            }
+
+            $activeMembership = $this->membershipService->currentActiveMembership($player);
+
+            return ! $activeMembership || (int) $activeMembership->team_id !== (int) $team->id;
+        })->values();
+    }
+
     public function attachPlayer(SportTeam $team, SportPlayer $player, User $actor, string $membershipStatus = SportMembershipStatus::ACTIVE, ?string $notes = null): SportPlayerTeamMembership
     {
         if (! $this->eligibilityService->playerCanJoinTeam($player, $team)) {

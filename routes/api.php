@@ -73,6 +73,7 @@ use App\Http\Controllers\Api\Sport\SportAdminCoachTeamAssignmentController;
 use App\Http\Controllers\Api\Sport\SportAttendanceController;
 use App\Http\Controllers\Api\Sport\SportApprovalController;
 use App\Http\Controllers\Api\Sport\SportCoachController;
+use App\Http\Controllers\Api\Sport\SportCoachLookupController;
 use App\Http\Controllers\Api\Sport\SportCoachTeamController;
 use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportDivisionController;
@@ -756,6 +757,9 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('coach/teams/{team}/players', [SportCoachTeamController::class, 'storePlayer']);
         Route::get('coach/matches', [SportCoachController::class, 'matches']);
         Route::post('coach/matches', [SportCoachTeamController::class, 'storeMatch']);
+        Route::get('coach/requests', [SportCoachLookupController::class, 'requests']);
+        Route::get('coach/opponent-teams', [SportCoachLookupController::class, 'opponentTeams']);
+        Route::get('coach/teams/{team}/roster-candidates', [SportCoachLookupController::class, 'rosterCandidates']);
 
         Route::get('admin/coach-team-assignments', [SportAdminCoachTeamAssignmentController::class, 'index']);
         Route::post('admin/coach-team-assignments', [SportAdminCoachTeamAssignmentController::class, 'store']);

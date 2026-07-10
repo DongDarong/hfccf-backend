@@ -47,6 +47,22 @@ class SportCoachAssignmentService
             ->get();
     }
 
+    public function opponentTeamsForCoach(User $coach): Collection
+    {
+        $managedTeamIds = $this->assignedTeamsForCoach($coach)->pluck('id')->all();
+
+        if ($managedTeamIds === []) {
+            return SportTeam::query()->whereRaw('1 = 0')->get();
+        }
+
+        return SportTeam::query()
+            ->with(['coach'])
+            ->where('status', 'active')
+            ->whereNotIn('id', $managedTeamIds)
+            ->orderBy('name')
+            ->get();
+    }
+
     public function coachCanManageTeam(User $user, SportTeam $team): bool
     {
         if (in_array($user->role_code, ['superadmin', 'adminsport'], true)) {
