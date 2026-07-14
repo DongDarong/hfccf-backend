@@ -8,6 +8,8 @@ use App\Models\SportPlayer;
 use App\Models\SportTeam;
 use App\Models\User;
 use App\Support\ApiResponse;
+use App\Support\SportCoachAssignmentService;
+use App\Support\SportPlayerMembershipService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,9 +17,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SportAttendanceController extends SportController
 {
+    public function __construct(
+        private readonly SportCoachAssignmentService $assignmentService,
+        private readonly SportPlayerMembershipService $membershipService,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeSportAdmin($request->user())) {
+        if ($response = $this->authorizeAttendanceAccess($request->user())) {
             return $response;
         }
 
@@ -46,10 +53,24 @@ class SportAttendanceController extends SportController
         $dateTo = trim((string) ($validated['date_to'] ?? ''));
         $sortBy = (string) ($validated['sort_by'] ?? 'attendance_date');
         $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+        $user = $request->user();
+        $coachTeamIds = $this->isSportCoach($user) ? $this->coachTeamIds($user) : [];
 
         $query = SportAttendanceRecord::query()
             ->where('attendance_type', 'player')
             ->with(['team', 'player.team', 'recordedBy']);
+
+        if ($this->isSportCoach($user)) {
+            if ($teamId > 0 && ! in_array($teamId, $coachTeamIds, true)) {
+                return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
+            }
+
+            if ($coachTeamIds === []) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('team_id', $coachTeamIds);
+            }
+        }
 
         if ($teamId > 0) {
             $query->where('team_id', $teamId);
@@ -122,7 +143,7 @@ class SportAttendanceController extends SportController
 
     public function store(Request $request): JsonResponse
     {
-        if ($response = $this->authorizeSportAdmin($request->user())) {
+        if ($response = $this->authorizeAttendanceAccess($request->user())) {
             return $response;
         }
 
@@ -134,7 +155,13 @@ class SportAttendanceController extends SportController
             'note' => ['sometimes', 'nullable', 'string'],
         ]);
 
-        $attendance = $this->upsertAttendance(null, $data, $request->user());
+        $payload = $this->buildAttendancePayload($data, null, $request->user());
+
+        if ($payload instanceof JsonResponse) {
+            return $payload;
+        }
+
+        $attendance = $this->upsertAttendance(null, $payload, $request->user());
 
         return ApiResponse::successResponse(
             'Sport attendance saved successfully.',
@@ -147,7 +174,7 @@ class SportAttendanceController extends SportController
 
     public function update(Request $request, string $id): JsonResponse
     {
-        if ($response = $this->authorizeSportAdmin($request->user())) {
+        if ($response = $this->authorizeAttendanceAccess($request->user())) {
             return $response;
         }
 
@@ -164,7 +191,13 @@ class SportAttendanceController extends SportController
             'note' => ['sometimes', 'nullable', 'string'],
         ]);
 
-        $attendance = $this->upsertAttendance($attendance, $data, $request->user());
+        $payload = $this->buildAttendancePayload($data, $attendance, $request->user());
+
+        if ($payload instanceof JsonResponse) {
+            return $payload;
+        }
+
+        $attendance = $this->upsertAttendance($attendance, $payload, $request->user());
 
         return ApiResponse::successResponse(
             'Sport attendance updated successfully.',
@@ -179,18 +212,10 @@ class SportAttendanceController extends SportController
         $attendanceDate = (string) ($data['attendance_date'] ?? $attendance?->attendance_date?->toDateString() ?? '');
         $status = (string) ($data['status'] ?? $attendance?->status ?? 'present');
         $note = $data['note'] ?? $attendance?->note;
-        $teamId = array_key_exists('team_id', $data)
-            ? ($data['team_id'] !== null ? (int) $data['team_id'] : null)
-            : $attendance?->team_id;
-        $playerId = array_key_exists('player_id', $data)
-            ? ($data['player_id'] !== null ? (int) $data['player_id'] : null)
-            : $attendance?->player_id;
+        $teamId = (int) ($data['team_id'] ?? $attendance?->team_id ?? 0);
+        $playerId = (int) ($data['player_id'] ?? $attendance?->player_id ?? 0);
 
-        $player = $playerId ? SportPlayer::query()->with('team')->find($playerId) : null;
-        $teamId = $teamId ?: $player?->team_id;
-        $playerId = $player?->id ?? $playerId;
-
-        $subjectKey = 'player:'.(string) ($playerId ?? '');
+        $subjectKey = 'player:'.(string) $playerId;
 
         if ($attendance) {
             $attendance->fill([
@@ -247,5 +272,99 @@ class SportAttendanceController extends SportController
             'status' => $status,
             'note' => $note,
         ]);
+    }
+
+    private function authorizeAttendanceAccess(?User $user): ?JsonResponse
+    {
+        if (! $user) {
+            return ApiResponse::errorResponse('Unauthenticated.', null, Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (in_array($user->role_code, ['superadmin', 'adminsport', 'coach'], true)) {
+            return null;
+        }
+
+        return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>|JsonResponse
+     */
+    private function buildAttendancePayload(array $data, ?SportAttendanceRecord $attendance, ?User $user): array|JsonResponse
+    {
+        $playerId = (int) ($data['player_id'] ?? $attendance?->player_id ?? 0);
+        if ($playerId <= 0) {
+            return ApiResponse::errorResponse('Player not found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $player = SportPlayer::query()->with(['team', 'activeMembership', 'memberships.team'])->find($playerId);
+        if (! $player) {
+            return ApiResponse::errorResponse('Player not found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $membership = $this->membershipService->currentActiveMembership($player);
+        $teamId = (int) ($data['team_id'] ?? $attendance?->team_id ?? $membership?->team_id ?? $player->team_id ?? 0);
+        if ($teamId <= 0) {
+            return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $team = SportTeam::query()->find($teamId);
+        if (! $team) {
+            return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if ($this->isSportCoach($user) && ! $this->coachCanAccessTeam($user, $team)) {
+            return ApiResponse::errorResponse('Forbidden.', null, Response::HTTP_FORBIDDEN);
+        }
+
+        if ($attendance) {
+            if ((int) $attendance->team_id !== (int) $team->id) {
+                return ApiResponse::errorResponse('Attendance record cannot be moved to another team.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if ((int) $attendance->player_id !== (int) $player->id) {
+                return ApiResponse::errorResponse('Attendance record cannot be moved to another player.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        } elseif (! $membership || (int) $membership->team_id !== (int) $team->id) {
+            return ApiResponse::errorResponse('Player does not belong to the selected team.', null, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return [
+            'attendance_date' => (string) ($data['attendance_date'] ?? $attendance?->attendance_date?->toDateString() ?? ''),
+            'status' => (string) ($data['status'] ?? $attendance?->status ?? 'present'),
+            'note' => $data['note'] ?? $attendance?->note,
+            'team_id' => $team->id,
+            'player_id' => $player->id,
+        ];
+    }
+
+    private function coachCanAccessTeam(?User $coach, SportTeam $team): bool
+    {
+        if (! $coach) {
+            return false;
+        }
+
+        if (in_array($coach->role_code, ['superadmin', 'adminsport'], true)) {
+            return true;
+        }
+
+        if ($coach->role_code !== 'coach') {
+            return false;
+        }
+
+        return in_array((int) $team->id, $this->coachTeamIds($coach), true);
+    }
+
+    /**
+     * @return array<int>
+     */
+    private function coachTeamIds(User $coach): array
+    {
+        return $this->assignmentService->assignedTeamsForCoach($coach)
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->values()
+            ->all();
     }
 }
