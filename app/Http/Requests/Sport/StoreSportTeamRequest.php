@@ -17,6 +17,8 @@ class StoreSportTeamRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $playerIds = $this->normalizePlayerIds($this->input('player_ids', $this->input('playerIds')));
+
         $payload = [
             'team_code' => $this->input('team_code', $this->input('teamCode')),
             'division_id' => $this->input('division_id', $this->input('divisionId')),
@@ -25,6 +27,7 @@ class StoreSportTeamRequest extends FormRequest
             'captain_name' => $this->input('captain_name', $this->input('captain')),
             'players_count' => $this->input('players_count', $this->input('players')),
             'matches_count' => $this->input('matches_count', $this->input('matches')),
+            'player_ids' => $playerIds,
             'logo' => $this->input('logo'),
             'remove_logo' => $this->boolean('remove_logo'),
         ];
@@ -48,6 +51,8 @@ class StoreSportTeamRequest extends FormRequest
             'captain_name' => ['sometimes', 'nullable', 'string', 'max:191'],
             'players_count' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'matches_count' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'player_ids' => ['sometimes', 'nullable', 'array'],
+            'player_ids.*' => ['integer', 'distinct', 'exists:sport_players,id'],
             'wins' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'draws' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'losses' => ['sometimes', 'nullable', 'integer', 'min:0'],
@@ -58,5 +63,27 @@ class StoreSportTeamRequest extends FormRequest
             'status' => ['required', 'in:active,pending,inactive,suspended'],
             'description' => ['sometimes', 'nullable', 'string'],
         ];
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function normalizePlayerIds(mixed $value): array
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $value = $decoded;
+            } else {
+                $value = array_filter(array_map('trim', explode(',', $value)), static fn (string $item): bool => $item !== '');
+            }
+        }
+
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter($value, static fn ($item): bool => $item !== null && $item !== ''));
     }
 }

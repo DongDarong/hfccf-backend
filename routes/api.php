@@ -772,6 +772,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('admin/pending-matches', [SportApprovalController::class, 'pendingMatches']);
         Route::post('admin/matches/{id}/approve', [SportApprovalController::class, 'approveMatch']);
         Route::post('admin/matches/{id}/reject', [SportApprovalController::class, 'rejectMatch']);
+        Route::get('admin/teams/roster-candidates', [SportTeamRosterController::class, 'candidates']);
+        Route::get('admin/teams/{team}/roster-candidates', [SportTeamRosterController::class, 'candidates']);
 
         Route::get('teams', [SportTeamController::class, 'index']);
         Route::post('teams', [SportTeamController::class, 'store']);

@@ -18,7 +18,7 @@ class SportPlayerEligibilityService
         return $this->assignmentService->coachCanManageTeam($user, $team);
     }
 
-    public function playerCanJoinTeam(SportPlayer $player, SportTeam $team): bool
+    public function playerCanJoinTeam(SportPlayer $player, ?SportTeam $team): bool
     {
         if (! in_array($player->approval_status, [SportPlayerApprovalStatus::APPROVED], true)) {
             return false;
@@ -30,12 +30,20 @@ class SportPlayerEligibilityService
 
         $activeMembership = $this->membershipService->currentActiveMembership($player);
 
+        if (! $team) {
+            return ! $activeMembership;
+        }
+
         return ! $activeMembership || (int) $activeMembership->team_id === (int) $team->id;
     }
 
-    public function playerHasActiveMembershipElsewhere(SportPlayer $player, SportTeam $team): bool
+    public function playerHasActiveMembershipElsewhere(SportPlayer $player, ?SportTeam $team): bool
     {
         $activeMembership = $this->membershipService->currentActiveMembership($player);
+
+        if (! $team) {
+            return (bool) $activeMembership;
+        }
 
         return (bool) $activeMembership && (int) $activeMembership->team_id !== (int) $team->id;
     }

@@ -10,15 +10,18 @@ use App\Models\SportTeam;
 use App\Models\User;
 use App\Support\ApiResponse;
 use App\Support\SportCoachAssignmentService;
+use App\Support\SportTeamRosterService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class SportTeamController extends SportController
 {
     public function __construct(
         private readonly SportCoachAssignmentService $assignmentService,
+        private readonly SportTeamRosterService $rosterService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -104,34 +107,47 @@ class SportTeamController extends SportController
         }
 
         $data = $request->validated();
+        $selectedPlayerIds = array_key_exists('player_ids', $data) ? $this->normalizePlayerIds($data['player_ids']) : null;
 
-        $team = SportTeam::query()->create([
-            'team_code' => $data['team_code'] ?? $this->makeSportCode('team'),
-            'name' => $data['name'],
-            'short_name' => $data['short_name'] ?? null,
-            'coach_user_id' => $this->resolveUserReference($data['coach_user_id'] ?? $data['coach'] ?? null, 'coach')?->id,
-            'coach_display_name' => $this->resolveCoachDisplayName($data),
-            'division' => $data['division'] ?? null,
-            'division_id' => $this->resolveDivisionId($data),
-            'playing_style_id' => $this->resolvePlayingStyleId($data),
-            'captain_name' => $data['captain_name'] ?? null,
-            'players_count' => (int) ($data['players_count'] ?? 0),
-            'matches_count' => (int) ($data['matches_count'] ?? 0),
-            'wins' => (int) ($data['wins'] ?? 0),
-            'draws' => (int) ($data['draws'] ?? 0),
-            'losses' => (int) ($data['losses'] ?? 0),
-            'points' => $this->resolvePoints($data),
-            'venue' => $data['venue'] ?? null,
-            'logo' => $this->storeSportFile($request->file('logo'), 'sport/teams'),
-            'status' => $data['status'],
-            'description' => $data['description'] ?? null,
-        ]);
+        try {
+            $team = DB::transaction(function () use ($request, $data, $selectedPlayerIds): SportTeam {
+                $team = SportTeam::query()->create([
+                    'team_code' => $data['team_code'] ?? $this->makeSportCode('team'),
+                    'name' => $data['name'],
+                    'short_name' => $data['short_name'] ?? null,
+                    'coach_user_id' => $this->resolveUserReference($data['coach_user_id'] ?? $data['coach'] ?? null, 'coach')?->id,
+                    'coach_display_name' => $this->resolveCoachDisplayName($data),
+                    'division' => $data['division'] ?? null,
+                    'division_id' => $this->resolveDivisionId($data),
+                    'playing_style_id' => $this->resolvePlayingStyleId($data),
+                    'captain_name' => $data['captain_name'] ?? null,
+                    'players_count' => 0,
+                    'matches_count' => (int) ($data['matches_count'] ?? 0),
+                    'wins' => (int) ($data['wins'] ?? 0),
+                    'draws' => (int) ($data['draws'] ?? 0),
+                    'losses' => (int) ($data['losses'] ?? 0),
+                    'points' => $this->resolvePoints($data),
+                    'venue' => $data['venue'] ?? null,
+                    'logo' => $this->storeSportFile($request->file('logo'), 'sport/teams'),
+                    'status' => $data['status'],
+                    'description' => $data['description'] ?? null,
+                ]);
 
-        if (! empty($data['coach_user_id'])) {
-            $coach = $this->resolveUserReference($data['coach_user_id'], 'coach');
-            if ($coach) {
-                $this->assignmentService->assignTeamToCoach($team, $coach, $request->user());
-            }
+                if (! empty($data['coach_user_id'])) {
+                    $coach = $this->resolveUserReference($data['coach_user_id'], 'coach');
+                    if ($coach) {
+                        $this->assignmentService->assignTeamToCoach($team, $coach, $request->user());
+                    }
+                }
+
+                if ($selectedPlayerIds !== null) {
+                    $this->rosterService->syncTeamRoster($team, $selectedPlayerIds, $request->user());
+                }
+
+                return $team->refresh();
+            });
+        } catch (\RuntimeException $exception) {
+            return ApiResponse::errorResponse($exception->getMessage(), null, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $team->loadMissing(['coach', 'playingStyle']);
@@ -178,77 +194,90 @@ class SportTeamController extends SportController
         }
 
         $data = $request->validated();
+        $selectedPlayerIds = array_key_exists('player_ids', $data) ? $this->normalizePlayerIds($data['player_ids']) : null;
 
-        foreach (['name', 'short_name', 'division', 'captain_name', 'venue', 'status', 'description'] as $field) {
-            if (array_key_exists($field, $data)) {
-                $team->{$field} = $data[$field];
-            }
-        }
-
-        if (array_key_exists('division', $data) || array_key_exists('division_id', $data)) {
-            $team->division_id = $this->resolveDivisionId($data);
-        }
-
-        if (array_key_exists('playing_style_id', $data)) {
-            $team->playing_style_id = $this->resolvePlayingStyleId($data);
-        }
-
-        if (array_key_exists('coach_user_id', $data) || array_key_exists('coach', $data)) {
-            $coach = $this->resolveUserReference($data['coach_user_id'] ?? $data['coach'] ?? null, 'coach');
-            $team->coach_user_id = $coach?->id;
-            $team->coach_display_name = $this->resolveCoachDisplayName($data, $team->coach_display_name, $coach);
-        }
-
-        if (array_key_exists('players_count', $data)) {
-            $team->players_count = max(0, (int) $data['players_count']);
-        }
-
-        if (array_key_exists('matches_count', $data)) {
-            $team->matches_count = max(0, (int) $data['matches_count']);
-        }
-
-        if (array_key_exists('wins', $data)) {
-            $team->wins = max(0, (int) $data['wins']);
-        }
-
-        if (array_key_exists('draws', $data)) {
-            $team->draws = max(0, (int) $data['draws']);
-        }
-
-        if (array_key_exists('losses', $data)) {
-            $team->losses = max(0, (int) $data['losses']);
-        }
-
-        if (array_key_exists('points', $data)) {
-            $team->points = max(0, (int) $data['points']);
-        } else {
-            $team->points = $this->resolvePoints($team->toArray());
-        }
-
-        if ($request->hasFile('logo')) {
-            $this->deleteSportFile($team->logo);
-            $team->logo = $this->storeSportFile($request->file('logo'), 'sport/teams');
-        } elseif ($request->boolean('remove_logo')) {
-            $this->deleteSportFile($team->logo);
-            $team->logo = null;
-        }
-
-        if (! $team->team_code) {
-            $team->team_code = $this->makeSportCode('team');
-        }
-
-        $team->save();
-
-        if (array_key_exists('coach_user_id', $data) || array_key_exists('coach', $data)) {
-            $coach = $this->resolveUserReference($data['coach_user_id'] ?? $data['coach'] ?? null, 'coach');
-            if ($coach) {
-                $this->assignmentService->assignTeamToCoach($team, $coach, $request->user());
-            } else {
-                $activeAssignment = $this->assignmentService->activeAssignmentForTeam($team);
-                if ($activeAssignment) {
-                    $this->assignmentService->deactivateAssignment($activeAssignment, $request->user());
+        try {
+            $team = DB::transaction(function () use ($request, $team, $data, $selectedPlayerIds): SportTeam {
+                foreach (['name', 'short_name', 'division', 'captain_name', 'venue', 'status', 'description'] as $field) {
+                    if (array_key_exists($field, $data)) {
+                        $team->{$field} = $data[$field];
+                    }
                 }
-            }
+
+                if (array_key_exists('division', $data) || array_key_exists('division_id', $data)) {
+                    $team->division_id = $this->resolveDivisionId($data);
+                }
+
+                if (array_key_exists('playing_style_id', $data)) {
+                    $team->playing_style_id = $this->resolvePlayingStyleId($data);
+                }
+
+                if (array_key_exists('coach_user_id', $data) || array_key_exists('coach', $data)) {
+                    $coach = $this->resolveUserReference($data['coach_user_id'] ?? $data['coach'] ?? null, 'coach');
+                    $team->coach_user_id = $coach?->id;
+                    $team->coach_display_name = $this->resolveCoachDisplayName($data, $team->coach_display_name, $coach);
+                }
+
+                if (array_key_exists('players_count', $data)) {
+                    $team->players_count = max(0, (int) $data['players_count']);
+                }
+
+                if (array_key_exists('matches_count', $data)) {
+                    $team->matches_count = max(0, (int) $data['matches_count']);
+                }
+
+                if (array_key_exists('wins', $data)) {
+                    $team->wins = max(0, (int) $data['wins']);
+                }
+
+                if (array_key_exists('draws', $data)) {
+                    $team->draws = max(0, (int) $data['draws']);
+                }
+
+                if (array_key_exists('losses', $data)) {
+                    $team->losses = max(0, (int) $data['losses']);
+                }
+
+                if (array_key_exists('points', $data)) {
+                    $team->points = max(0, (int) $data['points']);
+                } else {
+                    $team->points = $this->resolvePoints($team->toArray());
+                }
+
+                if ($request->hasFile('logo')) {
+                    $this->deleteSportFile($team->logo);
+                    $team->logo = $this->storeSportFile($request->file('logo'), 'sport/teams');
+                } elseif ($request->boolean('remove_logo')) {
+                    $this->deleteSportFile($team->logo);
+                    $team->logo = null;
+                }
+
+                if (! $team->team_code) {
+                    $team->team_code = $this->makeSportCode('team');
+                }
+
+                $team->save();
+
+                if (array_key_exists('coach_user_id', $data) || array_key_exists('coach', $data)) {
+                    $coach = $this->resolveUserReference($data['coach_user_id'] ?? $data['coach'] ?? null, 'coach');
+                    if ($coach) {
+                        $this->assignmentService->assignTeamToCoach($team, $coach, $request->user());
+                    } else {
+                        $activeAssignment = $this->assignmentService->activeAssignmentForTeam($team);
+                        if ($activeAssignment) {
+                            $this->assignmentService->deactivateAssignment($activeAssignment, $request->user());
+                        }
+                    }
+                }
+
+                if ($selectedPlayerIds !== null) {
+                    $this->rosterService->syncTeamRoster($team, $selectedPlayerIds, $request->user());
+                }
+
+                return $team->refresh();
+            });
+        } catch (\RuntimeException $exception) {
+            return ApiResponse::errorResponse($exception->getMessage(), null, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $team->loadMissing(['coach', 'playingStyle']);
@@ -332,5 +361,27 @@ class SportTeamController extends SportController
         }
 
         return $points !== null ? max(0, (int) $points) : max(0, ($wins * 3) + $draws);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function normalizePlayerIds(mixed $value): array
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $value = $decoded;
+            } else {
+                $value = array_filter(array_map('trim', explode(',', $value)), static fn (string $item): bool => $item !== '');
+            }
+        }
+
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter($value, static fn ($item): bool => $item !== null && $item !== ''));
     }
 }
