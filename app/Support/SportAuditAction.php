@@ -36,6 +36,20 @@ class SportAuditAction
 
     public const MATCH_SQUAD_LOCKED = 'match_squad_locked';
 
+    public const EQUIPMENT_ITEM_CREATED = 'equipment_item_created';
+
+    public const EQUIPMENT_ITEM_UPDATED = 'equipment_item_updated';
+
+    public const EQUIPMENT_REQUEST_CREATED = 'equipment_request_created';
+
+    public const EQUIPMENT_REQUEST_APPROVED = 'equipment_request_approved';
+
+    public const EQUIPMENT_REQUEST_REJECTED = 'equipment_request_rejected';
+
+    public const EQUIPMENT_REQUEST_ISSUED = 'equipment_request_issued';
+
+    public const EQUIPMENT_REQUEST_RETURNED = 'equipment_request_returned';
+
     /**
      * @return array<int, string>
      */
@@ -58,6 +72,13 @@ class SportAuditAction
             self::MATCH_SQUAD_SUBMITTED,
             self::MATCH_SQUAD_APPROVED,
             self::MATCH_SQUAD_LOCKED,
+            self::EQUIPMENT_ITEM_CREATED,
+            self::EQUIPMENT_ITEM_UPDATED,
+            self::EQUIPMENT_REQUEST_CREATED,
+            self::EQUIPMENT_REQUEST_APPROVED,
+            self::EQUIPMENT_REQUEST_REJECTED,
+            self::EQUIPMENT_REQUEST_ISSUED,
+            self::EQUIPMENT_REQUEST_RETURNED,
         ];
     }
 }

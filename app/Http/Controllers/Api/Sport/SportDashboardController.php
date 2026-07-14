@@ -16,6 +16,7 @@ use App\Models\SportTeam;
 use App\Models\SportTournament;
 use App\Models\User;
 use App\Support\ApiResponse;
+use App\Support\SportEquipmentService;
 use App\Support\SportCoachAssignmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class SportDashboardController extends SportController
 {
     public function __construct(
         private readonly SportCoachAssignmentService $assignmentService,
+        private readonly SportEquipmentService $equipmentService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -101,6 +103,7 @@ class SportDashboardController extends SportController
                 'coaches' => User::query()->where('role_code', 'coach')->count(),
                 'tournaments' => $tournamentCount,
                 'activeTournaments' => $activeTournamentCount,
+                ...$this->equipmentService->summary(),
             ],
             'teams' => SportTeamResource::collection($teams)->resolve($request),
             'players' => SportPlayerResource::collection($players)->resolve($request),
