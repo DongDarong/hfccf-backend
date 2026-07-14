@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Sport;
 use App\Http\Requests\Sport\StoreSportTeamRequest;
 use App\Http\Requests\Sport\UpdateSportTeamRequest;
 use App\Http\Resources\Sport\SportTeamResource;
+use App\Models\SportDivision;
 use App\Models\SportTeam;
 use App\Models\User;
 use App\Support\ApiResponse;
@@ -46,7 +47,7 @@ class SportTeamController extends SportController
         $sortBy = (string) ($validated['sort_by'] ?? 'created_at');
         $sortDirection = strtolower((string) ($validated['sort_direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $query = SportTeam::query()->with(['coach']);
+        $query = SportTeam::query()->with(['coach', 'playingStyle']);
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -98,6 +99,10 @@ class SportTeamController extends SportController
 
     public function store(StoreSportTeamRequest $request): JsonResponse
     {
+        if ($response = $this->authorizeSportAdmin($request->user())) {
+            return $response;
+        }
+
         $data = $request->validated();
 
         $team = SportTeam::query()->create([
@@ -107,6 +112,8 @@ class SportTeamController extends SportController
             'coach_user_id' => $this->resolveUserReference($data['coach_user_id'] ?? $data['coach'] ?? null, 'coach')?->id,
             'coach_display_name' => $this->resolveCoachDisplayName($data),
             'division' => $data['division'] ?? null,
+            'division_id' => $this->resolveDivisionId($data),
+            'playing_style_id' => $this->resolvePlayingStyleId($data),
             'captain_name' => $data['captain_name'] ?? null,
             'players_count' => (int) ($data['players_count'] ?? 0),
             'matches_count' => (int) ($data['matches_count'] ?? 0),
@@ -127,7 +134,7 @@ class SportTeamController extends SportController
             }
         }
 
-        $team->loadMissing(['coach']);
+        $team->loadMissing(['coach', 'playingStyle']);
 
         return ApiResponse::successResponse(
             'Sport team created successfully.',
@@ -144,7 +151,7 @@ class SportTeamController extends SportController
             return $response;
         }
 
-        $team = SportTeam::query()->with(['coach'])->find($id);
+        $team = SportTeam::query()->with(['coach', 'playingStyle'])->find($id);
 
         if (! $team) {
             return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_NOT_FOUND);
@@ -160,6 +167,10 @@ class SportTeamController extends SportController
 
     public function update(UpdateSportTeamRequest $request, string $id): JsonResponse
     {
+        if ($response = $this->authorizeSportAdmin($request->user())) {
+            return $response;
+        }
+
         $team = SportTeam::query()->find($id);
 
         if (! $team) {
@@ -172,6 +183,14 @@ class SportTeamController extends SportController
             if (array_key_exists($field, $data)) {
                 $team->{$field} = $data[$field];
             }
+        }
+
+        if (array_key_exists('division', $data) || array_key_exists('division_id', $data)) {
+            $team->division_id = $this->resolveDivisionId($data);
+        }
+
+        if (array_key_exists('playing_style_id', $data)) {
+            $team->playing_style_id = $this->resolvePlayingStyleId($data);
         }
 
         if (array_key_exists('coach_user_id', $data) || array_key_exists('coach', $data)) {
@@ -232,7 +251,7 @@ class SportTeamController extends SportController
             }
         }
 
-        $team->loadMissing(['coach']);
+        $team->loadMissing(['coach', 'playingStyle']);
 
         return ApiResponse::successResponse(
             'Sport team updated successfully.',
@@ -270,6 +289,31 @@ class SportTeamController extends SportController
 
         if ($coach) {
             return trim($coach->first_name.' '.$coach->last_name);
+        }
+
+        return null;
+    }
+
+    private function resolveDivisionId(array $data): ?int
+    {
+        if (array_key_exists('division_id', $data) && $data['division_id'] !== null) {
+            return (int) $data['division_id'];
+        }
+
+        $divisionName = trim((string) ($data['division'] ?? ''));
+        if ($divisionName === '') {
+            return null;
+        }
+
+        return SportDivision::query()
+            ->where('name', $divisionName)
+            ->value('id');
+    }
+
+    private function resolvePlayingStyleId(array $data): ?int
+    {
+        if (array_key_exists('playing_style_id', $data) && $data['playing_style_id'] !== null) {
+            return (int) $data['playing_style_id'];
         }
 
         return null;

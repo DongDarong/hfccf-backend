@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\SportMatch;
+use App\Models\SportDivision;
 use App\Models\SportTeam;
 use App\Models\SportTournament;
 use App\Models\User;
@@ -77,6 +78,10 @@ class SportApiTest extends TestCase
     {
         $this->actingAsRole('adminsport', 'usr_910', 'sport.admin910@hfccf.org');
         $coach = $this->createCoachUser('usr_911', 'Coach Team');
+        $division = SportDivision::query()->create([
+            'name' => 'Senior',
+            'status' => 'active',
+        ]);
 
         $create = $this->postJson('/api/sport/teams', [
             'team_code' => 'TEAM-910',
@@ -85,6 +90,7 @@ class SportApiTest extends TestCase
             'coach_user_id' => $coach->id,
             'coach_display_name' => trim($coach->first_name.' '.$coach->last_name),
             'division' => 'Senior',
+            'division_id' => $division->id,
             'captain_name' => 'Captain One',
             'players_count' => 0,
             'matches_count' => 0,
@@ -99,17 +105,20 @@ class SportApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.team.teamCode', 'TEAM-910')
-            ->assertJsonPath('data.team.coachUserId', $coach->id);
+            ->assertJsonPath('data.team.coachUserId', $coach->id)
+            ->assertJsonPath('data.team.divisionId', $division->id);
 
         $teamId = $create->json('data.team.id');
 
         $this->putJson('/api/sport/teams/'.$teamId, [
             'name' => 'Phoenix United',
             'status' => 'pending',
+            'division_id' => $division->id,
         ])
             ->assertOk()
             ->assertJsonPath('data.team.name', 'Phoenix United')
-            ->assertJsonPath('data.team.status', 'pending');
+            ->assertJsonPath('data.team.status', 'pending')
+            ->assertJsonPath('data.team.divisionId', $division->id);
 
         $list = $this->getJson('/api/sport/teams?page=1&per_page=10');
         $list

@@ -19,6 +19,8 @@ class SportTeamResource extends JsonResource
             'shortName' => $this->short_name,
             'coachUserId' => $this->coach_user_id,
             'coachDisplayName' => $this->coach_display_name,
+            'divisionId' => $this->division_id,
+            'playingStyleId' => $this->playing_style_id,
             'coach' => $this->whenLoaded('coach', fn (): array => [
                 'id' => $this->coach?->id,
                 'firstName' => $this->coach?->first_name,
@@ -37,6 +39,7 @@ class SportTeamResource extends JsonResource
             'coachAssignments' => $this->whenLoaded('coachAssignments', fn (): array => SportCoachTeamAssignmentResource::collection($this->coachAssignments)->resolve($request)),
             'players' => $this->whenLoaded('players', fn (): array => SportPlayerResource::collection($this->players)->resolve($request)),
             'division' => $this->division,
+            'playingStyleName' => $this->whenLoaded('playingStyle', fn (): ?string => $this->playingStyle?->name),
             'captainName' => $this->captain_name,
             'playersCount' => $this->players_count ?? $this->whenCounted('players'),
             'activePlayersCount' => $this->whenLoaded('players', fn (): int => $this->players->where('roster_status', 'active')->count()),

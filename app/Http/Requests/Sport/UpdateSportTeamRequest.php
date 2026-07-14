@@ -19,6 +19,8 @@ class UpdateSportTeamRequest extends FormRequest
     {
         $payload = [
             'team_code' => $this->input('team_code', $this->input('teamCode')),
+            'division_id' => $this->input('division_id', $this->input('divisionId')),
+            'playing_style_id' => $this->input('playing_style_id', $this->input('playingStyleId')),
             'coach_display_name' => $this->input('coach_display_name', $this->input('coach')),
             'captain_name' => $this->input('captain_name', $this->input('captain')),
             'players_count' => $this->input('players_count', $this->input('players')),
@@ -39,6 +41,8 @@ class UpdateSportTeamRequest extends FormRequest
             'coach' => ['sometimes', 'nullable', 'string', 'max:191'],
             'coach_display_name' => ['sometimes', 'nullable', 'string', 'max:191'],
             'division' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'division_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_divisions,id'],
+            'playing_style_id' => ['sometimes', 'nullable', 'integer', 'exists:sport_playing_styles,id'],
             'captain' => ['sometimes', 'nullable', 'string', 'max:191'],
             'captain_name' => ['sometimes', 'nullable', 'string', 'max:191'],
             'players_count' => ['sometimes', 'nullable', 'integer', 'min:0'],

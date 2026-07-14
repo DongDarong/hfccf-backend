@@ -19,6 +19,8 @@ class SportTeam extends Model
         'coach_user_id',
         'coach_display_name',
         'division',
+        'division_id',
+        'playing_style_id',
         'captain_name',
         'players_count',
         'matches_count',
@@ -41,12 +43,24 @@ class SportTeam extends Model
             'draws' => 'integer',
             'losses' => 'integer',
             'points' => 'integer',
+            'division_id' => 'integer',
+            'playing_style_id' => 'integer',
         ];
     }
 
     public function coach(): BelongsTo
     {
         return $this->belongsTo(User::class, 'coach_user_id', 'id');
+    }
+
+    public function divisionRelation(): BelongsTo
+    {
+        return $this->belongsTo(SportDivision::class, 'division_id');
+    }
+
+    public function playingStyle(): BelongsTo
+    {
+        return $this->belongsTo(SportPlayingStyle::class, 'playing_style_id');
     }
 
     public function coachAssignments(): HasMany
