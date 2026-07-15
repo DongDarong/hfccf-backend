@@ -404,6 +404,114 @@ class SportEquipmentTest extends TestCase
         $approvedAfterReturn->assertUnprocessable();
     }
 
+    public function test_admin_approval_requires_a_positive_approved_quantity(): void
+    {
+        $admin = $this->createUser('adminsport', 'equip-admin-5', 'equip-admin-5@hfccf.org');
+        $coach = $this->createUser('coach', 'equip-coach-5', 'equip-coach-5@hfccf.org');
+        $team = $this->createTeam('EQUIP-TEAM-5', 'Validation FC');
+
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/sport/admin/coach-team-assignments', [
+            'coach_user_id' => $coach->id,
+            'team_id' => $team->id,
+            'status' => 'active',
+        ])->assertCreated();
+
+        $item = $this->postJson('/api/sport/admin/equipment', [
+            'equipment_code' => 'EQ-VALIDATION-001',
+            'name' => 'Validation Bibs',
+            'category' => 'Training',
+            'unit' => 'set',
+            'total_quantity' => 10,
+            'available_quantity' => 10,
+            'minimum_stock_level' => 2,
+            'status' => 'active',
+        ])->assertCreated()->json('data.item');
+
+        Sanctum::actingAs($coach);
+        $request = $this->postJson('/api/sport/coach/equipment/requests', [
+            'equipment_item_id' => $item['id'],
+            'team_id' => $team->id,
+            'requested_quantity' => 4,
+            'purpose' => 'Validation check',
+            'required_date' => '2026-07-15',
+            'expected_return_date' => '2026-07-18',
+        ])->assertCreated()->json('data.request');
+
+        Sanctum::actingAs($admin);
+
+        $missingQuantity = $this->patchJson('/api/sport/admin/equipment-requests/'.$request['id'].'/approve', []);
+        $missingQuantity
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'The approved quantity field is required.')
+            ->assertJsonPath('data.errors.approved_quantity.0', 'The approved quantity field is required.');
+
+        $zeroQuantity = $this->patchJson('/api/sport/admin/equipment-requests/'.$request['id'].'/approve', [
+            'approved_quantity' => 0,
+        ]);
+        $zeroQuantity
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'The approved quantity field must be at least 1.')
+            ->assertJsonPath('data.errors.approved_quantity.0', 'The approved quantity field must be at least 1.');
+
+        $aboveRequested = $this->patchJson('/api/sport/admin/equipment-requests/'.$request['id'].'/approve', [
+            'approved_quantity' => 5,
+        ]);
+        $aboveRequested
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Approved quantity cannot exceed requested quantity.')
+            ->assertJsonPath('data', null);
+    }
+
+    public function test_non_pending_request_cannot_be_approved(): void
+    {
+        $admin = $this->createUser('adminsport', 'equip-admin-6', 'equip-admin-6@hfccf.org');
+        $coach = $this->createUser('coach', 'equip-coach-6', 'equip-coach-6@hfccf.org');
+        $team = $this->createTeam('EQUIP-TEAM-6', 'Lifecycle Guard FC');
+
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/sport/admin/coach-team-assignments', [
+            'coach_user_id' => $coach->id,
+            'team_id' => $team->id,
+            'status' => 'active',
+        ])->assertCreated();
+
+        $item = $this->postJson('/api/sport/admin/equipment', [
+            'equipment_code' => 'EQ-GUARD-001',
+            'name' => 'Lifecycle Guard Bibs',
+            'category' => 'Training',
+            'unit' => 'set',
+            'total_quantity' => 10,
+            'available_quantity' => 10,
+            'minimum_stock_level' => 2,
+            'status' => 'active',
+        ])->assertCreated()->json('data.item');
+
+        Sanctum::actingAs($coach);
+        $request = $this->postJson('/api/sport/coach/equipment/requests', [
+            'equipment_item_id' => $item['id'],
+            'team_id' => $team->id,
+            'requested_quantity' => 3,
+            'purpose' => 'Lifecycle guard',
+            'required_date' => '2026-07-15',
+            'expected_return_date' => '2026-07-18',
+        ])->assertCreated()->json('data.request');
+
+        Sanctum::actingAs($admin);
+        $this->patchJson('/api/sport/admin/equipment-requests/'.$request['id'].'/approve', [
+            'approved_quantity' => 3,
+        ])->assertOk();
+
+        $pendingApprove = $this->patchJson('/api/sport/admin/equipment-requests/'.$request['id'].'/approve', [
+            'approved_quantity' => 3,
+        ]);
+
+        $pendingApprove
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Equipment request is not pending.')
+            ->assertJsonPath('data', null);
+    }
+
     private function createUser(string $roleCode, string $id, string $email): User
     {
         return User::query()->create([
