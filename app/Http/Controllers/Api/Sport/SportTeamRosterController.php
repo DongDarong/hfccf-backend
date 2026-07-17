@@ -48,6 +48,66 @@ class SportTeamRosterController extends SportController
         ]);
     }
 
+    public function candidates(Request $request, ?string $team = null): JsonResponse
+    {
+        $validated = $request->validate([
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        $search = trim((string) ($validated['search'] ?? ''));
+        $teamModel = $team ? SportTeam::query()
+            ->with(['coach', 'activeCoachAssignment.coach', 'activeCoachAssignment.assignedBy', 'coachAssignments.coach', 'coachAssignments.assignedBy'])
+            ->find($team) : null;
+
+        if ($team && ! $teamModel) {
+            return ApiResponse::errorResponse('Team not found.', null, Response::HTTP_NOT_FOUND);
+        }
+
+        if ($teamModel) {
+            if ($response = $this->authorizeTeamAccess($request, $teamModel)) {
+                return $response;
+            }
+        } elseif ($response = $this->authorizeSportAdmin($request->user())) {
+            return $response;
+        }
+
+        $players = $this->rosterService->eligiblePlayersForTeam($teamModel, $search);
+
+        return ApiResponse::successResponse('Team roster candidates retrieved successfully.', [
+            'team' => $teamModel
+                ? SportTeamResource::make($teamModel->loadMissing(['coach', 'activeCoachAssignment.coach', 'activeCoachAssignment.assignedBy', 'coachAssignments.coach', 'coachAssignments.assignedBy']))->resolve($request)
+                : null,
+            'items' => $players->map(static fn (SportPlayer $player): array => [
+                'id' => $player->id,
+                'playerCode' => $player->player_code,
+                'firstName' => $player->first_name,
+                'lastName' => $player->last_name,
+                'name' => trim($player->first_name.' '.$player->last_name),
+                'jerseyNumber' => $player->jersey_number,
+                'position' => $player->position,
+                'primaryPosition' => $player->primary_position,
+                'division' => $player->division,
+                'approvalStatus' => $player->approval_status,
+                'rosterStatus' => $player->roster_status ?? $player->status,
+                'teamId' => $player->team_id,
+                'teamName' => $player->team?->name,
+                'activeMembership' => $player->activeMembership ? [
+                    'id' => $player->activeMembership->id,
+                    'teamId' => $player->activeMembership->team_id,
+                    'status' => $player->activeMembership->status,
+                    'joinedAt' => $player->activeMembership->joined_at?->toISOString(),
+                    'leftAt' => $player->activeMembership->left_at?->toISOString(),
+                ] : null,
+            ])->values()->all(),
+            'pagination' => [
+                'page' => 1,
+                'perPage' => $players->count() ?: 10,
+                'total' => $players->count(),
+                'totalPages' => 1,
+            ],
+        ]);
+    }
+
     public function store(StoreTeamRosterMembershipRequest $request, string $team): JsonResponse
     {
         $teamModel = SportTeam::query()->find($team);

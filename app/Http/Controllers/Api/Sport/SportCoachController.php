@@ -17,7 +17,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class SportCoachController extends SportController
@@ -92,22 +91,25 @@ class SportCoachController extends SportController
     {
         $data = $request->validated();
 
-        $coach = User::query()->create([
-            'id' => (string) Str::uuid(),
-            'first_name' => $data['first_name'],
-            'last_name' => $data['last_name'],
-            'username' => $data['username'] ?: trim($data['first_name'].' '.$data['last_name']),
-            'email' => strtolower($data['email']),
-            'phone' => $data['phone'] ?? null,
-            'role_code' => 'coach',
-            'department_code' => 'sports',
-            'status' => $data['status'],
-            'password' => $data['password'],
-            'avatar' => $this->storeSportFile($request->file('avatar'), 'sport/coaches'),
-        ]);
+        $coach = DB::transaction(function () use ($request, $data): User {
+            $coach = User::query()->create([
+                'id' => $this->nextUserId(),
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'username' => trim((string) ($data['username'] ?? '')) ?: trim($data['first_name'].' '.$data['last_name']),
+                'email' => strtolower($data['email']),
+                'phone' => $data['phone'] ?? null,
+                'role_code' => 'coach',
+                'department_code' => 'sports',
+                'status' => $data['status'],
+                'password' => $data['password'],
+                'avatar' => $this->storeSportFile($request->file('avatar'), 'sport/coaches'),
+            ]);
 
-        $this->syncRolePermissions($coach, 'coach');
-        $coach->loadMissing(['role', 'department', 'permissions']);
+            $this->syncRolePermissions($coach, 'coach');
+
+            return $coach->loadMissing(['role', 'department', 'permissions']);
+        });
 
         return ApiResponse::successResponse(
             'Sport coach created successfully.',
@@ -330,5 +332,21 @@ class SportCoachController extends SportController
             ],
             $permissionCodes,
         ));
+    }
+
+    private function nextUserId(): string
+    {
+        $maxNumeric = User::withTrashed()
+            ->where('id', 'like', 'usr_%')
+            ->pluck('id')
+            ->map(static function (string $id): int {
+                return (int) preg_replace('/^usr_/', '', $id);
+            })
+            ->max() ?? 0;
+
+        $next = $maxNumeric + 1;
+        $suffix = $next <= 999 ? str_pad((string) $next, 3, '0', STR_PAD_LEFT) : (string) $next;
+
+        return 'usr_'.$suffix;
     }
 }

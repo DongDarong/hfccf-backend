@@ -7,10 +7,12 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "ibracilinks/ziparchive": "dev-master@dev",
         "laravel/framework": "^13.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
-        "league/flysystem-aws-s3-v3": "^3.0"
+        "league/flysystem-aws-s3-v3": "^3.0",
+        "phpoffice/phpspreadsheet": "5.7"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -25,7 +27,13 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "app/Support/ZipArchive.php"
+        ],
+        "exclude-from-classmap": [
+            "app/Support/ZipArchive.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

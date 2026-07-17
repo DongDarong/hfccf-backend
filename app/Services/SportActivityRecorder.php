@@ -3,12 +3,15 @@
 namespace App\Services;
 
 use App\Models\CoachTeamAssignment;
+use App\Models\SportEquipmentItem;
+use App\Models\SportEquipmentRequest;
 use App\Models\SportMatch;
 use App\Models\SportMatchSquad;
 use App\Models\SportPlayer;
 use App\Models\SportPlayerTeamMembership;
 use App\Models\SportTeam;
 use App\Models\User;
+use App\Support\SportEquipmentRequestStatus;
 use App\Support\SportAuditAction;
 
 class SportActivityRecorder
@@ -160,6 +163,92 @@ class SportActivityRecorder
         }
     }
 
+    public function equipmentItemCreated(SportEquipmentItem $item, User $actor): void
+    {
+        $this->audit('sport', SportAuditAction::EQUIPMENT_ITEM_CREATED, 'sport_equipment_item', $item->id, $this->equipmentItemLabel($item), null, $this->equipmentItemPayload($item), $this->context($actor));
+
+        $payload = $this->notificationPayload(
+            'info',
+            'Sport equipment item created.',
+            $this->equipmentItemLabel($item).' has been created.',
+            $actor,
+            ['entityType' => 'sport_equipment_item', 'entityId' => $item->id]
+        );
+
+        $this->notificationDispatcher->notifyRole('adminsport', $payload);
+        $this->notificationDispatcher->notifyRole('superadmin', $payload);
+    }
+
+    public function equipmentItemUpdated(SportEquipmentItem $item, User $actor, array $oldValues = [], array $newValues = []): void
+    {
+        $this->audit('sport', SportAuditAction::EQUIPMENT_ITEM_UPDATED, 'sport_equipment_item', $item->id, $this->equipmentItemLabel($item), $oldValues, $newValues, $this->context($actor));
+    }
+
+    public function equipmentRequestCreated(SportEquipmentRequest $request, User $actor): void
+    {
+        $this->audit('sport', SportAuditAction::EQUIPMENT_REQUEST_CREATED, 'sport_equipment_request', $request->id, $this->equipmentRequestLabel($request), null, $this->equipmentRequestPayload($request), $this->context($actor));
+
+        $payload = $this->notificationPayload(
+            'info',
+            'Sport equipment request submitted.',
+            $this->equipmentRequestLabel($request).' requires review.',
+            $actor,
+            ['entityType' => 'sport_equipment_request', 'entityId' => $request->id, 'teamId' => $request->team_id]
+        );
+
+        $this->notificationDispatcher->notifyRole('adminsport', $payload);
+        $this->notificationDispatcher->notifyRole('superadmin', $payload);
+    }
+
+    public function equipmentRequestReviewed(SportEquipmentRequest $request, User $actor, string $action, ?string $reason = null): void
+    {
+        $auditAction = $action === SportEquipmentRequestStatus::APPROVED
+            ? SportAuditAction::EQUIPMENT_REQUEST_APPROVED
+            : SportAuditAction::EQUIPMENT_REQUEST_REJECTED;
+
+        $this->audit('sport', $auditAction, 'sport_equipment_request', $request->id, $this->equipmentRequestLabel($request), null, $this->equipmentRequestPayload($request), $this->context($actor, ['reason' => $reason]));
+
+        if ($coach = $request->coach) {
+            $this->notificationDispatcher->notifyUser($coach, $this->notificationPayload(
+                $action === SportEquipmentRequestStatus::APPROVED ? 'success' : 'warning',
+                $action === SportEquipmentRequestStatus::APPROVED ? 'Sport equipment request approved.' : 'Sport equipment request rejected.',
+                $this->equipmentRequestLabel($request).' has been '.($action === SportEquipmentRequestStatus::APPROVED ? 'approved' : 'rejected').'.',
+                $actor,
+                ['entityType' => 'sport_equipment_request', 'entityId' => $request->id, 'reason' => $reason]
+            ));
+        }
+    }
+
+    public function equipmentRequestIssued(SportEquipmentRequest $request, User $actor): void
+    {
+        $this->audit('sport', SportAuditAction::EQUIPMENT_REQUEST_ISSUED, 'sport_equipment_request', $request->id, $this->equipmentRequestLabel($request), null, $this->equipmentRequestPayload($request), $this->context($actor));
+
+        if ($coach = $request->coach) {
+            $this->notificationDispatcher->notifyUser($coach, $this->notificationPayload(
+                'success',
+                'Sport equipment issued.',
+                $this->equipmentRequestLabel($request).' has been issued.',
+                $actor,
+                ['entityType' => 'sport_equipment_request', 'entityId' => $request->id]
+            ));
+        }
+    }
+
+    public function equipmentRequestReturned(SportEquipmentRequest $request, User $actor): void
+    {
+        $this->audit('sport', SportAuditAction::EQUIPMENT_REQUEST_RETURNED, 'sport_equipment_request', $request->id, $this->equipmentRequestLabel($request), null, $this->equipmentRequestPayload($request), $this->context($actor));
+
+        if ($coach = $request->coach) {
+            $this->notificationDispatcher->notifyUser($coach, $this->notificationPayload(
+                'success',
+                'Sport equipment returned.',
+                $this->equipmentRequestLabel($request).' has been returned.',
+                $actor,
+                ['entityType' => 'sport_equipment_request', 'entityId' => $request->id]
+            ));
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $newValues
      * @param  array<string, mixed>  $metadata
@@ -266,6 +355,56 @@ class SportActivityRecorder
         }
 
         return SportTeam::query()->find($team)?->name ?? 'Team';
+    }
+
+    private function equipmentItemLabel(SportEquipmentItem $item): string
+    {
+        return trim($item->name.' ('.$item->equipment_code.')');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function equipmentItemPayload(SportEquipmentItem $item): array
+    {
+        return [
+            'equipmentItemId' => $item->id,
+            'equipmentCode' => $item->equipment_code,
+            'name' => $item->name,
+            'category' => $item->category,
+            'unit' => $item->unit,
+            'totalQuantity' => (int) $item->total_quantity,
+            'availableQuantity' => (int) $item->available_quantity,
+            'minimumStockLevel' => (int) $item->minimum_stock_level,
+            'storageLocation' => $item->storage_location,
+            'status' => $item->status,
+        ];
+    }
+
+    private function equipmentRequestLabel(SportEquipmentRequest $request): string
+    {
+        return trim(($request->item?->name ?? 'Equipment').' → '.($request->team?->name ?? 'Team'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function equipmentRequestPayload(SportEquipmentRequest $request): array
+    {
+        return [
+            'equipmentRequestId' => $request->id,
+            'requestCode' => $request->request_code,
+            'equipmentItemId' => $request->equipment_item_id,
+            'teamId' => $request->team_id,
+            'coachUserId' => $request->coach_user_id,
+            'requestedQuantity' => (int) $request->requested_quantity,
+            'approvedQuantity' => $request->approved_quantity !== null ? (int) $request->approved_quantity : null,
+            'issuedQuantity' => (int) $request->issued_quantity,
+            'returnedQuantity' => (int) $request->returned_quantity,
+            'damagedQuantity' => (int) $request->damaged_quantity,
+            'missingQuantity' => (int) $request->missing_quantity,
+            'status' => $request->status,
+        ];
     }
 
     private function squadLabel(SportMatchSquad $squad): string

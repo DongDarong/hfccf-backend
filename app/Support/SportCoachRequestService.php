@@ -7,6 +7,7 @@ use App\Models\SportPlayer;
 use App\Models\SportTeam;
 use App\Models\User;
 use App\Services\SportActivityRecorder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -108,5 +109,32 @@ class SportCoachRequestService
         $this->activityRecorder->matchRequestCreated($match, $coach);
 
         return $match;
+    }
+
+    /**
+     * Return the coach's own pending and reviewed requests in persisted order.
+     *
+     * @return array{playerRequests:Collection<int, SportPlayer>, matchRequests:Collection<int, SportMatch>}
+     */
+    public function coachRequests(User $coach): array
+    {
+        $playerRequests = SportPlayer::query()
+            ->with(['team', 'createdBy', 'approvedBy', 'activeMembership.team', 'memberships.team', 'memberships.createdBy', 'memberships.updatedBy'])
+            ->where('created_by_user_id', $coach->id)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get();
+
+        $matchRequests = SportMatch::query()
+            ->with(['homeTeam', 'awayTeam', 'creator', 'approvedBy'])
+            ->where('created_by_user_id', $coach->id)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get();
+
+        return [
+            'playerRequests' => $playerRequests,
+            'matchRequests' => $matchRequests,
+        ];
     }
 }

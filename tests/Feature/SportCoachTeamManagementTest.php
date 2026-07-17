@@ -232,6 +232,32 @@ class SportCoachTeamManagementTest extends TestCase
             ->assertJsonPath('data.match.status', 'cancelled');
     }
 
+    public function test_coach_match_request_rejects_invalid_scheduled_at(): void
+    {
+        $admin = $this->createUser('adminsport', 'usr_1012', 'admin1012@hfccf.org');
+        $coach = $this->createUser('coach', 'usr_1013', 'coach1013@hfccf.org');
+        $opponent = $this->createTeam('TEAM-1012', 'Opponent FC');
+        $coachTeam = $this->createTeam('TEAM-1013', 'Coach Side FC');
+
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/sport/admin/coach-team-assignments', [
+            'coach_user_id' => $coach->id,
+            'team_id' => $coachTeam->id,
+            'status' => 'active',
+        ])->assertCreated();
+
+        Sanctum::actingAs($coach);
+
+        $this->postJson('/api/sport/coach/matches', [
+            'team_id' => $coachTeam->id,
+            'opponent_team_id' => $opponent->id,
+            'match_type' => 'friendly',
+            'scheduled_at' => 'not-a-date',
+            'venue' => 'Main Ground',
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'The scheduled at field must be a valid date.');
+    }
+
     public function test_coach_cannot_create_match_for_unassigned_team(): void
     {
         $coach = $this->createUser('coach', 'usr_1010', 'coach1010@hfccf.org');

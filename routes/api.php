@@ -72,8 +72,12 @@ use App\Http\Controllers\Api\Scholarship\ScholarshipStudentController;
 use App\Http\Controllers\Api\Sport\SportAdminCoachTeamAssignmentController;
 use App\Http\Controllers\Api\Sport\SportAttendanceController;
 use App\Http\Controllers\Api\Sport\SportApprovalController;
+use App\Http\Controllers\Api\Sport\SportCoachEquipmentRequestController;
 use App\Http\Controllers\Api\Sport\SportCoachController;
+use App\Http\Controllers\Api\Sport\SportCoachLookupController;
 use App\Http\Controllers\Api\Sport\SportCoachTeamController;
+use App\Http\Controllers\Api\Sport\SportEquipmentController;
+use App\Http\Controllers\Api\Sport\SportEquipmentRequestController;
 use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportDivisionController;
 use App\Http\Controllers\Api\Sport\SportPlayingStyleController;
@@ -619,6 +623,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('invoices/{invoice}/cancel', [PreschoolInvoiceController::class, 'cancel']);
         Route::post('invoices/{invoice}/overdue', [PreschoolInvoiceController::class, 'overdue']);
         Route::get('invoices/{invoice}/print', [PreschoolInvoiceController::class, 'print']);
+        Route::get('invoices/{invoice}/download', [PreschoolInvoiceController::class, 'download']);
         Route::get('students/{student}/invoices', [PreschoolInvoiceController::class, 'studentInvoices']);
         Route::get('students/{student}/payment-summary', [PreschoolInvoiceController::class, 'studentPaymentSummary']);
         Route::get('receipts/{receipt}', [PreschoolReceiptController::class, 'show']);
@@ -756,6 +761,26 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('coach/teams/{team}/players', [SportCoachTeamController::class, 'storePlayer']);
         Route::get('coach/matches', [SportCoachController::class, 'matches']);
         Route::post('coach/matches', [SportCoachTeamController::class, 'storeMatch']);
+        Route::get('coach/requests', [SportCoachLookupController::class, 'requests']);
+        Route::get('coach/opponent-teams', [SportCoachLookupController::class, 'opponentTeams']);
+        Route::get('coach/teams/{team}/roster-candidates', [SportCoachLookupController::class, 'rosterCandidates']);
+
+        Route::get('admin/equipment', [SportEquipmentController::class, 'index']);
+        Route::post('admin/equipment', [SportEquipmentController::class, 'store']);
+        Route::get('admin/equipment/{id}', [SportEquipmentController::class, 'show']);
+        Route::put('admin/equipment/{id}', [SportEquipmentController::class, 'update']);
+
+        Route::get('admin/equipment-requests', [SportEquipmentRequestController::class, 'index']);
+        Route::get('admin/equipment-requests/{id}', [SportEquipmentRequestController::class, 'show']);
+        Route::patch('admin/equipment-requests/{id}/approve', [SportEquipmentRequestController::class, 'approve']);
+        Route::patch('admin/equipment-requests/{id}/reject', [SportEquipmentRequestController::class, 'reject']);
+        Route::patch('admin/equipment-requests/{id}/issue', [SportEquipmentRequestController::class, 'issue']);
+        Route::patch('admin/equipment-requests/{id}/return', [SportEquipmentRequestController::class, 'returnRequest']);
+
+        Route::get('coach/equipment', [SportCoachEquipmentRequestController::class, 'equipment']);
+        Route::get('coach/equipment/requests', [SportCoachEquipmentRequestController::class, 'index']);
+        Route::get('coach/equipment/requests/{id}', [SportCoachEquipmentRequestController::class, 'show']);
+        Route::post('coach/equipment/requests', [SportCoachEquipmentRequestController::class, 'store']);
 
         Route::get('admin/coach-team-assignments', [SportAdminCoachTeamAssignmentController::class, 'index']);
         Route::post('admin/coach-team-assignments', [SportAdminCoachTeamAssignmentController::class, 'store']);
@@ -768,6 +793,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('admin/pending-matches', [SportApprovalController::class, 'pendingMatches']);
         Route::post('admin/matches/{id}/approve', [SportApprovalController::class, 'approveMatch']);
         Route::post('admin/matches/{id}/reject', [SportApprovalController::class, 'rejectMatch']);
+        Route::get('admin/teams/roster-candidates', [SportTeamRosterController::class, 'candidates']);
+        Route::get('admin/teams/{team}/roster-candidates', [SportTeamRosterController::class, 'candidates']);
 
         Route::get('teams', [SportTeamController::class, 'index']);
         Route::post('teams', [SportTeamController::class, 'store']);

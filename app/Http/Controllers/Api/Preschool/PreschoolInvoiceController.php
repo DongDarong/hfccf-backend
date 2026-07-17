@@ -11,6 +11,7 @@ use App\Services\PreschoolBillingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class PreschoolInvoiceController extends PreschoolBillingController
@@ -353,6 +354,51 @@ class PreschoolInvoiceController extends PreschoolBillingController
 
         return response($this->billing->renderInvoicePrintHtml($invoiceModel), Response::HTTP_OK)
             ->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    public function download(Request $request, string $invoice): Response|JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $invoiceModel = PreschoolInvoice::query()->with([
+            'student',
+            'preschoolClass',
+            'academicYear',
+            'term',
+            'items',
+            'payments.receipts',
+            'receipts.payment.student',
+            'receipts.invoice',
+        ])->find($invoice);
+        if (! $invoiceModel) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found.',
+                'data' => null,
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $validated = $request->validate([
+            'format' => ['sometimes', 'nullable', Rule::in(['pdf', 'xlsx'])],
+        ]);
+
+        try {
+            $export = $this->billing->exportInvoice($invoiceModel, $validated['format'] ?? 'pdf');
+        } catch (\RuntimeException $exception) {
+            report($exception);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice PDF rendering is temporarily unavailable.',
+                'data' => null,
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return response($export['content'], Response::HTTP_OK)
+            ->header('Content-Type', $export['mimeType'])
+            ->header('Content-Disposition', 'attachment; filename="'.$export['filename'].'"');
     }
 
     private function applyFilters(Request $request, Builder $query): void
