@@ -26,6 +26,7 @@ class PreschoolPaymentResource extends JsonResource
             'paymentStatus' => $this->payment_status,
             'paidAt' => $this->paid_at?->toISOString(),
             'dueDate' => $this->due_date?->toDateString(),
+            'description' => $this->description,
             'note' => $this->note,
             'receiptCount' => $this->relationLoaded('receipts') ? $this->receipts->count() : 0,
             'createdAt' => $this->created_at?->toISOString(),

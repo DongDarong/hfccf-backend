@@ -623,6 +623,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('invoices/{invoice}/cancel', [PreschoolInvoiceController::class, 'cancel']);
         Route::post('invoices/{invoice}/overdue', [PreschoolInvoiceController::class, 'overdue']);
         Route::get('invoices/{invoice}/print', [PreschoolInvoiceController::class, 'print']);
+        Route::get('invoices/{invoice}/download', [PreschoolInvoiceController::class, 'download']);
         Route::get('students/{student}/invoices', [PreschoolInvoiceController::class, 'studentInvoices']);
         Route::get('students/{student}/payment-summary', [PreschoolInvoiceController::class, 'studentPaymentSummary']);
         Route::get('receipts/{receipt}', [PreschoolReceiptController::class, 'show']);

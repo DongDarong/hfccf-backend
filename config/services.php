@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'preschool_pdf' => [
+        'browser_binary' => env('PRESCHOOL_PDF_BROWSER_PATH'),
+    ],
+
 ];

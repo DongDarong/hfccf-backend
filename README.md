@@ -20,6 +20,7 @@ Laravel 13 API backend for the HFCCF admin system. The current backend supports 
 - Preschool module APIs for classes, students, teachers, attendance, and payments
 - Preschool academic lifecycle APIs for academic years, terms, and lifecycle state management
 - Preschool reporting and governance APIs for report periods, snapshots, exports, governance diff, integrity review, lifecycle audit, institutional reconstruction, and governance cases
+- Preschool invoice export APIs for PDF and XLSX downloads, with the XLSX path generated through PhpSpreadsheet and branded for HFCCF preschool invoices
 - Enterprise governance APIs for audit logs, security events, configuration history, operational risk, investigations, and exports
 - Preschool settings backbone APIs for the academic defaults used across the module
 - Scholarship module APIs for students, applications, reviews, and status workflow
@@ -52,6 +53,8 @@ The backend currently exposes these stabilized domain areas:
 composer install
 npm install
 ```
+
+The Preschool invoice XLSX export uses PhpSpreadsheet. Production PHP environments should have the `zip` extension enabled so native `ZipArchive` support is available for spreadsheet generation and reading.
 
 ### 2. Configure Environment
 

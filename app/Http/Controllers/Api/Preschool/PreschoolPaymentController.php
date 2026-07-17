@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\Preschool;
 use App\Http\Requests\Preschool\StorePreschoolPaymentRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolPaymentRequest;
 use App\Http\Resources\Preschool\PreschoolPaymentResource;
-use App\Models\PreschoolInvoice;
 use App\Models\PreschoolPayment;
 use App\Services\PreschoolBillingService;
 use Illuminate\Database\Eloquent\Builder;
@@ -47,45 +46,17 @@ class PreschoolPaymentController extends PreschoolBillingController
             return $response;
         }
 
-        $data = $request->validated();
-        if (! empty($data['invoice_id'])) {
-            $invoice = PreschoolInvoice::query()->find($data['invoice_id']);
-            if ($invoice) {
-                if ($invoice->status === 'cancelled') {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Cancelled invoices cannot receive payments.',
-                        'data' => null,
-                    ], Response::HTTP_UNPROCESSABLE_ENTITY);
-                }
-                $data['student_id'] = $invoice->student_id;
-                $data['class_id'] = $invoice->class_id;
-            }
-        }
-        $payment = PreschoolPayment::query()->create([
-            'student_id' => $data['student_id'],
-            'class_id' => $data['class_id'],
-            'invoice_id' => $data['invoice_id'] ?? null,
-            'payment_reference' => $data['payment_reference'] ?? $this->nextPaymentReference(),
-            'amount' => $data['amount'],
-            'currency' => $data['currency'] ?? 'USD',
-            'payment_method' => $data['payment_method'],
-            'payment_status' => $data['payment_status'],
-            'paid_at' => $data['paid_at'] ?? null,
-            'due_date' => $data['due_date'] ?? null,
-            'note' => $data['note'] ?? null,
-        ]);
-
-        $payment->load(['student', 'preschoolClass', 'invoice', 'receipts']);
-        if ($payment->invoice_id) {
-            $this->billing->syncPaymentInvoiceBalances($payment);
-        }
+        $result = $this->billing->createPaymentWorkflow($request->validated(), $request->user());
 
         return response()->json([
             'success' => true,
-            'message' => 'Preschool payment created successfully.',
+            'message' => 'Payment recorded successfully.',
             'data' => [
-                'payment' => PreschoolPaymentResource::make($payment)->resolve($request),
+                'invoice' => isset($result['invoice']) ? \App\Http\Resources\Preschool\PreschoolInvoiceResource::make($result['invoice'])->resolve($request) : null,
+                'payment' => PreschoolPaymentResource::make($result['payment'])->resolve($request),
+                'receipt' => ! empty($result['receipt'])
+                    ? \App\Http\Resources\Preschool\PreschoolReceiptResource::make($result['receipt'])->resolve($request)
+                    : null,
             ],
         ], Response::HTTP_CREATED);
     }
@@ -130,38 +101,13 @@ class PreschoolPaymentController extends PreschoolBillingController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        $data = $request->validated();
-        if (! empty($data['invoice_id'])) {
-            $invoice = PreschoolInvoice::query()->find($data['invoice_id']);
-            if ($invoice) {
-                if ($invoice->status === 'cancelled') {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Cancelled invoices cannot receive payments.',
-                        'data' => null,
-                    ], Response::HTTP_UNPROCESSABLE_ENTITY);
-                }
-                $data['student_id'] = $invoice->student_id;
-                $data['class_id'] = $invoice->class_id;
-            }
-        }
-        $previousInvoiceId = $payment->invoice_id;
-
-        foreach (['student_id', 'class_id', 'invoice_id', 'payment_reference', 'amount', 'currency', 'payment_method', 'payment_status', 'paid_at', 'due_date', 'note'] as $field) {
-            if (array_key_exists($field, $data)) {
-                $payment->{$field} = $data[$field];
-            }
-        }
-
-        $payment->save();
-        $payment->load(['student', 'preschoolClass', 'invoice', 'receipts']);
-        $this->billing->syncPaymentInvoiceBalances($payment, $previousInvoiceId);
+        $updated = $this->billing->updatePayment($payment, $request->validated(), $request->user());
 
         return response()->json([
             'success' => true,
             'message' => 'Preschool payment updated successfully.',
             'data' => [
-                'payment' => PreschoolPaymentResource::make($payment)->resolve($request),
+                'payment' => PreschoolPaymentResource::make($updated)->resolve($request),
             ],
         ], Response::HTTP_OK);
     }
