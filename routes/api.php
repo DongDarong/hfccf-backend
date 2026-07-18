@@ -88,6 +88,7 @@ use App\Http\Controllers\Api\Sport\SportPlayerController;
 use App\Http\Controllers\Api\Sport\SportPlayerLifecycleController;
 use App\Http\Controllers\Api\Sport\SportTeamController;
 use App\Http\Controllers\Api\Sport\SportTeamRosterController;
+use App\Http\Controllers\Api\Sport\SportTrainingSessionController;
 use App\Http\Controllers\Api\Sport\SportTournamentController;
 use App\Http\Controllers\Api\Sport\SportTournamentFixtureController;
 use App\Http\Controllers\Api\Sport\SportTournamentGroupController;
@@ -720,6 +721,12 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
     Route::prefix('sport')->middleware(['password.change.completed'])->group(function (): void {
         Route::get('dashboard', [SportDashboardController::class, 'index']);
         Route::get('coach/dashboard', [SportDashboardController::class, 'coach']);
+
+        Route::get('training-sessions', [SportTrainingSessionController::class, 'index']);
+        Route::post('training-sessions', [SportTrainingSessionController::class, 'store']);
+        Route::get('training-sessions/{id}', [SportTrainingSessionController::class, 'show']);
+        Route::put('training-sessions/{id}', [SportTrainingSessionController::class, 'update']);
+        Route::delete('training-sessions/{id}', [SportTrainingSessionController::class, 'destroy']);
 
         Route::get('tournaments', [SportTournamentController::class, 'index']);
         Route::post('tournaments', [SportTournamentController::class, 'store']);

@@ -92,4 +92,9 @@ class SportTeam extends Model
     {
         return $this->hasMany(SportMatchSquad::class, 'team_id');
     }
+
+    public function trainingSessions(): HasMany
+    {
+        return $this->hasMany(SportTrainingSession::class, 'team_id');
+    }
 }
