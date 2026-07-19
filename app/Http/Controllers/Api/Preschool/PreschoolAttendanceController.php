@@ -60,63 +60,10 @@ class PreschoolAttendanceController extends Controller
 
         $data = $request->validated();
         $session = $this->resolveAttendanceSession($data);
-
-        if ($session) {
-            if (in_array($session->status, ['locked', 'cancelled'], true)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot edit locked or cancelled session.',
-                    'data' => null,
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
-            $data['class_id'] = $session->preschool_class_id;
-            $data['attendance_date'] = $session->attendance_date?->toDateString();
-            $data['attendance_session_id'] = $session->id;
-        }
-
-        if ($response = $this->assertTeacherCanAccessAttendance($request->user(), (int) $data['class_id'], (int) $data['student_id'])) {
-            return $response;
-        }
-
-        $guardPayload = [
-            'class_id' => (int) $data['class_id'],
-            'attendance_date' => $data['attendance_date'],
-        ];
-        if ($response = app(PreschoolLifecycleGuardService::class)->attendanceWriteLock($request->user(), $guardPayload)) {
-            return $response;
-        }
-
-        if ($response = $this->assertTeacherCanAccessClass($request->user(), (int) $data['class_id'])) {
-            return $response;
-        }
-
-        $academicContext = app(PreschoolAcademicLifecycleService::class)->currentContext();
-        $attendance = PreschoolAttendanceRecord::query()->create([
-            'class_id' => $data['class_id'],
-            'student_id' => $data['student_id'],
-            'attendance_session_id' => $data['attendance_session_id'] ?? null,
-            'recorded_by_user_id' => $request->user()->id,
-            'attendance_date' => $data['attendance_date'],
-            'status' => $data['status'],
-            'note' => $data['note'] ?? null,
-            'academic_year_id' => $academicContext['academic_year_id'] ?? null,
-            'term_id' => $academicContext['term_id'] ?? null,
-        ]);
+        $attendance = app(PreschoolAttendanceSessionService::class)->saveLegacyAttendance($request->user(), $data);
 
         $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term', 'attendanceSession.schedule']);
         $this->syncAttendanceFollowUpSafely($attendance, $request->user(), 'store');
-
-        if ($session) {
-            $finalize = (bool) ($data['finalize'] ?? $data['complete'] ?? $data['submit'] ?? false);
-            $sessionService = app(PreschoolAttendanceSessionService::class);
-
-            if ($finalize) {
-                $sessionService->completeSession($request->user(), $session);
-            } elseif ($session->status === 'scheduled') {
-                $sessionService->openSession($request->user(), $session);
-            }
-        }
 
         return response()->json([
             'success' => true,
@@ -144,57 +91,19 @@ class PreschoolAttendanceController extends Controller
 
         $data = $request->validated();
         $session = $this->resolveAttendanceSession($data);
-
-        if ($session) {
-            if (in_array($session->status, ['locked', 'cancelled'], true)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot edit locked or cancelled session.',
-                    'data' => null,
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
-            $data['class_id'] = $session->preschool_class_id;
-            $data['attendance_date'] = $session->attendance_date?->toDateString();
-            $data['attendance_session_id'] = $session->id;
+        if (! $session || (int) $attendance->attendance_session_id !== (int) $session->id) {
+            return response()->json(['success' => false, 'error' => ['code' => 'SESSION_REQUIRED', 'message' => 'The record must be updated through its Attendance Session.'], 'data' => null], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        if ($response = $this->assertTeacherCanAccessAttendance($request->user(), (int) ($data['class_id'] ?? $attendance->class_id), (int) ($data['student_id'] ?? $attendance->student_id))) {
-            return $response;
-        }
-
-        if ($response = $this->assertTeacherCanAccessClass($request->user(), (int) ($data['class_id'] ?? $attendance->class_id))) {
-            return $response;
-        }
-
-        $guardPayload = [
-            'class_id' => (int) ($data['class_id'] ?? $attendance->class_id),
-            'attendance_date' => $data['attendance_date'] ?? $attendance->attendance_date?->toDateString(),
-        ];
-        if ($response = app(PreschoolLifecycleGuardService::class)->attendanceWriteLock($request->user(), $guardPayload, $attendance)) {
-            return $response;
-        }
-
-        foreach (['class_id', 'student_id', 'attendance_session_id', 'attendance_date', 'status', 'note'] as $field) {
-            if (array_key_exists($field, $data)) {
-                $attendance->{$field} = $data[$field];
-            }
-        }
-
-        $attendance->save();
+        $studentId = (int) ($data['student_id'] ?? $attendance->student_id);
+        $saved = app(PreschoolAttendanceSessionService::class)->saveRecordsForSession($request->user(), $session, ['records' => [[
+            'student_id' => $studentId,
+            'status' => $data['status'] ?? $attendance->status,
+            'note' => $data['note'] ?? $attendance->note,
+        ]]]);
+        $attendance = $saved->first();
         $attendance->load(['student', 'preschoolClass', 'recordedBy', 'academicYear', 'term', 'attendanceSession.schedule']);
         $this->syncAttendanceFollowUpSafely($attendance, $request->user(), 'update');
-
-        if ($session) {
-            $finalize = (bool) ($data['finalize'] ?? $data['complete'] ?? $data['submit'] ?? false);
-            $sessionService = app(PreschoolAttendanceSessionService::class);
-
-            if ($finalize) {
-                $sessionService->completeSession($request->user(), $session);
-            } elseif ($session->status === 'scheduled') {
-                $sessionService->openSession($request->user(), $session);
-            }
-        }
 
         return response()->json([
             'success' => true,

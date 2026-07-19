@@ -387,12 +387,14 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('attendance-sessions/generate', [PreschoolAttendanceSessionController::class, 'generate']);
         Route::get('attendance-sessions/{attendanceSession}', [PreschoolAttendanceSessionController::class, 'show']);
         Route::post('attendance-sessions/{attendanceSession}/records', [PreschoolAttendanceSessionController::class, 'storeRecords']);
+        Route::put('attendance-sessions/{attendanceSession}/attendance', [PreschoolAttendanceSessionController::class, 'storeRecords']);
         Route::patch('attendance-sessions/{attendanceSession}/open', [PreschoolAttendanceSessionController::class, 'open']);
         Route::patch('attendance-sessions/{attendanceSession}/complete', [PreschoolAttendanceSessionController::class, 'complete']);
         Route::patch('attendance-sessions/{attendanceSession}/close', [PreschoolAttendanceSessionController::class, 'close']);
         Route::patch('attendance-sessions/{attendanceSession}/lock', [PreschoolAttendanceSessionController::class, 'lock']);
         Route::patch('attendance-sessions/{attendanceSession}/reopen', [PreschoolAttendanceSessionController::class, 'reopen']);
         Route::patch('attendance-sessions/{attendanceSession}/cancel', [PreschoolAttendanceSessionController::class, 'cancel']);
+        Route::post('attendance-sessions/{attendanceSession}/reassign', [PreschoolAttendanceSessionController::class, 'reassign']);
 
         Route::get('schedules/{schedule}/sessions', [PreschoolScheduleController::class, 'sessions']);
         Route::get('schedules/{schedule}/today-session', [PreschoolScheduleController::class, 'todaySession']);

@@ -18,6 +18,7 @@ class PreschoolAttendanceResource extends JsonResource
             'studentId' => $this->student_id,
             'studentName' => trim(($this->student?->first_name ?? '').' '.($this->student?->last_name ?? '')),
             'attendanceSessionId' => $this->attendance_session_id,
+            'isLegacy' => $this->attendance_session_id === null,
             'attendanceSessionStatus' => $this->attendanceSession?->status,
             'attendanceSessionDate' => $this->attendanceSession?->attendance_date?->toDateString(),
             'attendanceSessionStartTime' => $this->attendanceSession?->start_time,

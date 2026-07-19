@@ -164,8 +164,9 @@ class PreschoolAttendanceSessionController extends Controller
         }
 
         $validated = $request->validate([
-            'records' => ['sometimes', 'array', 'min:1'],
-            'records.*.student_id' => ['required_with:records', 'integer', 'exists:preschool_students,id'],
+            'records' => ['sometimes', 'array', 'min:1', 'max:200'],
+            'records.*.student_id' => ['sometimes', 'integer', 'exists:preschool_students,id'],
+            'records.*.participantId' => ['sometimes', 'integer', 'exists:preschool_students,id'],
             'records.*.status' => ['required_with:records', Rule::in(['present', 'absent', 'late', 'excused'])],
             'records.*.note' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'student_id' => ['required_without:records', 'integer', 'exists:preschool_students,id'],
@@ -256,7 +257,8 @@ class PreschoolAttendanceSessionController extends Controller
             return $response;
         }
 
-        $session = $service->reopenSession($request->user(), $attendanceSession);
+        $validated = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
+        $session = $service->reopenSession($request->user(), $attendanceSession, $validated['reason']);
 
         return response()->json([
             'success' => true,
@@ -296,7 +298,8 @@ class PreschoolAttendanceSessionController extends Controller
             return $response;
         }
 
-        $session = $service->closeSession($request->user(), $attendanceSession);
+        $validated = $request->validate(['reason' => ['sometimes', 'nullable', 'string', 'max:2000']]);
+        $session = $service->closeSession($request->user(), $attendanceSession, $validated['reason'] ?? null);
 
         return response()->json([
             'success' => true,
@@ -305,6 +308,17 @@ class PreschoolAttendanceSessionController extends Controller
                 'attendanceSession' => PreschoolAttendanceSessionResource::make($session)->resolve($request),
             ],
         ], Response::HTTP_OK);
+    }
+
+    public function reassign(Request $request, PreschoolAttendanceSession $attendanceSession, PreschoolAttendanceSessionService $service): JsonResponse
+    {
+        if ($response = $this->authorizeManager($request->user())) return $response;
+        $validated = $request->validate([
+            'teacher_user_id' => ['required', 'string', 'exists:users,id'],
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+        $session = $service->reassignTeacher($request->user(), $attendanceSession, $validated['teacher_user_id'], $validated['reason']);
+        return response()->json(['success' => true, 'message' => 'Preschool attendance session reassigned successfully.', 'data' => ['attendanceSession' => PreschoolAttendanceSessionResource::make($session)->resolve($request)]]);
     }
 
     private function authorizeViewer(?User $user): ?JsonResponse
@@ -363,7 +377,9 @@ class PreschoolAttendanceSessionController extends Controller
             return null;
         }
 
-        if ($user->role_code === 'teacher-preschool' && $session->preschoolClass?->teacher_user_id === $user->id) {
+        $teacherMatches = (string) $session->teacher_user_id === (string) $user->id
+            || ($session->teacher_user_id === null && (string) $session->preschoolClass?->teacher_user_id === (string) $user->id);
+        if ($user->role_code === 'teacher-preschool' && $teacherMatches && $user->status === 'active') {
             return null;
         }
 

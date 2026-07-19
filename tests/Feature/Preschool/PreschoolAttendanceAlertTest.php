@@ -61,14 +61,26 @@ class PreschoolAttendanceAlertTest extends TestCase
             'student_type' => 'regular',
             'avatar' => null,
         ]);
+        DB::table('preschool_class_students')->insert([
+            'class_id' => $class->id,
+            'student_id' => $student->id,
+            'status' => 'active',
+            'enrollment_status' => 'active',
+            'enrollment_started_at' => Carbon::now()->subDay(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $session = PreschoolAttendanceSession::query()->create([
             'preschool_class_id' => $class->id,
             'attendance_date' => Carbon::now()->toDateString(),
+            'start_time' => '07:00:00',
+            'end_time' => '10:00:00',
             'status' => 'open',
             'generated_from_schedule' => true,
             'session_key' => 'class:'.$class->id.':'.Carbon::now()->toDateString().':manual',
         ]);
+        Carbon::setTestNow(Carbon::parse('2026-07-01T01:00:00Z'));
 
         $response = $this->postJson('/api/preschool/attendance-sessions/'.$session->id.'/records', [
             'records' => [
