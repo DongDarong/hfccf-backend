@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PreschoolAcademicYear extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'code',
         'label',
@@ -32,5 +35,10 @@ class PreschoolAcademicYear extends Model
     public function terms(): HasMany
     {
         return $this->hasMany(PreschoolAcademicTerm::class, 'academic_year_id');
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
     }
 }

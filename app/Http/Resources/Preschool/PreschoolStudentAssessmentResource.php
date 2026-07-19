@@ -15,6 +15,8 @@ class PreschoolStudentAssessmentResource extends JsonResource
             'id' => $this->id,
             'studentId' => $this->student_id,
             'studentName' => trim(($this->student?->first_name ?? '').' '.($this->student?->last_name ?? '')),
+            'studentGender' => $this->student?->gender,
+            'studentDateOfBirth' => $this->student?->date_of_birth?->toDateString(),
             'classId' => $this->class_id,
             'className' => $this->preschoolClass?->name,
             'categoryId' => $this->category_id,

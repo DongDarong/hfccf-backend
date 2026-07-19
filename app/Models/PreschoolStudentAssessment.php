@@ -12,6 +12,7 @@ class PreschoolStudentAssessment extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'monthly_submission_id',
         'student_id',
         'class_id',
         'category_id',
@@ -71,6 +72,11 @@ class PreschoolStudentAssessment extends Model
     public function term(): BelongsTo
     {
         return $this->belongsTo(PreschoolAcademicTerm::class, 'term_id');
+    }
+
+    public function monthlySubmission(): BelongsTo
+    {
+        return $this->belongsTo(PreschoolMonthlySubmission::class, 'monthly_submission_id');
     }
 
     public function isEditable(): bool

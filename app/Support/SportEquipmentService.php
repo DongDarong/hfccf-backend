@@ -18,6 +18,7 @@ class SportEquipmentService
 {
     public function __construct(
         private readonly SportActivityRecorder $activityRecorder,
+        private readonly SportEquipmentAssignmentService $assignmentService,
     ) {}
 
     public function summary(): array
@@ -171,6 +172,8 @@ class SportEquipmentService
                 'issued_at' => Carbon::now(),
             ])->save();
 
+            $this->assignmentService->createFromIssuedRequest($lockedRequest, $actor, $issuedQuantity, $adminNote);
+
             return $lockedRequest->refresh()->loadMissing(['item', 'coach', 'team', 'reviewedBy', 'issuedBy', 'returnedBy']);
         });
     }
@@ -215,6 +218,15 @@ class SportEquipmentService
                 'returned_by_user_id' => $actor->id,
                 'returned_at' => Carbon::now(),
             ])->save();
+
+            $this->assignmentService->completeFromReturnedRequest(
+                $lockedRequest,
+                $actor,
+                $returnedQuantity,
+                $damagedQuantity,
+                $missingQuantity,
+                $adminNote,
+            );
 
             return $lockedRequest->refresh()->loadMissing(['item', 'coach', 'team', 'reviewedBy', 'issuedBy', 'returnedBy']);
         });

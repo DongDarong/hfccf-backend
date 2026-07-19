@@ -3,14 +3,20 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreUserRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
+        $firstName = $this->input('first_name', $this->input('firstName'));
+        $lastName = $this->input('last_name', $this->input('lastName'));
+        $username = trim((string) $this->input('username', ''));
+
         $this->merge([
-            'first_name' => $this->input('first_name', $this->input('firstName')),
-            'last_name' => $this->input('last_name', $this->input('lastName')),
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'username' => $username !== '' ? $username : trim((string) $firstName.' '.(string) $lastName),
             'role' => $this->input('role', $this->input('role_code')),
             'role_code' => $this->input('role_code', $this->input('role')),
             'department_code' => $this->input('department_code', $this->input('departmentCode')),
@@ -31,7 +37,7 @@ class StoreUserRequest extends FormRequest
         return [
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
-            'username' => ['nullable', 'string', 'max:191'],
+            'username' => ['required', 'string', 'max:191', Rule::unique('users', 'username')],
             'email' => ['required', 'email', 'max:191', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:32'],
             'role' => ['required', 'string', 'max:32', 'exists:roles,code'],

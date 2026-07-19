@@ -277,6 +277,49 @@ class SportApiTest extends TestCase
         ]);
     }
 
+    public function test_tournament_detail_returns_attached_teams_with_pivot_data(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_9352', 'sport.admin9352@hfccf.org');
+        $tournament = $this->createTournament('TRN-9352', 'League Detail');
+        $team = $this->createTeam('TEAM-9352-A', 'Detail Team');
+        $joinedAt = now()->subDay()->startOfSecond();
+
+        $tournament->teams()->attach($team->id, ['joined_at' => $joinedAt]);
+
+        $this->getJson('/api/sport/tournaments/'.$tournament->id)
+            ->assertOk()
+            ->assertJsonPath('data.tournament.name', 'League Detail')
+            ->assertJsonPath('data.tournament.teamsCount', 1)
+            ->assertJsonPath('data.tournament.teams.0.id', $team->id)
+            ->assertJsonPath('data.tournament.teams.0.teamId', $team->id)
+            ->assertJsonPath('data.tournament.teams.0.name', 'Detail Team')
+            ->assertJsonPath('data.tournament.teams.0.joinedAt', $joinedAt->toISOString());
+    }
+
+    public function test_tournament_team_mutations_return_the_same_attached_team_contract(): void
+    {
+        $this->actingAsRole('adminsport', 'usr_9353', 'sport.admin9353@hfccf.org');
+        $tournament = $this->createTournament('TRN-9353', 'League Mutation');
+        $team = $this->createTeam('TEAM-9353-A', 'Mutation Team');
+
+        $this->postJson('/api/sport/tournaments/'.$tournament->id.'/teams', [
+            'team_id' => $team->id,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.tournament.teams.0.teamId', $team->id)
+            ->assertJsonPath('data.tournament.teams.0.name', 'Mutation Team');
+
+        $this->getJson('/api/sport/tournaments/'.$tournament->id)
+            ->assertJsonPath('data.tournament.teams.0.teamId', $team->id);
+
+        $this->deleteJson('/api/sport/tournaments/'.$tournament->id.'/teams/'.$team->id)
+            ->assertOk()
+            ->assertJsonPath('data.tournament.teams', []);
+
+        $this->getJson('/api/sport/tournaments/'.$tournament->id)
+            ->assertJsonPath('data.tournament.teams', []);
+    }
+
     public function test_duplicate_tournament_team_attachment_is_not_duplicated(): void
     {
         $this->actingAsRole('adminsport', 'usr_9351', 'sport.admin9351@hfccf.org');

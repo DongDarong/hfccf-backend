@@ -49,4 +49,9 @@ class SportEquipmentItem extends Model
     {
         return $this->hasMany(SportEquipmentRequest::class, 'equipment_item_id');
     }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(SportEquipmentAssignment::class, 'equipment_item_id');
+    }
 }

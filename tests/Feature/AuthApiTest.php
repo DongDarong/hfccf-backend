@@ -55,6 +55,16 @@ class AuthApiTest extends TestCase
         $this->assertNotEmpty($response->json('data.token'));
     }
 
+    public function test_seeded_sport_admin_can_log_in_with_documented_credentials(): void
+    {
+        $this->postJson('/api/auth/login', [
+            'email' => 'sport.admin01@hfccf.org',
+            'password' => 'sportAdmin@123',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.user.role', 'adminsport');
+    }
+
     public function test_superadmin_login_uses_role_permissions_when_direct_permissions_are_missing(): void
     {
         $user = $this->createUserWithoutDirectPermissions();
@@ -274,6 +284,38 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.user.role', 'coach')
             ->assertJsonPath('data.user.permissions.0', 'athletes:read');
+    }
+
+    public function test_user_creation_returns_validation_error_for_duplicate_generated_username(): void
+    {
+        $user = $this->createUser();
+        $token = $this->loginAndGetToken($user);
+        $payload = [
+            'first_name' => 'Generated',
+            'last_name' => 'Username',
+            'email' => 'generated.username.one@hfccf.org',
+            'role' => 'adminenglish',
+            'status' => 'active',
+            'password' => 'secret-pass',
+            'password_confirmation' => 'secret-pass',
+        ];
+
+        $this->postJson('/api/users', $payload, [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertCreated();
+
+        $this->postJson('/api/users', [
+            ...$payload,
+            'email' => 'generated.username.two@hfccf.org',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('data.errors.username.0', 'The username has already been taken.');
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'generated.username.two@hfccf.org',
+        ]);
     }
 
     public function test_forgot_password_does_not_reveal_email_existence(): void

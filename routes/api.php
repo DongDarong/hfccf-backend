@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Locations\CambodiaLocationController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategoryController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentCategorySettingsController;
+use App\Http\Controllers\Api\Preschool\PreschoolMonthlySubmissionController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentGradingScaleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentReportPeriodController as PreschoolAssessmentSettingsReportPeriodController;
 use App\Http\Controllers\Api\Preschool\PreschoolAssessmentSettingsController;
@@ -77,6 +78,7 @@ use App\Http\Controllers\Api\Sport\SportCoachController;
 use App\Http\Controllers\Api\Sport\SportCoachLookupController;
 use App\Http\Controllers\Api\Sport\SportCoachTeamController;
 use App\Http\Controllers\Api\Sport\SportEquipmentController;
+use App\Http\Controllers\Api\Sport\SportEquipmentAssignmentController;
 use App\Http\Controllers\Api\Sport\SportEquipmentRequestController;
 use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportDivisionController;
@@ -430,6 +432,18 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('enrollments/{application}/enroll', [PreschoolEnrollmentController::class, 'enroll']);
         Route::patch('enrollments/{application}/documents/{document}', [PreschoolEnrollmentController::class, 'updateDocument']);
 
+        // Monthly submission workflow stays alongside the rest of Preschool CRUD
+        // so teachers and admins can manage assessment submissions and reviews.
+        Route::get('monthly-submissions', [PreschoolMonthlySubmissionController::class, 'index']);
+        Route::post('monthly-submissions', [PreschoolMonthlySubmissionController::class, 'store']);
+        Route::get('monthly-submissions/{submission}', [PreschoolMonthlySubmissionController::class, 'show']);
+        Route::patch('monthly-submissions/{submission}/scores/{student}', [PreschoolMonthlySubmissionController::class, 'upsertScore']);
+        Route::post('monthly-submissions/{submission}/submit', [PreschoolMonthlySubmissionController::class, 'submit']);
+        Route::post('monthly-submissions/{submission}/return', [PreschoolMonthlySubmissionController::class, 'return']);
+        Route::post('monthly-submissions/{submission}/finalize', [PreschoolMonthlySubmissionController::class, 'finalize']);
+        Route::post('monthly-submissions/{submission}/archive', [PreschoolMonthlySubmissionController::class, 'archive']);
+        Route::delete('monthly-submissions/{submission}', [PreschoolMonthlySubmissionController::class, 'destroy']);
+
         // Assessment routes stay alongside the rest of Preschool CRUD so staff
         // can track progress without a separate module or report workflow.
         Route::get('assessment-categories', [PreschoolAssessmentCategoryController::class, 'index']);
@@ -776,8 +790,13 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
 
         Route::get('admin/equipment', [SportEquipmentController::class, 'index']);
         Route::post('admin/equipment', [SportEquipmentController::class, 'store']);
+        Route::get('admin/equipment/{id}/assignments', [SportEquipmentAssignmentController::class, 'itemHistory']);
         Route::get('admin/equipment/{id}', [SportEquipmentController::class, 'show']);
         Route::put('admin/equipment/{id}', [SportEquipmentController::class, 'update']);
+
+        Route::get('admin/equipment-assignments', [SportEquipmentAssignmentController::class, 'index']);
+        Route::get('admin/equipment-assignments/{id}', [SportEquipmentAssignmentController::class, 'show']);
+        Route::get('admin/teams/{id}/equipment-assignments', [SportEquipmentAssignmentController::class, 'teamHistory']);
 
         Route::get('admin/equipment-requests', [SportEquipmentRequestController::class, 'index']);
         Route::get('admin/equipment-requests/{id}', [SportEquipmentRequestController::class, 'show']);
@@ -790,6 +809,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('coach/equipment/requests', [SportCoachEquipmentRequestController::class, 'index']);
         Route::get('coach/equipment/requests/{id}', [SportCoachEquipmentRequestController::class, 'show']);
         Route::post('coach/equipment/requests', [SportCoachEquipmentRequestController::class, 'store']);
+        Route::get('coach/equipment/assignments', [SportEquipmentAssignmentController::class, 'coachIndex']);
+        Route::get('coach/equipment/assignments/{id}', [SportEquipmentAssignmentController::class, 'coachShow']);
 
         Route::get('admin/coach-team-assignments', [SportAdminCoachTeamAssignmentController::class, 'index']);
         Route::post('admin/coach-team-assignments', [SportAdminCoachTeamAssignmentController::class, 'store']);

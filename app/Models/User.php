@@ -181,6 +181,11 @@ class User extends Authenticatable
         return $this->hasMany(FormSubmission::class, 'submitted_by', 'id');
     }
 
+    public function preschoolClassTeacherAssignments(): HasMany
+    {
+        return $this->hasMany(PreschoolClassTeacherAssignment::class, 'teacher_user_id', 'id');
+    }
+
     private function resolveAvatarUrl(mixed $value): ?string
     {
         return ImageStorage::url($value);

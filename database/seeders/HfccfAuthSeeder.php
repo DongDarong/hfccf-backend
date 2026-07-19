@@ -108,7 +108,7 @@ class HfccfAuthSeeder extends Seeder
             ['role_code' => 'teacher-scholarship', 'permission_code' => 'tasks:write'],
         ]);
 
-        DB::table('users')->upsert([ 
+        DB::table('users')->upsert([
             [
                 'id' => 'usr_001',
                 'first_name' => 'Vanna',
@@ -200,7 +200,7 @@ class HfccfAuthSeeder extends Seeder
                 'department_code' => 'sports',
                 'status' => 'active',
                 'avatar' => 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=200&q=80',
-                'password' => '$2y$10$.ABQclzC/hcDA76xiptxeuNmMQBppVFkhRJXnLo2Mr9JFTBG0/s2a',
+                'password' => Hash::make('sportAdmin@123'),
                 'last_login_at' => '2026-03-08 04:15:00',
                 'created_at' => '2026-02-07 08:00:00',
                 'updated_at' => '2026-02-07 08:00:00',

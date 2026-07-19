@@ -6,6 +6,7 @@ use App\Models\SportTournament;
 use App\Support\SportMedia;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 
 /** @mixin SportTournament */
 class SportTournamentResource extends JsonResource
@@ -36,6 +37,25 @@ class SportTournamentResource extends JsonResource
             'rules' => $this->rules,
             'settings' => $this->settings,
             'createdByUserId' => $this->created_by_user_id,
+            'teams' => $this->whenLoaded('teams', fn (): array => $this->teams->map(fn ($team): array => [
+                'id' => $team->id,
+                'teamId' => $team->id,
+                'teamCode' => $team->team_code,
+                'name' => $team->name,
+                'shortName' => $team->short_name,
+                'logo' => SportMedia::resolveUrl($team->logo),
+                'coachUserId' => $team->coach_user_id,
+                'coachDisplayName' => $team->coach_display_name,
+                'coach' => $team->relationLoaded('coach') ? [
+                    'id' => $team->coach?->id,
+                    'firstName' => $team->coach?->first_name,
+                    'lastName' => $team->coach?->last_name,
+                    'username' => $team->coach?->username,
+                ] : null,
+                'joinedAt' => $team->pivot?->joined_at
+                    ? Carbon::parse($team->pivot->joined_at)->toISOString()
+                    : null,
+            ])->values()->all()),
             'teamsCount' => $this->teams_count ?? $this->whenCounted('teams'),
             'matchesCount' => $this->matches_count ?? $this->whenCounted('matches'),
             'standingsCount' => $this->standings_count ?? $this->whenCounted('standings'),

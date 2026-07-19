@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SportEquipmentRequest extends Model
@@ -80,5 +81,10 @@ class SportEquipmentRequest extends Model
     public function returnedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'returned_by_user_id', 'id');
+    }
+
+    public function assignment(): HasOne
+    {
+        return $this->hasOne(SportEquipmentAssignment::class, 'equipment_request_id');
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\PreschoolMonthlySubmissionException;
 use App\Http\Middleware\EnsureGuardianPortalAccess;
 use App\Http\Middleware\EnsurePasswordChangeCompleted;
 use App\Http\Middleware\EnsureUserHasPermission;
@@ -109,6 +110,16 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'API endpoint not found.',
                     'data' => null,
                 ], Response::HTTP_NOT_FOUND);
+            }
+        });
+
+        $exceptions->render(function (PreschoolMonthlySubmissionException $exception, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $exception->getMessage(),
+                    'data' => ['error_code' => $exception->getErrorCode()],
+                ], $exception->getCode());
             }
         });
     })->create();

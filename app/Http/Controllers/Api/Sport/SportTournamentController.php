@@ -138,7 +138,10 @@ class SportTournamentController extends SportController
             return $response;
         }
 
-        $tournament = SportTournament::query()->withCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents'])->find($id);
+        $tournament = SportTournament::query()
+            ->with(['teams.coach'])
+            ->withCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents'])
+            ->find($id);
 
         if (! $tournament) {
             return ApiResponse::errorResponse('Tournament not found.', null, Response::HTTP_NOT_FOUND);
@@ -221,7 +224,7 @@ class SportTournamentController extends SportController
             return $response;
         }
 
-        $tournament = SportTournament::query()->with(['teams'])->find($id);
+        $tournament = SportTournament::query()->with(['teams.coach'])->find($id);
 
         if (! $tournament) {
             return ApiResponse::errorResponse('Tournament not found.', null, Response::HTTP_NOT_FOUND);
@@ -238,6 +241,7 @@ class SportTournamentController extends SportController
         ]);
 
         $standings = $this->standingsService->rebuildTournament($tournament);
+        $tournament->load(['teams.coach']);
         $tournament->loadCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents']);
 
         return ApiResponse::successResponse('Team added to tournament successfully.', [
@@ -265,6 +269,7 @@ class SportTournamentController extends SportController
             ->delete();
 
         $standings = $this->standingsService->rebuildTournament($tournament);
+        $tournament->load(['teams.coach']);
         $tournament->loadCount(['teams', 'matches', 'standings', 'groups', 'knockoutRounds', 'matchEvents']);
 
         return ApiResponse::successResponse('Team removed from tournament successfully.', [
