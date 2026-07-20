@@ -320,7 +320,13 @@ class PreschoolTeacherController extends Controller
             $class->where('teacher_user_id', $user->id);
         }
 
-        $class = $class->with(['teacher', 'classLevel', 'students', 'teacherAssignments'])->find($id);
+        $class = $class
+            ->with(['teacher', 'classLevel', 'students', 'teacherAssignments'])
+            ->withCount(['students' => function (Builder $q): void {
+                $q->where('preschool_class_students.status', 'active')
+                    ->whereNull('preschool_students.deleted_at');
+            }])
+            ->find($id);
 
         if (! $class) {
             return response()->json([
