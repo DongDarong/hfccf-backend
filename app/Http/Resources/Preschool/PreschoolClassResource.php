@@ -117,7 +117,7 @@ class PreschoolClassResource extends JsonResource
             'classLevel' => $classLevel,
             'level' => $this->level ?: ($this->classLevel?->name_en ?? null),
             'schedule' => $this->schedule,
-            'studentsCount' => $this->students_count ?? $this->students()->wherePivot('status', 'active')->count(),
+            'studentsCount' => (int) ($this->students_count ?? 0),
             'studentAssignments' => $allStudentAssignments,
             'activeStudentAssignments' => $activeStudentAssignments,
             'teacherAssignments' => $teacherAssignments,

@@ -53,6 +53,26 @@ class PreschoolStudentHealthController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function destroyMedicalProfile(Request $request, PreschoolStudent $student): JsonResponse
+    {
+        if ($response = $this->authorizeAdmin($request->user())) {
+            return $response;
+        }
+
+        $profile = $student->medicalProfile()->first();
+        if (! $profile) {
+            return $this->notFound('Medical profile not found.');
+        }
+
+        $profile->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool medical profile deleted successfully.',
+            'data' => null,
+        ], Response::HTTP_OK);
+    }
+
     public function upsertMedicalProfile(Request $request, PreschoolStudent $student): JsonResponse
     {
         if ($response = $this->authorizeAdmin($request->user())) {

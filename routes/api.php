@@ -255,6 +255,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::delete('teachers/{id}', [PreschoolTeacherController::class, 'destroy']);
         Route::get('teacher/my-students', [PreschoolTeacherController::class, 'myStudents']);
         Route::get('teacher/my-classes', [PreschoolTeacherController::class, 'myClasses']);
+        Route::get('teacher/my-classes/{id}', [PreschoolTeacherController::class, 'myClass']);
         Route::get('teacher/attendance', [PreschoolTeacherController::class, 'myAttendance']);
 
         Route::get('class-levels', [PreschoolClassLevelController::class, 'index']);
@@ -343,6 +344,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
             Route::get('summary', [PreschoolStudentHealthController::class, 'summary']);
             Route::get('medical-profile', [PreschoolStudentHealthController::class, 'medicalProfile']);
             Route::put('medical-profile', [PreschoolStudentHealthController::class, 'upsertMedicalProfile']);
+            Route::delete('medical-profile', [PreschoolStudentHealthController::class, 'destroyMedicalProfile']);
             Route::get('allergies', [PreschoolStudentHealthController::class, 'allergies']);
             Route::post('allergies', [PreschoolStudentHealthController::class, 'storeAllergy']);
             Route::put('allergies/{allergy}', [PreschoolStudentHealthController::class, 'updateAllergy']);
