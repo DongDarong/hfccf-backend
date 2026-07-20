@@ -309,6 +309,65 @@ class PreschoolHealthApiTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_admin_can_delete_medical_profile(): void
+    {
+        $admin = $this->createUserWithRole('adminpreschool', [
+            'first_name' => 'Delete',
+            'last_name' => 'Admin',
+            'username' => 'delete-admin',
+            'email' => 'delete.admin@hfccf.org',
+            'phone' => '+855 12 700 001',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $student = $this->createStudent('STU-DELETE-001', 'Charlie', 'Smith');
+
+        // Create a medical profile
+        $this->putJson("/api/preschool/students/{$student->id}/health/medical-profile", [
+            'blood_type' => 'O+',
+            'medical_conditions' => ['Diabetes'],
+            'medical_notes' => 'Type 1 diabetic, requires monitoring.',
+        ]);
+
+        // Verify it exists in the database
+        $this->assertDatabaseHas('preschool_student_medical_profiles', [
+            'student_id' => $student->id,
+            'blood_type' => 'O+',
+        ]);
+
+        // Delete the medical profile
+        $response = $this->deleteJson("/api/preschool/students/{$student->id}/health/medical-profile");
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('message', 'Preschool medical profile deleted successfully.');
+
+        // Verify it's soft-deleted (deleted_at should be set)
+        $this->assertSoftDeleted('preschool_student_medical_profiles', [
+            'student_id' => $student->id,
+            'blood_type' => 'O+',
+        ]);
+    }
+
+    public function test_delete_nonexistent_medical_profile_returns_not_found(): void
+    {
+        $admin = $this->createUserWithRole('adminpreschool', [
+            'first_name' => 'Admin',
+            'last_name' => 'User',
+            'username' => 'admin-notfound',
+            'email' => 'admin.notfound@hfccf.org',
+            'phone' => '+855 12 900 001',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $student = $this->createStudent('STU-DELETE-003', 'Eve', 'Lee');
+
+        // Try to delete non-existent profile
+        $response = $this->deleteJson("/api/preschool/students/{$student->id}/health/medical-profile");
+        $response->assertNotFound();
+    }
+
     private function createStudent(string $publicId, string $firstName, string $lastName): object
     {
         $studentId = DB::table('preschool_students')->insertGetId([

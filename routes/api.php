@@ -343,6 +343,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
             Route::get('summary', [PreschoolStudentHealthController::class, 'summary']);
             Route::get('medical-profile', [PreschoolStudentHealthController::class, 'medicalProfile']);
             Route::put('medical-profile', [PreschoolStudentHealthController::class, 'upsertMedicalProfile']);
+            Route::delete('medical-profile', [PreschoolStudentHealthController::class, 'destroyMedicalProfile']);
             Route::get('allergies', [PreschoolStudentHealthController::class, 'allergies']);
             Route::post('allergies', [PreschoolStudentHealthController::class, 'storeAllergy']);
             Route::put('allergies/{allergy}', [PreschoolStudentHealthController::class, 'updateAllergy']);

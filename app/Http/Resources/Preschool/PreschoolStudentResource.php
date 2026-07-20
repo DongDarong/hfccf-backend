@@ -158,6 +158,7 @@ class PreschoolStudentResource extends JsonResource
             'classesCount' => $this->whenLoaded('classes', fn () => $this->classes->filter(static fn ($class) => ($class->pivot->status ?? 'active') === 'active')->count(), 0),
             'classes' => $activeClassAssignments,
             'classAssignments' => $allClassAssignments,
+            'hasHealthProfile' => $this->whenLoaded('medicalProfile', fn () => $this->medicalProfile !== null, false),
             'healthSummary' => [
                 'medicalProfile' => $this->whenLoaded('medicalProfile', fn () => $this->medicalProfile, null),
                 'legacyProfile' => $this->whenLoaded('profile', fn () => $this->profile, null),
