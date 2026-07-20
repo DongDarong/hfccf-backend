@@ -307,6 +307,38 @@ class PreschoolTeacherController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function myClass(Request $request, string $id): JsonResponse
+    {
+        if ($response = $this->authorizeTeacherViewer($request->user())) {
+            return $response;
+        }
+
+        $user = $request->user();
+        $class = PreschoolClass::query()->whereNull('deleted_at');
+
+        if ($user->role_code === 'teacher-preschool') {
+            $class->where('teacher_user_id', $user->id);
+        }
+
+        $class = $class->with(['teacher', 'classLevel', 'students', 'teacherAssignments'])->find($id);
+
+        if (! $class) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Class not found.',
+                'data' => null,
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool class retrieved successfully.',
+            'data' => [
+                'class' => PreschoolClassResource::make($class)->resolve($request),
+            ],
+        ], Response::HTTP_OK);
+    }
+
     public function myAttendance(Request $request): JsonResponse
     {
         if ($response = $this->authorizeTeacherViewer($request->user())) {
