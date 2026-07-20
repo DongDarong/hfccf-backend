@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolClassController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassLevelController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomReportController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassroomResourceController;
+use App\Http\Controllers\Api\Preschool\ClassroomResourceRequestController;
 use App\Http\Controllers\Api\Preschool\PreschoolDashboardController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianCommunicationController;
@@ -655,6 +656,15 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('classroom-resources/{id}', [PreschoolClassroomResourceController::class, 'show']);
         Route::put('classroom-resources/{id}', [PreschoolClassroomResourceController::class, 'update']);
         Route::delete('classroom-resources/{id}', [PreschoolClassroomResourceController::class, 'destroy']);
+
+        // Classroom resource requests allow teachers to request resources and
+        // admins to approve/reject requests in the teacher-friendly workflow.
+        Route::prefix('classroom-resource-requests')->group(function () {
+            Route::get('/', [ClassroomResourceRequestController::class, 'index']);
+            Route::post('/', [ClassroomResourceRequestController::class, 'store']);
+            Route::put('{id}/approve', [ClassroomResourceRequestController::class, 'approve']);
+            Route::put('{id}/reject', [ClassroomResourceRequestController::class, 'reject']);
+        });
     });
 
     /*
