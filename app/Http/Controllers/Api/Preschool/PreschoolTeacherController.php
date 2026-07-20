@@ -290,6 +290,10 @@ class PreschoolTeacherController extends Controller
 
         $paginator = $query
             ->with(['teacher', 'students'])
+            ->withCount(['students' => function (Builder $q): void {
+                $q->where('preschool_class_students.status', 'active')
+                    ->whereNull('preschool_students.deleted_at');
+            }])
             ->orderBy('created_at', 'desc')
             ->paginate($perPage, ['*'], 'page', $page);
 
