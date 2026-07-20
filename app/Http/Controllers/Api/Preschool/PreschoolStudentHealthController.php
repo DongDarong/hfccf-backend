@@ -450,7 +450,7 @@ class PreschoolStudentHealthController extends Controller
 
     public function storeIncident(Request $request, PreschoolStudent $student): JsonResponse
     {
-        if ($response = $this->authorizeTeacherIncidentWrite($request->user(), $student)) {
+        if ($response = $this->authorizeAdmin($request->user())) {
             return $response;
         }
 
@@ -671,7 +671,7 @@ class PreschoolStudentHealthController extends Controller
 
     public function storeHealthCheck(Request $request, PreschoolStudent $student): JsonResponse
     {
-        if ($response = $this->authorizeTeacherIncidentWrite($request->user(), $student)) {
+        if ($response = $this->authorizeAdmin($request->user())) {
             return $response;
         }
 
