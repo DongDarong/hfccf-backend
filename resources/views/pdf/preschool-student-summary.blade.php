@@ -19,8 +19,8 @@
         }
 
         @page {
-            size: A4 portrait;
-            margin: 12mm 16mm 12mm;
+            size: A4 {{ $mode === 'class' ? 'landscape' : 'portrait' }};
+            margin: {{ $mode === 'class' ? '12mm 10mm' : '12mm 16mm 12mm' }};
         }
 
         * {
@@ -244,6 +244,116 @@
         .class-document .profile-title {
             padding-top: 8mm;
         }
+
+        .class-document {
+            min-height: 186mm;
+        }
+
+        .class-document .national-heading {
+            margin-bottom: 10mm;
+        }
+
+        .class-document .top-row {
+            min-height: 30mm;
+            margin-bottom: 5mm;
+        }
+
+        .class-document .organization-block {
+            width: 58mm;
+        }
+
+        .class-document .logo-box {
+            width: 50mm;
+            height: 34mm;
+            margin: 0 auto;
+        }
+
+        .class-document .logo-box img {
+            width: 100%;
+            height: 100%;
+            max-width: 50mm;
+            max-height: 34mm;
+            object-fit: contain;
+        }
+
+        .class-document .logo-fallback {
+            width: 50mm;
+            height: 34mm;
+            line-height: 34mm;
+        }
+
+        .class-document .profile-title {
+            padding-top: 8mm;
+            font-size: 20pt;
+        }
+
+        .class-meta {
+            display: table;
+            width: 100%;
+            margin-top: 3mm;
+            margin-bottom: 5mm;
+            font-size: 13pt;
+        }
+
+        .class-meta-row {
+            display: table-row;
+        }
+
+        .class-meta-cell {
+            display: table-cell;
+            width: 33.333%;
+            padding: 0 4mm 1.5mm 0;
+            vertical-align: top;
+        }
+
+        .class-meta-label {
+            font-weight: 700;
+        }
+
+        .roster-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10.5pt;
+            line-height: 1.35;
+        }
+
+        .roster-table th,
+        .roster-table td {
+            border: 1px solid #333333;
+            padding: 1.5mm 1.8mm;
+            vertical-align: top;
+        }
+
+        .roster-table th {
+            font-weight: 700;
+            text-align: center;
+            background: #f4f4f4;
+        }
+
+        .roster-table td {
+            text-align: left;
+        }
+
+        .roster-number,
+        .roster-gender,
+        .roster-date,
+        .roster-status {
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .roster-code {
+            white-space: nowrap;
+        }
+
+        .roster-name,
+        .roster-address {
+            word-break: break-word;
+        }
+
+        .roster-section {
+            margin-top: 4mm;
+        }
     </style>
 </head>
 <body>
@@ -362,49 +472,44 @@
                 </div>
             </div>
 
-            <h1 class="profile-title">បញ្ជីសង្ខេបប្រវត្តិរូបសិស្ស៖</h1>
+            <h1 class="profile-title">បញ្ជីរាយនាមសិស្សតាមថ្នាក់</h1>
         </div>
 
-        <div class="section">
-            <p class="section-title">ព័ត៌មានថ្នាក់សិក្សា៖</p>
-            <div class="info-lines">
-                <p class="line"><span class="label">កម្រិតសិក្សាៈ</span>{{ $display($class->name) }}</p>
-                <p class="line"><span class="label">ឆ្នាំសិក្សាៈ</span>{{ $academicYear?->label ?? 'ទាំងអស់' }}</p>
-                <p class="line"><span class="label">ចំនួនសិស្សសរុបៈ</span>{{ $classSummary['totalStudents'] }}</p>
-                <p class="line"><span class="label">ចំនួនសិស្សសកម្មៈ</span>{{ $classSummary['activeStudents'] }}</p>
+        <div class="class-meta">
+            <div class="class-meta-row">
+                <div class="class-meta-cell"><span class="class-meta-label">ថ្នាក់សិក្សា៖</span> {{ $display($class->name) }}</div>
+                <div class="class-meta-cell"><span class="class-meta-label">ឆ្នាំសិក្សា៖</span> {{ $academicYear?->label ?? 'ទាំងអស់' }}</div>
+                <div class="class-meta-cell"><span class="class-meta-label">ចំនួនសិស្សសរុប៖</span> {{ $classSummary['totalStudents'] }}</div>
             </div>
         </div>
 
-        <div class="section">
-            <p class="section-title">បញ្ជីសិស្ស៖</p>
-            <table class="khmer-table">
+        <div class="roster-section">
+            <table class="roster-table">
                 <thead>
                     <tr>
-                        <th>រូបថត</th>
+                        <th style="width: 8mm;">ល.រ</th>
                         <th>អត្តលេខសិស្ស</th>
                         <th>គោត្តនាម-នាម</th>
                         <th>ឈ្មោះជាឡាតាំង</th>
                         <th>ភេទ</th>
-                        <th>កម្រិតសិក្សា</th>
+                        <th>ថ្ងៃខែឆ្នាំកំណើត</th>
+                        <th>សញ្ជាតិ</th>
+                        <th>អាសយដ្ឋាន</th>
                         <th>ស្ថានភាព</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($classStudents as $item)
                         <tr>
-                            <td>
-                                @if (! empty($item['studentPhoto']))
-                                    <div class="class-photo"><img src="{{ $item['studentPhoto'] }}" alt=""></div>
-                                @else
-                                    <div class="class-photo-empty">—</div>
-                                @endif
-                            </td>
-                            <td>{{ $item['student']->student_code ?: ($item['student']->public_id ?: '—') }}</td>
-                            <td>{{ trim($item['student']->first_name.' '.$item['student']->last_name) ?: '—' }}</td>
-                            <td>{{ $item['student']->latin_name ?: '—' }}</td>
-                            <td>{{ $khGender($item['student']->gender) }}</td>
-                            <td>{{ $class->name ?: '—' }}</td>
-                            <td>{{ $khStatus($item['student']->status) }}</td>
+                            <td class="roster-number">{{ $loop->iteration }}</td>
+                            <td class="roster-code">{{ $item['student']->student_code ?: ($item['student']->public_id ?: '—') }}</td>
+                            <td class="roster-name">{{ trim($item['student']->first_name.' '.$item['student']->last_name) ?: '—' }}</td>
+                            <td class="roster-name">{{ $item['student']->latin_name ?: '—' }}</td>
+                            <td class="roster-gender">{{ $khGender($item['student']->gender) }}</td>
+                            <td class="roster-date">{{ $dateValue($item['student']->date_of_birth) }}</td>
+                            <td>{{ $display($item['student']->nationality) }}</td>
+                            <td class="roster-address">{{ $display($item['student']->address) }}</td>
+                            <td class="roster-status">{{ $khStatus($item['student']->status) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

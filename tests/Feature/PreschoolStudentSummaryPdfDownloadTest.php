@@ -6,6 +6,7 @@ use App\Models\PreschoolAcademicYear;
 use App\Models\PreschoolAttendanceRecord;
 use App\Models\PreschoolClass;
 use App\Models\PreschoolStudent;
+use App\Services\PreschoolStudentSummaryPdfService;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -67,6 +68,61 @@ class PreschoolStudentSummaryPdfDownloadTest extends TestCase
             'mode' => 'class',
             'class_id' => $context['class']->id,
         ]))->assertForbidden();
+    }
+
+    public function test_class_student_summary_pdf_renders_khmer_roster_without_attendance_content(): void
+    {
+        $context = $this->createReportContext();
+
+        $secondStudent = PreschoolStudent::factory()->create([
+            'first_name' => 'សុខា',
+            'last_name' => 'Chan',
+            'latin_name' => 'Sokha Chan',
+            'student_code' => 'PS-QA-0002',
+            'gender' => 'male',
+            'nationality' => 'Cambodian',
+            'address' => 'Phnom Penh',
+        ]);
+
+        DB::table('preschool_class_students')->insert([
+            'class_id' => $context['class']->id,
+            'student_id' => $secondStudent->id,
+            'enrolled_at' => now()->subMonth(),
+            'academic_year' => $context['year']->label,
+            'academic_year_id' => $context['year']->id,
+            'status' => 'active',
+            'enrollment_status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $html = app(PreschoolStudentSummaryPdfService::class)->renderHtml([
+            'mode' => 'class',
+            'academic_year_id' => $context['year']->id,
+            'class_id' => $context['class']->id,
+        ]);
+
+        $this->assertStringContainsString('size: A4 landscape', $html);
+        $this->assertStringContainsString('បញ្ជីរាយនាមសិស្សតាមថ្នាក់', $html);
+        $this->assertStringContainsString('ថ្នាក់សិក្សា៖', $html);
+        $this->assertStringContainsString('ឆ្នាំសិក្សា៖', $html);
+        $this->assertStringContainsString('ចំនួនសិស្សសរុប៖</span> 2', $html);
+        $this->assertStringContainsString('អត្តលេខសិស្ស', $html);
+        $this->assertStringContainsString('PS-QA-0001', $html);
+        $this->assertStringContainsString('PS-QA-0002', $html);
+        $this->assertStringContainsString('មីយ៉ា Lopez', $html);
+        $this->assertStringContainsString('សុខា Chan', $html);
+        $this->assertStringContainsString('កាលបរិច្ឆេទបង្កើត៖', $html);
+        $this->assertStringNotContainsString('វត្តមាន', $html);
+        $this->assertStringNotContainsString('អវត្តមាន', $html);
+        $this->assertStringNotContainsString('មកយឺត', $html);
+        $this->assertStringNotContainsString('មានច្បាប់', $html);
+        $this->assertStringNotContainsString('Attendance', $html);
+        $this->assertStringNotContainsString('Assessment', $html);
+        $this->assertStringNotContainsString('ចំនួនសិស្សសកម្ម', $html);
+        $this->assertStringNotContainsString('រូបថត', $html);
+        $this->assertStringNotContainsString('ព័ត៌មានអាណាព្យាបាល', $html);
+        $this->assertStringNotContainsString('ប្រវត្តិរូបសិស្ស៖', $html);
     }
 
     public function test_student_summary_pdf_download_cleans_up_temp_files_when_browser_process_fails(): void

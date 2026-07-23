@@ -84,7 +84,7 @@ class PreschoolStudentSummaryPdfService
     }
 
     /**
-     * @return array{classStudents:array<int,array<string,mixed>>,classSummary:array<string,int|string|null>}
+     * @return array{classStudents:array<int,array{student:PreschoolStudent}>,classSummary:array{totalStudents:int}}
      */
     private function classPayload(PreschoolClass $class): array
     {
@@ -97,32 +97,14 @@ class PreschoolStudentSummaryPdfService
             ->orderBy('last_name')
             ->get();
 
-        $classStudents = $students->map(function (PreschoolStudent $student) use ($class): array {
-            $attendance = $this->attendanceSummary($student->id, $class->id);
-
-            return [
-                'student' => $student,
-                'attendancePercentage' => $attendance['percentage'],
-                'studentPhoto' => $this->studentPhotoDataUri($student),
-                'latestAssessment' => null,
-            ];
-        })->all();
-
-        $attendancePercentages = collect($classStudents)
-            ->pluck('attendancePercentage')
-            ->filter(static fn ($value): bool => $value !== null);
+        $classStudents = $students->map(static fn (PreschoolStudent $student): array => [
+            'student' => $student,
+        ])->all();
 
         return [
             'classStudents' => $classStudents,
             'classSummary' => [
                 'totalStudents' => count($classStudents),
-                'activeStudents' => collect($classStudents)
-                    ->filter(static fn (array $item): bool => ($item['student']->status ?? '') === 'active')
-                    ->count(),
-                'averageAttendance' => $attendancePercentages->isNotEmpty()
-                    ? (int) round($attendancePercentages->average())
-                    : 0,
-                'averageAssessment' => null,
             ],
         ];
     }
