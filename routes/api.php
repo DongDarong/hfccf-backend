@@ -64,6 +64,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentGuardianController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentReportController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentSummaryReportDownloadController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherScheduleController;
 use App\Http\Controllers\Api\RoleController;
@@ -599,6 +600,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
             Route::get('guardians/issues', [PreschoolReportingController::class, 'guardianIssues']);
             Route::get('classroom', [PreschoolReportingController::class, 'classroom']);
             Route::get('compliance', [PreschoolReportingController::class, 'compliance']);
+            Route::get('student-summary/download', PreschoolStudentSummaryReportDownloadController::class);
             Route::get('export', [PreschoolReportingController::class, 'export']);
         });
 
@@ -1048,7 +1050,6 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
-
 
 
 
