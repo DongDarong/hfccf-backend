@@ -192,23 +192,31 @@ class SportReportTestingSeeder extends Seeder
     private function upsertTestUser(string $id, string $firstName, string $lastName, string $email, string $role, string $status): User
     {
         $username = Str::lower(str_replace(' ', '.', trim("{$firstName}.{$lastName}")));
+        $password = Hash::make((string) env('SPORT_TEST_PASSWORD', Str::random(48)));
+        $now = now();
 
-        DB::table('users')->updateOrInsert(
-            ['email' => $email],
-            [
-                'id' => $id,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'username' => $username,
-                'email' => $email,
-                'role_code' => $role,
-                'department_code' => 'sports',
-                'status' => $status,
-                'password' => Hash::make((string) env('SPORT_TEST_PASSWORD', Str::random(48))),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        );
+        // Check if user already exists
+        $user = User::query()->where('email', $email)->first();
+        if ($user) {
+            return $user;
+        }
+
+        // Create new user directly
+        DB::table('users')->insert([
+            'id' => $id,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'username' => $username,
+            'email' => $email,
+            'role_code' => $role,
+            'department_code' => 'sports',
+            'status' => $status,
+            'password' => $password,
+            'created_by' => null,
+            'updated_by' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
 
         return User::query()->where('email', $email)->firstOrFail();
     }

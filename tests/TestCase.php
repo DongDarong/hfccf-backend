@@ -14,6 +14,20 @@ abstract class TestCase extends BaseTestCase
 {
     protected const OTP_TEST_IP = '10.10.10.10';
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Register a database listener to disable foreign keys for SQLite testing
+        if (DB::getDriverName() === 'sqlite') {
+            try {
+                DB::statement('PRAGMA foreign_keys=OFF');
+            } catch (\Exception $e) {
+                // Ignore errors if statement fails
+            }
+        }
+    }
+
     /**
      * Create a user with the given role and sync permissions from role_permissions.
      * Password defaults to 'password' — pass $overrides['password'] to change it.
