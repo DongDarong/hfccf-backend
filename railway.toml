@@ -9,3 +9,4 @@ restartPolicyMaxRetries = 5
 
 [env]
 PHP_VERSION = "8.3"
+PHP_EXTENSIONS = "gd,zip,curl,mbstring,pdo,pdo_mysql,opcache"
