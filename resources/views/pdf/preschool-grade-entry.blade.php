@@ -23,17 +23,6 @@
         };
     };
 
-    $statusLabel = static function ($value): string {
-        return match (strtolower((string) $value)) {
-            'draft' => 'ព្រាង',
-            'submitted' => 'បានដាក់ស្នើ',
-            'returned' => 'បានបញ្ជូនត្រឡប់',
-            'finalized' => 'បានបញ្ចប់',
-            'archived' => 'បានរក្សាទុក',
-            default => trim((string) $value) !== '' ? (string) $value : '—',
-        };
-    };
-
     $formatValue = static fn ($value): string => trim((string) ($value ?? '')) !== '' ? (string) $value : '—';
     $formatScore = static fn ($value): string => $value === null || $value === '' ? '—' : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
 @endphp
@@ -56,7 +45,7 @@
         }
 
         @page {
-            size: A4 landscape;
+            size: A4 portrait;
             margin: 10mm;
         }
 
@@ -66,6 +55,9 @@
 
         body {
             margin: 0;
+            min-height: 277mm;
+            display: flex;
+            flex-direction: column;
             background: #ffffff;
             color: #111111;
             font-family: 'Noto Sans Khmer', sans-serif;
@@ -145,33 +137,88 @@
         .gender-cell,
         .date-cell,
         .score-cell,
-        .rating-cell,
-        .status-cell {
+        .rating-cell {
             text-align: center;
         }
 
         .footer {
-            margin-top: 4mm;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 10mm;
+            margin-top: auto;
+            padding-top: 12mm;
+            padding-right: 6mm;
+            text-align: right;
             page-break-inside: avoid;
+            break-inside: avoid;
         }
 
-        .generated-date {
-            font-size: 9pt;
+        .formal-signature-table {
+            width: 122mm;
+            margin-left: auto;
+            border: 0;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 11.5pt;
+            line-height: 1.75;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
 
-        .signature {
-            width: 52mm;
+        .formal-signature-table td {
+            border: 0;
+            padding: 0;
+            vertical-align: middle;
+            word-break: normal;
+            white-space: nowrap;
+        }
+
+        .col-label-1 {
+            width: 25mm;
+        }
+
+        .col-space-1 {
+            width: 14mm;
+        }
+
+        .col-label-2 {
+            width: 8mm;
+        }
+
+        .col-space-2 {
+            width: 14mm;
+        }
+
+        .col-label-3 {
+            width: 10mm;
+        }
+
+        .col-space-3 {
+            width: 14mm;
+        }
+
+        .col-buddhist-label {
+            width: 37mm;
+        }
+
+        .label-cell,
+        .location-label {
+            text-align: right;
+        }
+
+        .blank-cell {
+            text-align: left;
+        }
+
+        .buddhist-cell {
+            text-align: right;
+        }
+
+        .signature-label-cell {
+            padding-top: 5mm !important;
             text-align: center;
-            font-size: 10pt;
-            line-height: 1.9;
+            font-weight: 700;
         }
 
-        .signature-space {
-            height: 14mm;
+        .signature-writing-cell {
+            height: 24mm;
         }
     </style>
 </head>
@@ -183,7 +230,6 @@
 
     <div class="top-row">
         <div class="organization-block">
-            <div>{{ $organization['kh_name'] ?? '' }}</div>
             <div class="logo-box">
                 @if (! empty($organization['logo_data_uri']))
                     <img src="{{ $organization['logo_data_uri'] }}" alt="">
@@ -207,11 +253,10 @@
                 <th style="width: 26mm;">អត្តលេខសិស្ស</th>
                 <th>គោត្តនាម-នាម</th>
                 <th style="width: 16mm;">ភេទ</th>
-                <th style="width: 28mm;">ថ្ងៃខែឆ្នាំកំណើត</th>
-                <th style="width: 32mm;">ថ្នាក់</th>
+                <th style="width: 30mm;">ថ្ងៃខែឆ្នាំកំណើត</th>
+                <th style="width: 34mm;">ថ្នាក់</th>
                 <th style="width: 18mm;">ពិន្ទុ</th>
                 <th style="width: 18mm;">និទ្ទេស</th>
-                <th style="width: 25mm;">ស្ថានភាព</th>
             </tr>
         </thead>
         <tbody>
@@ -225,25 +270,55 @@
                     <td>{{ $formatValue($row['class_name'] ?? $class?->name) }}</td>
                     <td class="score-cell">{{ $formatScore($row['score']) }}</td>
                     <td class="rating-cell">{{ $formatValue($row['rating']) }}</td>
-                    <td class="status-cell">{{ $statusLabel($row['status']) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" style="text-align: center;">មិនមានទិន្នន័យសិស្ស</td>
+                    <td colspan="8" style="text-align: center;">មិនមានទិន្នន័យសិស្ស</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
 
     <div class="footer">
-        <div class="generated-date">
-            កាលបរិច្ឆេទបង្កើត៖ {{ $generatedAt?->format('Y-m-d') }}
-        </div>
-        <div class="signature">
-            <div>គ្រូបន្ទុកថ្នាក់</div>
-            <div class="signature-space"></div>
-            <div></div>
-        </div>
+        <table class="formal-signature-table">
+            <colgroup>
+                <col class="col-label-1">
+                <col class="col-space-1">
+                <col class="col-label-2">
+                <col class="col-space-2">
+                <col class="col-label-3">
+                <col class="col-space-3">
+                <col class="col-buddhist-label">
+            </colgroup>
+            <tbody>
+                <tr>
+                    <td class="label-cell">ថ្ងៃ</td>
+                    <td class="blank-cell"></td>
+                    <td class="label-cell">ខែ</td>
+                    <td class="blank-cell"></td>
+
+                    <td class="label-cell">ឆ្នាំ</td>
+                    <td class="blank-cell"></td>
+                    <td class="buddhist-cell">ពុទ្ធសករាជ ២៥៧</td>
+                </tr>
+                <tr>
+                    <td class="blank-cell"></td>
+                    <td class="location-label" colspan="2">បាត់ដំបង ថ្ងៃទី</td>
+                    <td class="blank-cell"></td>
+                    <td class="label-cell">ខែ</td>
+
+                    <td class="label-cell">ឆ្នាំ</td>
+                    <td class="blank-cell"></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td colspan="8" class="signature-label-cell">ហត្ថលេខា និងឈ្មោះ</td>
+                </tr>
+                <tr>
+                    <td colspan="8" class="signature-writing-cell"></td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </body>
 </html>
