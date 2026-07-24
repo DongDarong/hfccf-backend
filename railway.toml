@@ -1,0 +1,7 @@
+[deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+[env]
+RAILPACK_PHP_EXTENSIONS = "gd,pdo_pgsql"
+LOG_CHANNEL = "stderr"
