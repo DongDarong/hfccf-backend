@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Preschool\StorePreschoolAttendanceRequest;
 use App\Http\Requests\Preschool\UpdatePreschoolAttendanceRequest;
 use App\Http\Resources\Preschool\PreschoolAttendanceResource;
+use App\Http\Resources\Preschool\PreschoolStudentResource;
 use App\Models\PreschoolAttendanceRecord;
 use App\Models\PreschoolAttendanceSession;
 use App\Models\PreschoolClass;
 use App\Models\PreschoolClassStudent;
 use App\Models\User;
 use App\Services\PreschoolGuardianCommunicationService;
+use App\Services\PreschoolMonthlyAttendanceReportService;
 use App\Support\PreschoolAcademicLifecycleService;
 use App\Support\PreschoolAttendanceSessionService;
 use App\Support\PreschoolLifecycleGuardService;
@@ -242,6 +244,59 @@ class PreschoolAttendanceController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function monthlyReport(Request $request, PreschoolMonthlyAttendanceReportService $service): JsonResponse
+    {
+        if ($response = $this->authorizeAny($request->user())) {
+            return $response;
+        }
+
+        $validated = $request->validate([
+            'academic_year_id' => ['required', 'integer', 'exists:preschool_academic_years,id'],
+            'class_id' => ['required', 'integer', 'exists:preschool_classes,id'],
+            'month' => ['required', 'integer', 'between:1,12'],
+            'year' => ['required', 'integer', 'between:2000,2100'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $report = $service->monthly($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preschool monthly attendance report retrieved successfully.',
+            'data' => [
+                'class' => [
+                    'id' => $report['class']->id,
+                    'name' => $report['class']->name,
+                    'code' => $report['class']->code,
+                ],
+                'academicYear' => [
+                    'id' => $report['academicYear']->id,
+                    'label' => $report['academicYear']->label,
+                    'code' => $report['academicYear']->code,
+                ],
+                'month' => $report['month'],
+                'year' => $report['year'],
+                'dateFrom' => $report['dateFrom']->toDateString(),
+                'dateTo' => $report['dateTo']->toDateString(),
+                'dayCount' => count($report['days']),
+                'students' => PreschoolStudentResource::collection($report['roster'])->resolve($request),
+                'attendanceRecords' => PreschoolAttendanceResource::collection($report['attendanceRecords'])->resolve($request),
+                'summary' => [
+                    'totalStudents' => $report['totalStudentCount'],
+                    'femaleStudents' => $report['femaleStudentCount'],
+                    'totalRecords' => $report['summary']['total'],
+                    'present' => $report['summary']['present'],
+                    'absent' => $report['summary']['absent'],
+                    'late' => $report['summary']['late'],
+                    'excused' => $report['summary']['excused'],
+                    'percentage' => $report['summary']['percentage'],
+                ],
+                'compatibility' => $report['compatibility'],
+            ],
+        ], Response::HTTP_OK);
+    }
+
     private function applyAttendanceFilters(Request $request, Builder $query): void
     {
         $search = trim((string) $request->query('search', ''));
@@ -250,6 +305,9 @@ class PreschoolAttendanceController extends Controller
         $status = trim((string) $request->query('status', ''));
         $date = trim((string) $request->query('attendance_date', ''));
         $sessionId = trim((string) $request->query('attendance_session_id', ''));
+        $dateFrom = trim((string) $request->query('date_from', ''));
+        $dateTo = trim((string) $request->query('date_to', ''));
+        $academicYearId = trim((string) $request->query('academic_year_id', ''));
 
         if ($search !== '') {
             $query->where(function (Builder $builder) use ($search): void {
@@ -279,6 +337,18 @@ class PreschoolAttendanceController extends Controller
         }
         if ($date !== '') {
             $query->whereDate('attendance_date', $date);
+        }
+        if ($dateFrom !== '') {
+            $query->whereDate('attendance_date', '>=', $dateFrom);
+        }
+        if ($dateTo !== '') {
+            $query->whereDate('attendance_date', '<=', $dateTo);
+        }
+        if ($academicYearId !== '') {
+            $query->where(function (Builder $builder) use ($academicYearId): void {
+                $builder->where('academic_year_id', $academicYearId)
+                    ->orWhereNull('academic_year_id');
+            });
         }
         if ($sessionId !== '') {
             $query->where('attendance_session_id', $sessionId);

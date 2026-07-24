@@ -62,18 +62,29 @@ class PreschoolGradeEntryPdfDownloadTest extends TestCase
         ]);
 
         $this->assertStringContainsString('បញ្ជីពិន្ទុសិស្សប្រចាំខែ', $html);
+        $this->assertStringNotContainsString('អង្គការ HFCCF', $html);
         $this->assertStringContainsString('ថ្នាក់៖ Lotus', $html);
         $this->assertStringContainsString('ឆ្នាំសិក្សា៖ Academic Year 2026', $html);
         $this->assertStringContainsString('ខែ៖ កក្កដា ឆ្នាំ៖ 2026', $html);
+        $this->assertStringContainsString('ល.រ', $html);
         $this->assertStringContainsString('អត្តលេខសិស្ស', $html);
         $this->assertStringContainsString('គោត្តនាម-នាម', $html);
+        $this->assertStringContainsString('ភេទ', $html);
         $this->assertStringContainsString('ថ្ងៃខែឆ្នាំកំណើត', $html);
+        $this->assertStringContainsString('ថ្នាក់', $html);
+        $this->assertStringContainsString('ពិន្ទុ', $html);
+        $this->assertStringContainsString('និទ្ទេស', $html);
+        $this->assertStringNotContainsString('ស្ថានភាព', $html);
+        $this->assertSame(8, preg_match_all('/<th(?:\s|>)/', $html));
         $this->assertStringContainsString('PS-GRADE-0001', $html);
         $this->assertStringContainsString('សុភា រ៉ា', $html);
         $this->assertStringContainsString('>0<', $html);
-        $this->assertStringContainsString('A', $html);
+        $this->assertStringContainsString('>A<', $html);
         $this->assertStringContainsString('PS-GRADE-0002', $html);
         $this->assertStringContainsString('សុខា Chan', $html);
+        $this->assertStringContainsString('>85<', $html);
+        $this->assertStringContainsString('>B<', $html);
+        $this->assertStringNotContainsString('ព្រាង', $html);
         $this->assertStringNotContainsString('PS-OTHER-YEAR', $html);
         $this->assertStringNotContainsString('PS-INACTIVE', $html);
         $this->assertStringNotContainsString('html2pdf', $html);
@@ -137,9 +148,11 @@ class PreschoolGradeEntryPdfDownloadTest extends TestCase
     {
         $admin = User::factory()->asAdminPreschool()->create();
         $year = PreschoolAcademicYear::factory()->create([
+            'code' => 'AY-GRADE-2026',
             'label' => 'Academic Year 2026',
         ]);
         $otherYear = PreschoolAcademicYear::factory()->create([
+            'code' => 'AY-GRADE-2025',
             'label' => 'Academic Year 2025',
         ]);
         $class = PreschoolClass::factory()->create([
