@@ -885,6 +885,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('matches', [SportMatchController::class, 'index']);
         Route::get('reports/matches', [SportMatchesReportController::class, 'index']);
         Route::get('reports/matches/download', [SportMatchesReportController::class, 'download']);
+        Route::get('reports/matches/download/excel', [SportMatchesReportController::class, 'downloadExcel']);
         Route::get('reports/standings', [SportStandingsReportController::class, 'index']);
         Route::get('reports/standings/download', [SportStandingsReportController::class, 'downloadPdf']);
         Route::get('reports/standings/download/excel', [SportStandingsReportController::class, 'downloadExcel']);
