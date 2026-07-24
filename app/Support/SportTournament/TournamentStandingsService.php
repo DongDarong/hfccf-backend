@@ -26,8 +26,8 @@ class TournamentStandingsService
     public function calculate(int|SportTournament $tournament): array
     {
         $resolvedTournament = $tournament instanceof SportTournament
-            ? $tournament->loadMissing(['groups.groupTeams.team', 'matches'])
-            : SportTournament::query()->with(['groups.groupTeams.team', 'matches'])->findOrFail($tournament);
+            ? $tournament->loadMissing(['groups.groupTeams.team', 'teams', 'matches'])
+            : SportTournament::query()->with(['groups.groupTeams.team', 'teams', 'matches'])->findOrFail($tournament);
 
         $groups = $resolvedTournament->groups
             ->sortBy('position')
@@ -48,6 +48,11 @@ class TournamentStandingsService
             }
         }
 
+        // If no groups, calculate standings for all tournament teams
+        if (empty($groupSummaries)) {
+            $overallRows = $this->calculateTournamentStandings($resolvedTournament);
+        }
+
         $overall = $this->rankRows($overallRows, collect($resolvedTournament->matches), []);
 
         return [
@@ -55,6 +60,91 @@ class TournamentStandingsService
             'groups' => $groupSummaries,
             'overall' => $overall,
         ];
+    }
+
+    /**
+     * Calculate standings for tournaments without groups.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function calculateTournamentStandings(SportTournament $tournament): array
+    {
+        $teamRows = [];
+        $teamNames = [];
+
+        foreach ($tournament->teams as $team) {
+            $teamId = (int) $team->id;
+            $teamNames[$teamId] = (string) $team->name;
+            $teamRows[$teamId] = [
+                'tournament_id' => (int) $tournament->id,
+                'group_id' => null,
+                'group_name' => null,
+                'team_id' => $teamId,
+                'team_name' => $teamNames[$teamId],
+                'played' => 0,
+                'wins' => 0,
+                'draws' => 0,
+                'losses' => 0,
+                'goals_for' => 0,
+                'goals_against' => 0,
+                'goal_difference' => 0,
+                'points' => 0,
+                'rank_position' => 0,
+            ];
+        }
+
+        $matches = $tournament->matches()->get();
+
+        foreach ($matches as $match) {
+            if (! $this->shouldCountMatch($match)) {
+                continue;
+            }
+
+            $homeTeamId = (int) $match->home_team_id;
+            $awayTeamId = (int) $match->away_team_id;
+
+            if (! isset($teamRows[$homeTeamId], $teamRows[$awayTeamId])) {
+                continue;
+            }
+
+            $homeScore = (int) $match->home_score;
+            $awayScore = (int) $match->away_score;
+
+            $teamRows[$homeTeamId]['played']++;
+            $teamRows[$awayTeamId]['played']++;
+            $teamRows[$homeTeamId]['goals_for'] += $homeScore;
+            $teamRows[$homeTeamId]['goals_against'] += $awayScore;
+            $teamRows[$awayTeamId]['goals_for'] += $awayScore;
+            $teamRows[$awayTeamId]['goals_against'] += $homeScore;
+
+            if ($homeScore > $awayScore) {
+                $teamRows[$homeTeamId]['wins']++;
+                $teamRows[$homeTeamId]['points'] += 3;
+                $teamRows[$awayTeamId]['losses']++;
+
+                continue;
+            }
+
+            if ($awayScore > $homeScore) {
+                $teamRows[$awayTeamId]['wins']++;
+                $teamRows[$awayTeamId]['points'] += 3;
+                $teamRows[$homeTeamId]['losses']++;
+
+                continue;
+            }
+
+            $teamRows[$homeTeamId]['draws']++;
+            $teamRows[$awayTeamId]['draws']++;
+            $teamRows[$homeTeamId]['points']++;
+            $teamRows[$awayTeamId]['points']++;
+        }
+
+        foreach ($teamRows as &$row) {
+            $row['goal_difference'] = $row['goals_for'] - $row['goals_against'];
+        }
+        unset($row);
+
+        return array_values($teamRows);
     }
 
     /**
