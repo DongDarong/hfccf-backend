@@ -89,6 +89,7 @@ use App\Http\Controllers\Api\Sport\SportDivisionController;
 use App\Http\Controllers\Api\Sport\SportPlayingStyleController;
 use App\Http\Controllers\Api\Sport\SportMatchController;
 use App\Http\Controllers\Api\Sport\SportMatchesReportController;
+use App\Http\Controllers\Api\Sport\SportPlayerStatisticsReportController;
 use App\Http\Controllers\Api\Sport\SportStandingsReportController;
 use App\Http\Controllers\Api\Sport\SportMatchEventController;
 use App\Http\Controllers\Api\Sport\SportMatchSquadController;
@@ -887,6 +888,9 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::get('reports/standings', [SportStandingsReportController::class, 'index']);
         Route::get('reports/standings/download', [SportStandingsReportController::class, 'downloadPdf']);
         Route::get('reports/standings/download/excel', [SportStandingsReportController::class, 'downloadExcel']);
+        Route::get('reports/players', [SportPlayerStatisticsReportController::class, 'index']);
+        Route::get('reports/players/download', [SportPlayerStatisticsReportController::class, 'downloadPdf']);
+        Route::get('reports/players/download/excel', [SportPlayerStatisticsReportController::class, 'downloadExcel']);
         Route::post('matches', [SportMatchController::class, 'store']);
         Route::get('matches/{id}', [SportMatchController::class, 'show']);
         Route::put('matches/{id}', [SportMatchController::class, 'update']);
