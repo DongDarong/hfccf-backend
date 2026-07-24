@@ -5,8 +5,9 @@ FROM php:8.3-alpine
 
 WORKDIR /app
 
-# Install system dependencies and PHP extensions in one layer
+# Install build tools, system dependencies, and compile PHP extensions
 RUN apk add --no-cache \
+    build-base \
     curl \
     git \
     libpq-dev \
@@ -24,7 +25,8 @@ RUN apk add --no-cache \
         pdo_pgsql \
         zip \
         mbstring \
-        opcache
+        opcache \
+    && apk del --no-cache build-base
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
