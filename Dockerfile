@@ -1,12 +1,11 @@
-# Multi-stage build for Laravel 13 + PHP 8.3 + PostgreSQL
-# Production-ready Dockerfile with GD, PostgreSQL PDO, and minimal runtime size
+# Single-stage build for Laravel 13 + PHP 8.3 + PostgreSQL
+# Production-ready Dockerfile with all extensions compiled once
 
-# Stage 1: Builder - Compile PHP extensions and install dependencies
-FROM php:8.3-cli-alpine AS builder
+FROM php:8.3-alpine
 
 WORKDIR /app
 
-# Install build dependencies and PHP extension requirements
+# Install system dependencies and PHP extensions in one layer
 RUN apk add --no-cache \
     curl \
     git \
@@ -25,8 +24,7 @@ RUN apk add --no-cache \
         pdo_pgsql \
         zip \
         mbstring \
-        opcache \
-    && rm -rf /var/cache/apk/*
+        opcache
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -40,28 +38,6 @@ COPY . .
 
 # Generate optimized autoloader
 RUN composer dump-autoload --optimize
-
-# Stage 2: Runtime - Only runtime libraries, no build tools
-FROM php:8.3-cli-alpine
-
-WORKDIR /app
-
-# Install ONLY runtime dependencies (no -dev packages, no build tools)
-RUN apk add --no-cache \
-    libpq \
-    libpng \
-    libjpeg \
-    freetype \
-    zlib \
-    libzip \
-    curl
-
-# Copy pre-compiled PHP extensions from builder
-COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
-COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
-
-# Copy built application from builder
-COPY --from=builder /app /app
 
 # Create storage directories with proper permissions
 RUN mkdir -p storage/logs storage/app storage/framework/cache storage/framework/sessions storage/framework/views \
