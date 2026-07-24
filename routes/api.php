@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
+use App\Http\Controllers\Api\Preschool\PreschoolGradeEntryReportDownloadController;
 use App\Http\Controllers\Api\Preschool\PreschoolInstitutionalGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolWorkflowApprovalController;
 use App\Http\Controllers\Api\Preschool\PreschoolWorkflowController;
@@ -438,6 +439,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
 
         // Monthly submission workflow stays alongside the rest of Preschool CRUD
         // so teachers and admins can manage assessment submissions and reviews.
+        Route::get('grades/download', PreschoolGradeEntryReportDownloadController::class);
         Route::get('monthly-submissions', [PreschoolMonthlySubmissionController::class, 'index']);
         Route::post('monthly-submissions', [PreschoolMonthlySubmissionController::class, 'store']);
         Route::get('monthly-submissions/{submission}', [PreschoolMonthlySubmissionController::class, 'show']);
