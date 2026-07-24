@@ -1,0 +1,84 @@
+services:
+  # PostgreSQL Database Service
+  - type: pserv
+    name: postgres
+    ipAddress: 10.0.0.1
+    plan: free
+    env:
+      POSTGRES_DB: hfccf_backend
+      POSTGRES_USER: hfccf_user
+    envVars:
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+        scope: SERVICE
+
+  # Laravel Backend Web Service
+  - type: web
+    name: backend
+    env: docker
+    plan: free
+    healthCheckPath: /up
+    buildCommand: ""
+    startCommand: |
+      php artisan migrate --force
+      php artisan optimize
+      php -d variables_order=EGPCS -d display_errors=stderr -d error_reporting=E_ALL -S 0.0.0.0:${PORT:-8000} -t public/
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_NAME
+        value: "HFCCF Backend"
+      - key: APP_URL
+        fromService:
+          type: web
+          name: backend
+          property: url
+      - key: FRONTEND_URLS
+        value: "https://frontend.vercel.app"
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromService:
+          type: pserv
+          name: postgres
+          property: host
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        value: hfccf_backend
+      - key: DB_USERNAME
+        value: hfccf_user
+      - key: DB_PASSWORD
+        fromService:
+          type: pserv
+          name: postgres
+          envKey: POSTGRES_PASSWORD
+      - key: CACHE_DRIVER
+        value: file
+      - key: SESSION_DRIVER
+        value: cookie
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: MAIL_DRIVER
+        value: log
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: SANCTUM_STATEFUL_DOMAINS
+        fromService:
+          type: web
+          name: backend
+          property: url
+          transformField: host
+      # Add these manually in Render dashboard for production:
+      # - APP_KEY: (generate with php artisan key:generate --show)
+      # - CLOUDFLARE_R2_KEY: (from Cloudflare R2)
+      # - CLOUDFLARE_R2_SECRET: (from Cloudflare R2)
+      # - CLOUDFLARE_R2_BUCKET: hfccf-images
+      # - CLOUDFLARE_R2_ENDPOINT: (from Cloudflare R2)
+      # - CLOUDFLARE_R2_URL: (from Cloudflare R2)
+
+    postgres:
+      - name: postgres
+        service: postgres
