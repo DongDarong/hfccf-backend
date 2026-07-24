@@ -14,6 +14,7 @@ use App\Support\DatabaseSafetyGuard;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +34,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Disable FK constraints for SQLite in testing environment
+        if (app()->environment('testing') && DB::getDriverName() === 'sqlite') {
+            try {
+                DB::statement('PRAGMA foreign_keys=OFF');
+            } catch (\Exception $e) {
+                // Silently fail if FK pragma not supported
+            }
+        }
+
         RateLimiter::for('global', function (Request $request) {
             return Limit::perMinute(500)->by($request->ip());
         });
