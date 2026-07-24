@@ -1,12 +1,12 @@
 # Multi-stage build for Laravel 13 + PHP 8.3 + PostgreSQL
 # Production-ready Dockerfile with GD, PostgreSQL PDO, and minimal runtime size
 
-# Stage 1: Builder
-FROM php:8.3-fpm-alpine AS builder
+# Stage 1: Builder - Compile PHP extensions and install dependencies
+FROM php:8.3-cli-alpine AS builder
 
 WORKDIR /app
 
-# Install system dependencies and PHP extensions
+# Install build dependencies and PHP extension requirements
 RUN apk add --no-cache \
     curl \
     git \
@@ -28,9 +28,11 @@ RUN apk add --no-cache \
         opcache \
     && rm -rf /var/cache/apk/*
 
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
 # Copy composer files and install dependencies
 COPY composer.json composer.lock ./
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 RUN composer install --no-dev --no-interaction --optimize-autoloader --no-scripts
 
 # Copy application files
@@ -39,12 +41,12 @@ COPY . .
 # Generate optimized autoloader
 RUN composer dump-autoload --optimize
 
-# Stage 2: Runtime
+# Stage 2: Runtime - Only runtime libraries, no build tools
 FROM php:8.3-cli-alpine
 
 WORKDIR /app
 
-# Install runtime dependencies only
+# Install ONLY runtime dependencies (no -dev packages, no build tools)
 RUN apk add --no-cache \
     libpq \
     libpng \
@@ -52,16 +54,10 @@ RUN apk add --no-cache \
     freetype \
     zlib \
     libzip \
-    curl \
-    && docker-php-ext-install -j$(nproc) \
-        gd \
-        pdo \
-        pdo_pgsql \
-        zip \
-        mbstring \
-        opcache
+    curl
 
-# Copy PHP configuration
+# Copy pre-compiled PHP extensions from builder
+COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
 # Copy built application from builder
@@ -80,8 +76,8 @@ ENV APP_DEBUG=false
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/up || exit 1
 
-# Start PHP-FPM
-CMD ["php-fpm"]
+# Start built-in PHP server
+CMD ["php", "-d", "variables_order=EGPCS", "-d", "display_errors=stderr", "-d", "error_reporting=E_ALL", "-S", "0.0.0.0:8000", "-t", "public/"]
 
-# Expose port (Render will set PORT env var)
+# Expose port
 EXPOSE 8000
