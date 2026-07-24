@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthController;
 use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolMonthlyAttendanceReportDownloadController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceSessionController;
 use App\Http\Controllers\Api\Preschool\PreschoolEnrollmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
@@ -87,6 +88,8 @@ use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportDivisionController;
 use App\Http\Controllers\Api\Sport\SportPlayingStyleController;
 use App\Http\Controllers\Api\Sport\SportMatchController;
+use App\Http\Controllers\Api\Sport\SportMatchesReportController;
+use App\Http\Controllers\Api\Sport\SportStandingsReportController;
 use App\Http\Controllers\Api\Sport\SportMatchEventController;
 use App\Http\Controllers\Api\Sport\SportMatchSquadController;
 use App\Http\Controllers\Api\Sport\SportPlayerController;
@@ -602,6 +605,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
             Route::get('guardians/issues', [PreschoolReportingController::class, 'guardianIssues']);
             Route::get('classroom', [PreschoolReportingController::class, 'classroom']);
             Route::get('compliance', [PreschoolReportingController::class, 'compliance']);
+            Route::get('attendance/monthly', [PreschoolAttendanceController::class, 'monthlyReport']);
+            Route::get('attendance/monthly/download', PreschoolMonthlyAttendanceReportDownloadController::class);
             Route::get('student-summary/download', PreschoolStudentSummaryReportDownloadController::class);
             Route::get('export', [PreschoolReportingController::class, 'export']);
         });
@@ -877,6 +882,11 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::patch('players/{player}/archive', [SportPlayerLifecycleController::class, 'archive']);
 
         Route::get('matches', [SportMatchController::class, 'index']);
+        Route::get('reports/matches', [SportMatchesReportController::class, 'index']);
+        Route::get('reports/matches/download', [SportMatchesReportController::class, 'download']);
+        Route::get('reports/standings', [SportStandingsReportController::class, 'index']);
+        Route::get('reports/standings/download', [SportStandingsReportController::class, 'downloadPdf']);
+        Route::get('reports/standings/download/excel', [SportStandingsReportController::class, 'downloadExcel']);
         Route::post('matches', [SportMatchController::class, 'store']);
         Route::get('matches/{id}', [SportMatchController::class, 'show']);
         Route::put('matches/{id}', [SportMatchController::class, 'update']);
@@ -1052,6 +1062,3 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
-
-
-
