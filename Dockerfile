@@ -1,61 +1,42 @@
-# Single-stage build for Laravel 13 + PHP 8.3 + PostgreSQL
-# Production-ready Dockerfile with all extensions compiled once
+# Laravel 13 + PHP 8.3 + PostgreSQL — production image
+# Uses the Debian-based official PHP image and mlocati/docker-php-extension-installer,
+# which auto-resolves all system libraries for each extension (no manual apt/apk package guessing).
 
-FROM php:8.3-alpine
+FROM php:8.3-cli
 
 WORKDIR /app
 
-# Install build tools, system dependencies, and compile PHP extensions
-RUN apk add --no-cache \
-    build-base \
-    curl \
-    git \
-    libpq-dev \
-    libpng-dev \
-    libjpeg-dev \
-    freetype-dev \
-    zlib-dev \
-    libzip-dev \
-    && docker-php-ext-configure gd \
-        --with-freetype \
-        --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        gd \
-        pdo \
-        pdo_pgsql \
-        zip \
-        mbstring \
-        opcache \
-    && apk del --no-cache build-base
+# Install PHP extensions via the extension installer (handles all system deps automatically)
+ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+RUN install-php-extensions \
+    gd \
+    pdo_pgsql \
+    zip \
+    mbstring \
+    opcache
 
-# Install Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+# Composer (copied from the official Composer image)
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
-# Copy composer files and install dependencies
+# Install PHP dependencies first (better layer caching)
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --optimize-autoloader --no-scripts
 
-# Copy application files
+# Copy application source
 COPY . .
 
-# Generate optimized autoloader
+# Finalize autoloader
 RUN composer dump-autoload --optimize
 
-# Create storage directories with proper permissions
+# Storage/cache directories with correct permissions
 RUN mkdir -p storage/logs storage/app storage/framework/cache storage/framework/sessions storage/framework/views \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 0775 storage bootstrap/cache
 
-# Set production environment
 ENV APP_ENV=production
 ENV APP_DEBUG=false
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/up || exit 1
+# Start the built-in PHP server bound to Render's $PORT (defaults to 8000 locally)
+CMD ["sh", "-c", "php -d variables_order=EGPCS -d display_errors=stderr -d error_reporting=E_ALL -S 0.0.0.0:${PORT:-8000} -t public/"]
 
-# Start built-in PHP server
-CMD ["php", "-d", "variables_order=EGPCS", "-d", "display_errors=stderr", "-d", "error_reporting=E_ALL", "-S", "0.0.0.0:8000", "-t", "public/"]
-
-# Expose port
 EXPOSE 8000
