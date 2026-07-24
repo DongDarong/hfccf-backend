@@ -11,9 +11,8 @@ RUN apk add --no-cache \
     curl \
     git \
     libpq-dev \
-    libgd \
     libpng-dev \
-    libjpeg-turbo-dev \
+    libjpeg-dev \
     freetype-dev \
     zlib-dev \
     libzip-dev \
@@ -48,9 +47,8 @@ WORKDIR /app
 # Install runtime dependencies only
 RUN apk add --no-cache \
     libpq \
-    libgd \
     libpng \
-    libjpeg-turbo \
+    libjpeg \
     freetype \
     zlib \
     libzip \
