@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthAuditController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentHealthController;
 use App\Http\Controllers\Api\Preschool\PreschoolAcademicLifecycleController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceController;
+use App\Http\Controllers\Api\Preschool\PreschoolMonthlyAttendanceReportDownloadController;
 use App\Http\Controllers\Api\Preschool\PreschoolAttendanceSessionController;
 use App\Http\Controllers\Api\Preschool\PreschoolEnrollmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolClassController;
@@ -40,6 +41,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolGuardianIntegrityController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianPortalController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolGuardianRemediationController;
+use App\Http\Controllers\Api\Preschool\PreschoolGradeEntryReportDownloadController;
 use App\Http\Controllers\Api\Preschool\PreschoolInstitutionalGovernanceController;
 use App\Http\Controllers\Api\Preschool\PreschoolWorkflowApprovalController;
 use App\Http\Controllers\Api\Preschool\PreschoolWorkflowController;
@@ -64,6 +66,7 @@ use App\Http\Controllers\Api\Preschool\PreschoolStudentAssessmentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentGuardianController;
 use App\Http\Controllers\Api\Preschool\PreschoolStudentReportController;
+use App\Http\Controllers\Api\Preschool\PreschoolStudentSummaryReportDownloadController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherController;
 use App\Http\Controllers\Api\Preschool\PreschoolTeacherScheduleController;
 use App\Http\Controllers\Api\RoleController;
@@ -85,6 +88,9 @@ use App\Http\Controllers\Api\Sport\SportDashboardController;
 use App\Http\Controllers\Api\Sport\SportDivisionController;
 use App\Http\Controllers\Api\Sport\SportPlayingStyleController;
 use App\Http\Controllers\Api\Sport\SportMatchController;
+use App\Http\Controllers\Api\Sport\SportMatchesReportController;
+use App\Http\Controllers\Api\Sport\SportPlayerStatisticsReportController;
+use App\Http\Controllers\Api\Sport\SportStandingsReportController;
 use App\Http\Controllers\Api\Sport\SportMatchEventController;
 use App\Http\Controllers\Api\Sport\SportMatchSquadController;
 use App\Http\Controllers\Api\Sport\SportPlayerController;
@@ -437,6 +443,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
 
         // Monthly submission workflow stays alongside the rest of Preschool CRUD
         // so teachers and admins can manage assessment submissions and reviews.
+        Route::get('grades/download', PreschoolGradeEntryReportDownloadController::class);
         Route::get('monthly-submissions', [PreschoolMonthlySubmissionController::class, 'index']);
         Route::post('monthly-submissions', [PreschoolMonthlySubmissionController::class, 'store']);
         Route::get('monthly-submissions/{submission}', [PreschoolMonthlySubmissionController::class, 'show']);
@@ -599,6 +606,9 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
             Route::get('guardians/issues', [PreschoolReportingController::class, 'guardianIssues']);
             Route::get('classroom', [PreschoolReportingController::class, 'classroom']);
             Route::get('compliance', [PreschoolReportingController::class, 'compliance']);
+            Route::get('attendance/monthly', [PreschoolAttendanceController::class, 'monthlyReport']);
+            Route::get('attendance/monthly/download', PreschoolMonthlyAttendanceReportDownloadController::class);
+            Route::get('student-summary/download', PreschoolStudentSummaryReportDownloadController::class);
             Route::get('export', [PreschoolReportingController::class, 'export']);
         });
 
@@ -873,6 +883,15 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::patch('players/{player}/archive', [SportPlayerLifecycleController::class, 'archive']);
 
         Route::get('matches', [SportMatchController::class, 'index']);
+        Route::get('reports/matches', [SportMatchesReportController::class, 'index']);
+        Route::get('reports/matches/download', [SportMatchesReportController::class, 'download']);
+        Route::get('reports/matches/download/excel', [SportMatchesReportController::class, 'downloadExcel']);
+        Route::get('reports/standings', [SportStandingsReportController::class, 'index']);
+        Route::get('reports/standings/download', [SportStandingsReportController::class, 'downloadPdf']);
+        Route::get('reports/standings/download/excel', [SportStandingsReportController::class, 'downloadExcel']);
+        Route::get('reports/players', [SportPlayerStatisticsReportController::class, 'index']);
+        Route::get('reports/players/download', [SportPlayerStatisticsReportController::class, 'downloadPdf']);
+        Route::get('reports/players/download/excel', [SportPlayerStatisticsReportController::class, 'downloadExcel']);
         Route::post('matches', [SportMatchController::class, 'store']);
         Route::get('matches/{id}', [SportMatchController::class, 'show']);
         Route::put('matches/{id}', [SportMatchController::class, 'update']);
@@ -1048,7 +1067,3 @@ Route::middleware(['auth:sanctum', 'throttle:api', 'password.change.completed'])
         Route::post('submissions/{dsamSubmission}/reject', [DsamSubmissionController::class, 'reject']);
     });
 });
-
-
-
-

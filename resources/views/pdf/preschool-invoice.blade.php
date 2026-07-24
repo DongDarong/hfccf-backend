@@ -138,8 +138,8 @@
         }
 
         .brand__logo-box {
-            width: 112px;
-            height: 74px;
+            width: 150px;
+            height: 99px;
             margin: 0 auto;
             border: 1px solid #d2dceb;
             border-radius: 14px;
@@ -148,13 +148,13 @@
             text-align: center;
             font-size: 16px;
             font-weight: 700;
-            line-height: 74px;
+            line-height: 99px;
         }
 
         .brand__logo img {
-            width: 112px;
-            max-width: 112px;
-            max-height: 74px;
+            width: 150px;
+            max-width: 150px;
+            max-height: 99px;
             margin: 0 auto;
             display: block;
             object-fit: contain;
@@ -552,11 +552,6 @@
                             @else
                                 <div class="brand__logo-box">HFCCF</div>
                             @endif
-                        </div>
-                        <div class="brand__content">
-                            <p class="org-name-kh">{{ $organization['kh_name'] }}</p>
-                            <p class="org-name-en">{{ $organization['en_name'] }}</p>
-                            <p class="program-name">កម្មវិធីមត្តេយ្យសិក្សា<br>Preschool Program</p>
                         </div>
                     </div>
                 </div>

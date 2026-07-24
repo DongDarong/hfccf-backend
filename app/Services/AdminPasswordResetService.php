@@ -80,7 +80,7 @@ class AdminPasswordResetService
             ]);
         }
 
-        if ($actor->role_code === 'superadmin' || $this->hasPermission($actor, 'all:*')) {
+        if ($this->isAdmin($actor) || $this->hasPermission($actor, 'all:*')) {
             return;
         }
 
@@ -138,6 +138,11 @@ class AdminPasswordResetService
             'notification_id' => $notification->id,
             'user_id' => $target->id,
         ]);
+    }
+
+    private function isAdmin(User $user): bool
+    {
+        return $user->role_code === 'superadmin' || str_starts_with((string) $user->role_code, 'admin');
     }
 
     private function hasPermission(User $user, string $permissionCode): bool
